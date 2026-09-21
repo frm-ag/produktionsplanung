@@ -430,6 +430,7 @@ onAuthStateChanged(auth, user => {
     $('#login-screen').style.display = 'none';
     $('#topStrip').style.display = 'block';
     $('#app').style.display = 'block';
+    if(unsubOrders) unsubOrders();
     subscribeOrders();
   }else{
     if(unsubOrders) unsubOrders();
