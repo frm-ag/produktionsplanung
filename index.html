@@ -700,6 +700,7 @@ function buildCalendarPopup(){
   calPopup.id = "calendar-popup";
   document.body.appendChild(calPopup);
   calPopup.addEventListener("click", e=>{
+    e.stopPropagation();
     var nav = e.target.closest("[data-cal-nav]");
     if(nav){
       var dir = Number(nav.dataset.calNav);
