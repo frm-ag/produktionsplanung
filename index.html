@@ -559,7 +559,7 @@ function orderCardHTML(o, isMontageOnly){
     matLines += '<div class="material-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + " · " + line + "</div>";
   });
   var todoLines = "";
-  orderTodos(o).forEach(t=>{
+  orderTodos(o).forEach((t,i)=>{
     todoLines += '<div class="card-todo-line' + (t.done?" done":"") + ((!t.done && t.dueDate && t.dueDate < todayISO())?" overdue":"") + '" data-order-id="' + o.id + '" data-todo-idx="' + i + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + (t.dueDate ? ' <span class="todo-due">· bis ' + fmtShort(t.dueDate) + '</span>' : "") + "</div>";
   });
   return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + (o.completed?" completed":"") + '" data-id="' + o.id + '">' +
