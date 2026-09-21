@@ -128,6 +128,7 @@
   .material-line .mdot.warn{background:var(--warn);}
   .material-line.warn-text{color:var(--warn);font-weight:600;}
   .montage-only{opacity:.92;border-left-color:#7b4fa0 !important;}
+  .phase-montage{border-left-color:#7b4fa0 !important;}
   .montage-only .order-top .order-no::before{content:"Montage · ";font-weight:500;color:#a9b2b8;}
 
   .month-grid{display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:740px;}
@@ -323,6 +324,12 @@
           <label for="f-workshop">Werkstatt</label>
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
         </div>
+        <div class="field">
+          <label for="f-phase">Phase</label>
+          <select id="f-phase"><option value="werkstatt">Werkstatt</option><option value="montage">Montage</option></select>
+        </div>
+      </div>
+      <div class="field-row">
         <div class="field"><label for="f-projectLead">Projektleiter</label><input id="f-projectLead" placeholder="z. B. Joel Muster"></div>
       </div>
       <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
@@ -546,7 +553,8 @@ function orderCardHTML(o, isMontageOnly){
   var mats = orderMaterials(o);
   var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
   var tagClass = o.workshop==="aluminium" ? "tag-aluminium" : (o.workshop==="reparaturen" ? "tag-reparaturen" : "");
-  var tags = '<span class="tag ' + (isMontageOnly ? "tag-montage" : "tag-werkstatt") + '">' + (isMontageOnly ? "Montage" : "Werkstatt") + '</span>';
+  var phase = o.phase === "montage" ? "montage" : "werkstatt";
+  var tags = '<span class="tag ' + (phase==="montage" ? "tag-montage" : "tag-werkstatt") + '">' + (phase==="montage" ? "Montage" : "Werkstatt") + '</span>';
   tags += '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
   tags += leadTagHTML(o.projectLead);
   if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
@@ -562,7 +570,7 @@ function orderCardHTML(o, isMontageOnly){
   orderTodos(o).forEach((t,i)=>{
     todoLines += '<div class="card-todo-line' + (t.done?" done":"") + ((!t.done && t.dueDate && t.dueDate < todayISO())?" overdue":"") + '" data-order-id="' + o.id + '" data-todo-idx="' + i + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + (t.dueDate ? ' <span class="todo-due">· bis ' + fmtShort(t.dueDate) + '</span>' : "") + "</div>";
   });
-  return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + (o.completed?" completed":"") + '" data-id="' + o.id + '">' +
+  return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + (phase==="montage"?" phase-montage":"") + (o.completed?" completed":"") + '" data-id="' + o.id + '">' +
     '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span>' + (isMontageOnly ? '<span class="dot ' + dotClass + '"></span>' : '<input type="checkbox" class="card-done-toggle" data-id="' + o.id + '"' + (o.completed?" checked":"") + '>') + '</div>' +
     '<div class="order-customer">' + escapeHtml(o.customer) + '</div>' +
     (o.description ? '<div class="order-desc">' + escapeHtml(o.description) + '</div>' : "") +
@@ -714,6 +722,7 @@ function openModal(order, prefillDate){
   $("#f-customer").value = order ? order.customer : "";
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
+  $("#f-phase").value = order ? (order.phase || "werkstatt") : "werkstatt";
   $("#f-projectLead").value = order ? (order.projectLead||"") : "";
   $("#f-completed").checked = order ? !!order.completed : false;
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
@@ -753,6 +762,7 @@ form.addEventListener("submit", async e=>{
     orderNumber, customer,
     description: $("#f-description").value.trim(),
     workshop: $("#f-workshop").value,
+    phase: $("#f-phase").value,
     projectLead: $("#f-projectLead").value.trim(),
     completed: $("#f-completed").checked,
     productionStart: $("#f-productionStart").value,
