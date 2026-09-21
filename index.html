@@ -101,6 +101,7 @@
 
   .order-card{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:2px;padding:9px 10px;cursor:pointer;}
   .order-card.wk-aluminium{border-left-color:#8b96a0;}
+  .order-card.wk-reparaturen{border-left-color:#8e6b1f;}
   .order-card.mat-pending{border-style:dashed;border-color:var(--warn);}
   .order-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
   .order-no{font-family:var(--mono);font-size:11.5px;font-weight:600;}
@@ -113,6 +114,7 @@
   .order-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
   .tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--accent-dim);color:#1c3b52;}
   .tag.tag-aluminium{background:#e4e8ea;color:#4b5a63;}
+  .tag.tag-reparaturen{background:#f4e9d3;color:#8e6b1f;}
   .tag.tag-montage{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
   .lead-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:color-mix(in srgb, var(--lead-color) 14%, white);color:var(--lead-color);}
   .lead-dot{width:6px;height:6px;border-radius:50%;background:var(--lead-color);flex:none;}
@@ -137,6 +139,7 @@
   .month-chips{display:flex;flex-direction:column;gap:3px;overflow-y:auto;max-height:74px;flex:1;cursor:pointer;}
   .chip{font-size:10px;padding:2px 6px;border-radius:4px;border-left:3px solid var(--accent);background:var(--accent-dim);color:#1c3b52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
   .chip.aluminium{border-left-color:#8b96a0;background:#e4e8ea;color:#4b5a63;}
+  .chip.reparaturen{border-left-color:#8e6b1f;background:#f4e9d3;color:#8e6b1f;}
   .chip.montage-chip{border-left-style:dotted;background:var(--panel-alt);border-left-color:#a9b2b8;}
   .chip.pending{outline:1px dashed var(--warn);outline-offset:-1px;}
 
@@ -183,6 +186,20 @@
     .material-row .mat-date-wrap{grid-area:date;width:100%;}
   }
   .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
+  .todos-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
+  .todo-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+  .todo-row input[type="checkbox"]{width:16px;height:16px;flex:none;accent-color:var(--accent);}
+  .todo-row input[type="text"]{flex:1;font:inherit;font-size:12.5px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .todo-row input[type="text"].done{color:var(--text-muted);text-decoration:line-through;}
+  .todo-row .todo-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
+  .todo-row .todo-remove:hover{color:var(--danger);}
+  .add-todo-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
+  .todos-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
+  .todo-progress{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
+  .todo-progress.done-all{background:var(--ok-soft, #e3f2e9);color:var(--success);border-color:var(--success);}
+  .card-todo-lines{margin-top:6px;display:flex;flex-direction:column;gap:2px;}
+  .card-todo-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
+  .card-todo-line.done{text-decoration:line-through;color:#c3ccd1;}
   .materials-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
 
   .date-field{position:relative;display:block;}
@@ -244,6 +261,7 @@
       <button data-filter="alle" class="active">Alle</button>
       <button data-filter="stahl">Stahl</button>
       <button data-filter="aluminium">Aluminium</button>
+      <button data-filter="reparaturen">Reparaturen</button>
     </div>
 
     <button class="add-btn" id="add-btn">+ Auftrag</button>
@@ -274,7 +292,7 @@
       <div class="field-row">
         <div class="field">
           <label for="f-workshop">Werkstatt</label>
-          <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option></select>
+          <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
         </div>
         <div class="field"><label for="f-projectLead">Projektleiter</label><input id="f-projectLead" placeholder="z. B. Joel Muster"></div>
       </div>
@@ -297,6 +315,13 @@
         <div class="materials-box">
           <div id="materials-list"></div>
           <button type="button" class="add-material-btn" id="add-material-btn">+ Material hinzufügen</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>To-Dos</label>
+        <div class="todos-box">
+          <div id="todos-list"></div>
+          <button type="button" class="add-todo-btn" id="add-todo-btn">+ To-Do hinzufügen</button>
         </div>
       </div>
       <div class="modal-actions">
@@ -401,7 +426,7 @@ function subscribeOrders(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], view: "week", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [] };
+var state = { orders: [], view: "week", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [] };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -454,6 +479,12 @@ function leadTagHTML(name){
   return '<span class="lead-tag" style="--lead-color:' + c + '"><span class="lead-dot"></span>' + escapeHtml(name) + '</span>';
 }
 function orderMaterials(o){ return Array.isArray(o.materials) ? o.materials : []; }
+function orderTodos(o){ return Array.isArray(o.todos) ? o.todos : []; }
+function todoProgress(o){
+  var todos = orderTodos(o);
+  var done = todos.filter(t=>t.done).length;
+  return { done: done, total: todos.length };
+}
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
 function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
 
@@ -472,20 +503,28 @@ function renderHeader(){
   else{ var d=fromISO(state.refDate); label = d.toLocaleDateString("de-CH", { month: "long", year: "numeric" }); }
   $("#nav-label").textContent = label;
 }
+function workshopLabel(w){ return w==="aluminium" ? "Aluminium" : (w==="reparaturen" ? "Reparaturen" : "Stahl"); }
 function orderCardHTML(o, isMontageOnly){
-  var wsClass = o.workshop==="aluminium" ? "wk-aluminium" : "";
+  var wsClass = o.workshop==="aluminium" ? "wk-aluminium" : (o.workshop==="reparaturen" ? "wk-reparaturen" : "");
   var pending = hasPendingMaterial(o);
   var mats = orderMaterials(o);
   var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
-  var tags = '<span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":"") + '">' + (o.workshop==="aluminium"?"Aluminium":"Stahl") + "</span>";
+  var tagClass = o.workshop==="aluminium" ? "tag-aluminium" : (o.workshop==="reparaturen" ? "tag-reparaturen" : "");
+  var tags = '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
   tags += leadTagHTML(o.projectLead);
   if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
   if(isMontageOnly) tags += '<span class="tag tag-montage">Montage</span>';
+  var prog = todoProgress(o);
+  if(prog.total > 0) tags += '<span class="todo-progress' + (prog.done===prog.total?" done-all":"") + '">☑ ' + prog.done + '/' + prog.total + '</span>';
   var matLines = "";
   mats.forEach(m=>{
     var isOk = m.status==="geliefert";
     var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
     matLines += '<div class="material-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + " · " + line + "</div>";
+  });
+  var todoLines = "";
+  orderTodos(o).forEach(t=>{
+    todoLines += '<div class="card-todo-line' + (t.done?" done":"") + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + "</div>";
   });
   return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + '" data-id="' + o.id + '">' +
     '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span><span class="dot ' + dotClass + '"></span></div>' +
@@ -493,6 +532,7 @@ function orderCardHTML(o, isMontageOnly){
     (o.description ? '<div class="order-desc">' + escapeHtml(o.description) + '</div>' : "") +
     '<div class="order-tags">' + tags + '</div>' +
     (matLines ? '<div class="material-lines">' + matLines + '</div>' : "") +
+    (todoLines ? '<div class="card-todo-lines">' + todoLines + '</div>' : "") +
     '</div>';
 }
 function renderWeek(){
@@ -518,7 +558,7 @@ function renderMonth(){
     var starting=ordersStartingOn(iso), montage=ordersAssemblyOn(iso);
     html += '<div class="month-cell' + (out?" out":"") + (isToday?" is-today":"") + '"><div class="month-daynum" data-add-date="' + iso + '">' + d.getDate() + '</div><div class="month-chips">';
     starting.forEach(o=>{
-      var cls = (o.workshop==="aluminium"?"aluminium":"") + (hasPendingMaterial(o)?" pending":"");
+      var cls = (o.workshop==="aluminium"?"aluminium":(o.workshop==="reparaturen"?"reparaturen":"")) + (hasPendingMaterial(o)?" pending":"");
       var leadDot = o.projectLead ? '<span class="chip-lead-dot" style="background:' + leadColor(o.projectLead) + '"></span>' : "";
       html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + leadDot + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
     });
@@ -578,6 +618,38 @@ $("#materials-list").addEventListener("change", e=>{
   if(e.target.classList.contains("mat-status")) state.modalMaterials[idx].status = e.target.value;
 });
 
+function renderTodoRows(){
+  var list = $("#todos-list");
+  if(state.modalTodos.length===0){ list.innerHTML = '<div class="todos-empty">Noch kein To-Do erfasst.</div>'; return; }
+  var html = "";
+  state.modalTodos.forEach((t,i)=>{
+    html += '<div class="todo-row" data-idx="' + i + '">' +
+      '<input type="checkbox" class="todo-done"' + (t.done?" checked":"") + '>' +
+      '<input type="text" class="todo-text' + (t.done?" done":"") + '" placeholder="z. B. Masse vor Ort prüfen" value="' + escapeHtml(t.text) + '">' +
+      '<button type="button" class="todo-remove" aria-label="To-Do entfernen">✕</button></div>';
+  });
+  list.innerHTML = html;
+}
+$("#add-todo-btn").addEventListener("click", ()=>{ state.modalTodos.push({text:"",done:false}); renderTodoRows(); });
+$("#todos-list").addEventListener("click", e=>{
+  var btn = e.target.closest(".todo-remove"); if(!btn) return;
+  var idx = Number(btn.closest(".todo-row").dataset.idx);
+  state.modalTodos.splice(idx,1); renderTodoRows();
+});
+$("#todos-list").addEventListener("input", e=>{
+  var row = e.target.closest(".todo-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalTodos[idx]) return;
+  if(e.target.classList.contains("todo-text")) state.modalTodos[idx].text = e.target.value;
+});
+$("#todos-list").addEventListener("change", e=>{
+  var row = e.target.closest(".todo-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalTodos[idx]) return;
+  if(e.target.classList.contains("todo-done")){
+    state.modalTodos[idx].done = e.target.checked;
+    e.target.nextElementSibling.classList.toggle("done", e.target.checked);
+  }
+});
+
 /* ---------- Modal ---------- */
 
 var backdrop = $("#modal-backdrop");
@@ -599,6 +671,8 @@ function openModal(order, prefillDate){
   updateWeekHint("#f-assemblyDate", "#f-assemblyDate-week");
   state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:""}];
   renderMaterialRows();
+  state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
+  renderTodoRows();
   $("#delete-btn").style.display = order ? "inline-block" : "none";
   backdrop.classList.add("open");
   setTimeout(()=>$("#f-orderNumber").focus(), 30);
@@ -619,6 +693,9 @@ form.addEventListener("submit", async e=>{
   var materials = state.modalMaterials
     .map(m=>({ name:(m.name||"").trim(), status:m.status, expectedDate:m.expectedDate||"" }))
     .filter(m=>m.name.length>0);
+  var todos = state.modalTodos
+    .map(t=>({ text:(t.text||"").trim(), done: !!t.done }))
+    .filter(t=>t.text.length>0);
   var payload = {
     orderNumber, customer,
     description: $("#f-description").value.trim(),
@@ -627,6 +704,7 @@ form.addEventListener("submit", async e=>{
     productionStart: $("#f-productionStart").value,
     assemblyDate: $("#f-assemblyDate").value,
     materials,
+    todos,
     updatedAt: Date.now()
   };
   var submitBtn = form.querySelector('button[type="submit"]');
