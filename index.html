@@ -158,6 +158,7 @@
   .field label{display:block;font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px;}
   .field input,.field select{width:100%;font:inherit;font-size:13.5px;padding:8px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);}
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media (max-width:480px){ .field-row{grid-template-columns:1fr;} }
   .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:8px;}
   .btn{font:inherit;font-size:13px;font-weight:600;padding:8px 15px;border-radius:7px;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -168,10 +169,22 @@
   .material-row input,.material-row select{font:inherit;font-size:12px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .material-row .mat-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;}
   .material-row .mat-remove:hover{color:var(--danger);}
+  @media (max-width:560px){
+    .material-row{
+      grid-template-columns:1fr 26px;
+      grid-template-areas:"name remove" "status date";
+      row-gap:6px;
+    }
+    .material-row .mat-name{grid-area:name;}
+    .material-row .mat-remove{grid-area:remove;justify-self:end;}
+    .material-row .mat-status{grid-area:status;width:100%;}
+    .material-row .mat-date{grid-area:date;width:100%;}
+  }
   .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
   .materials-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
 
   footer.status{text-align:center;font-size:11px;color:#a9b2b8;margin-top:24px;}
+  .week-hint{display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2933;color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
   .toast.show{opacity:1;}
 </style>
@@ -249,8 +262,8 @@
         </div>
         <div class="field"><label for="f-projectLead">Projektleiter</label><input id="f-projectLead" placeholder="z. B. Joel Muster"></div>
       </div>
-      <div class="field"><label for="f-productionStart">Frühester Produktionsstart</label><input type="date" id="f-productionStart"></div>
-      <div class="field"><label for="f-assemblyDate">Montage-Termin</label><input type="date" id="f-assemblyDate"></div>
+      <div class="field"><label for="f-productionStart">Frühester Produktionsstart</label><input type="date" id="f-productionStart"><small class="week-hint" id="f-productionStart-week"></small></div>
+      <div class="field"><label for="f-assemblyDate">Montage-Termin</label><input type="date" id="f-assemblyDate"><small class="week-hint" id="f-assemblyDate-week"></small></div>
       <div class="field">
         <label>Materialien</label>
         <div class="materials-box">
@@ -368,6 +381,18 @@ function todayISO(){ return toISO(new Date()); }
 function fmtDay(d){ return d.toLocaleDateString("de-CH", { weekday: "long" }); }
 function fmtDate(d){ return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function fmtShort(iso){ if(!iso) return ""; var d=fromISO(iso); return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }); }
+function isoWeek(iso){
+  if(!iso) return null;
+  var d = fromISO(iso);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + 3 - ((d.getDay()+6)%7));
+  var week1 = new Date(d.getFullYear(),0,4);
+  return 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay()+6)%7)) / 7);
+}
+function updateWeekHint(inputId, hintId){
+  var val = $(inputId).value;
+  $(hintId).textContent = val ? "KW " + isoWeek(val) : "";
+}
 function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
 function getWeekDays(refISO){
@@ -414,7 +439,7 @@ function renderHeader(){
   document.querySelectorAll("#view-seg button").forEach(b=>b.classList.toggle("active", b.dataset.view===state.view));
   document.querySelectorAll("#filter-chips button").forEach(b=>b.classList.toggle("active", b.dataset.filter===state.filter));
   var label;
-  if(state.view==="week"){ var days=getWeekDays(state.refDate); label = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]); }
+  if(state.view==="week"){ var days=getWeekDays(state.refDate); label = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]) + " · KW " + isoWeek(toISO(days[0])); }
   else{ var d=fromISO(state.refDate); label = d.toLocaleDateString("de-CH", { month: "long", year: "numeric" }); }
   $("#nav-label").textContent = label;
 }
@@ -499,7 +524,7 @@ function renderMaterialRows(){
     html += '<div class="material-row" data-idx="' + i + '">' +
       '<input class="mat-name" placeholder="z. B. Glas, Stahl, Beschläge" value="' + escapeHtml(m.name) + '">' +
       '<select class="mat-status"><option value="geliefert"' + (m.status==="geliefert"?" selected":"") + '>Geliefert</option><option value="ausstehend"' + (m.status==="ausstehend"?" selected":"") + '>Ausstehend</option></select>' +
-      '<input type="date" class="mat-date" value="' + (m.expectedDate||"") + '" title="Lieferdatum">' +
+      '<input type="date" class="mat-date" value="' + (m.expectedDate||"") + '" title="' + (m.expectedDate ? "KW " + isoWeek(m.expectedDate) : "") + '">' +
       '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button></div>';
   });
   list.innerHTML = html;
@@ -514,7 +539,10 @@ $("#materials-list").addEventListener("input", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
   var idx = Number(row.dataset.idx); if(!state.modalMaterials[idx]) return;
   if(e.target.classList.contains("mat-name")) state.modalMaterials[idx].name = e.target.value;
-  if(e.target.classList.contains("mat-date")) state.modalMaterials[idx].expectedDate = e.target.value;
+  if(e.target.classList.contains("mat-date")){
+    state.modalMaterials[idx].expectedDate = e.target.value;
+    e.target.title = e.target.value ? "KW " + isoWeek(e.target.value) : "";
+  }
 });
 $("#materials-list").addEventListener("change", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
@@ -537,6 +565,8 @@ function openModal(order, prefillDate){
   $("#f-projectLead").value = order ? (order.projectLead||"") : "";
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
+  updateWeekHint("#f-productionStart", "#f-productionStart-week");
+  updateWeekHint("#f-assemblyDate", "#f-assemblyDate-week");
   state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:""}];
   renderMaterialRows();
   $("#delete-btn").style.display = order ? "inline-block" : "none";
@@ -546,6 +576,8 @@ function openModal(order, prefillDate){
 function closeModal(){ backdrop.classList.remove("open"); state.editingId = null; }
 
 $("#add-btn").addEventListener("click", ()=>openModal(null,null));
+$("#f-productionStart").addEventListener("input", ()=>updateWeekHint("#f-productionStart","#f-productionStart-week"));
+$("#f-assemblyDate").addEventListener("input", ()=>updateWeekHint("#f-assemblyDate","#f-assemblyDate-week"));
 $("#cancel-btn").addEventListener("click", closeModal);
 backdrop.addEventListener("click", e=>{ if(e.target===backdrop) closeModal(); });
 
