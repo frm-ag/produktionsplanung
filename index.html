@@ -145,6 +145,15 @@
 
   .sidebar{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px;position:sticky;top:78px;}
   .sidebar h2{font-family:var(--disp);font-size:13px;margin:0 0 3px;}
+  .sidebar-h2-second{margin-top:18px !important;padding-top:14px;border-top:1px solid var(--border);}
+  .ready-item{border:1px solid var(--accent);background:#eaf1f6;border-radius:7px;padding:8px 9px;margin-bottom:8px;cursor:pointer;}
+  .ready-item .order-no{color:var(--accent);}
+  .ready-item .order-customer{font-size:12px;margin-top:2px;}
+  .ready-item .ready-since{font-size:10.5px;color:var(--accent);margin-top:4px;font-weight:600;}
+  .ready-item .ready-desc{font-size:10.5px;color:var(--text-muted);margin-top:2px;}
+  .card-done-toggle{width:15px;height:15px;flex:none;accent-color:var(--success);cursor:pointer;}
+  .order-card.completed{opacity:.55;}
+  .order-card.completed .order-customer,.order-card.completed .order-desc{text-decoration:line-through;}
   .sidebar .count{font-size:11.5px;color:var(--text-muted);margin-bottom:10px;}
   .pending-item{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:7px;padding:8px 9px;margin-bottom:8px;cursor:pointer;}
   .pending-item .order-no{color:var(--warn);}
@@ -271,7 +280,10 @@
   <div class="layout">
     <div class="cal-scroll"><div id="calendar"></div></div>
     <aside class="sidebar">
-      <h2>Wartet auf Material</h2>
+      <h2>Bereit zur Ausführung</h2>
+      <div class="count" id="ready-count"></div>
+      <div id="ready-list"></div>
+      <h2 class="sidebar-h2-second">Wartet auf Material</h2>
       <div class="count" id="pending-count"></div>
       <div id="pending-list"></div>
     </aside>
@@ -323,6 +335,10 @@
           <div id="todos-list"></div>
           <button type="button" class="add-todo-btn" id="add-todo-btn">+ To-Do hinzufügen</button>
         </div>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="f-completed" style="width:16px;height:16px;">
+        <label for="f-completed" style="margin:0;">Als erledigt markieren</label>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn danger" id="delete-btn" style="display:none;">Löschen</button>
@@ -487,6 +503,8 @@ function todoProgress(o){
 }
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
 function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
+function isReadyNotDone(o){ return !!o.productionStart && o.productionStart <= todayISO() && !o.completed && !hasPendingMaterial(o); }
+function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.productionStart)) / 86400000); }
 
 /* ---------- Rendering ---------- */
 
@@ -526,8 +544,8 @@ function orderCardHTML(o, isMontageOnly){
   orderTodos(o).forEach(t=>{
     todoLines += '<div class="card-todo-line' + (t.done?" done":"") + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + "</div>";
   });
-  return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + '" data-id="' + o.id + '">' +
-    '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span><span class="dot ' + dotClass + '"></span></div>' +
+  return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + (o.completed?" completed":"") + '" data-id="' + o.id + '">' +
+    '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span>' + (isMontageOnly ? '<span class="dot ' + dotClass + '"></span>' : '<input type="checkbox" class="card-done-toggle" data-id="' + o.id + '"' + (o.completed?" checked":"") + '>') + '</div>' +
     '<div class="order-customer">' + escapeHtml(o.customer) + '</div>' +
     (o.description ? '<div class="order-desc">' + escapeHtml(o.description) + '</div>' : "") +
     '<div class="order-tags">' + tags + '</div>' +
@@ -569,6 +587,20 @@ function renderMonth(){
   $("#calendar").innerHTML = html;
 }
 function renderSidebar(){
+  var ready = filteredOrders().filter(isReadyNotDone).sort((a,b)=> a.productionStart < b.productionStart ? -1 : 1);
+  $("#ready-count").textContent = ready.length + (ready.length===1 ? " Auftrag wartet" : " Aufträge warten");
+  var readyHtml = "";
+  if(ready.length===0) readyHtml = '<div class="empty-note">Nichts Offenes wartet.</div>';
+  else ready.forEach(o=>{
+    var days = daysWaiting(o);
+    readyHtml += '<div class="ready-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
+    if(o.description) readyHtml += '<div class="ready-desc">' + escapeHtml(o.description) + '</div>';
+    readyHtml += '<div class="ready-since">bereit seit ' + fmtShort(o.productionStart) + (days>0 ? " · " + days + (days===1?" Tag":" Tage") : " · heute") + '</div>';
+    if(o.projectLead) readyHtml += leadTagHTML(o.projectLead);
+    readyHtml += "</div>";
+  });
+  $("#ready-list").innerHTML = readyHtml;
+
   var pending = filteredOrders().filter(hasPendingMaterial);
   $("#pending-count").textContent = pending.length + (pending.length===1 ? " Auftrag blockiert" : " Aufträge blockiert");
   var html = "";
@@ -663,6 +695,7 @@ function openModal(order, prefillDate){
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
   $("#f-projectLead").value = order ? (order.projectLead||"") : "";
+  $("#f-completed").checked = order ? !!order.completed : false;
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
   $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
@@ -701,6 +734,7 @@ form.addEventListener("submit", async e=>{
     description: $("#f-description").value.trim(),
     workshop: $("#f-workshop").value,
     projectLead: $("#f-projectLead").value.trim(),
+    completed: $("#f-completed").checked,
     productionStart: $("#f-productionStart").value,
     assemblyDate: $("#f-assemblyDate").value,
     materials,
@@ -751,12 +785,22 @@ function navigate(dir){
   state.refDate = toISO(d); render();
 }
 $("#calendar").addEventListener("click", e=>{
+  var toggle = e.target.closest(".card-done-toggle");
+  if(toggle){ toggleCompleted(toggle.dataset.id, toggle.checked); return; }
   var addBtn = e.target.closest("[data-date]"); if(addBtn){ openModal(null, addBtn.dataset.date); return; }
   var dayNum = e.target.closest("[data-add-date]"); if(dayNum && !e.target.closest(".chip")){ openModal(null, dayNum.dataset.addDate); return; }
   var card = e.target.closest("[data-id]");
   if(card){ var o = state.orders.find(x=>x.id===card.dataset.id); if(o) openModal(o,null); }
 });
+async function toggleCompleted(id, done){
+  try{ await updateDoc(doc(db, COLLECTION, id), { completed: done }); }
+  catch(err){ console.error(err); toast("Aktualisieren fehlgeschlagen."); }
+}
 $("#pending-list").addEventListener("click", e=>{
+  var item = e.target.closest("[data-id]"); if(!item) return;
+  var o = state.orders.find(x=>x.id===item.dataset.id); if(o) openModal(o,null);
+});
+$("#ready-list").addEventListener("click", e=>{
   var item = e.target.closest("[data-id]"); if(!item) return;
   var o = state.orders.find(x=>x.id===item.dataset.id); if(o) openModal(o,null);
 });
