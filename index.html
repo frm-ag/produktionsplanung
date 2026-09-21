@@ -169,6 +169,8 @@
   .material-row input,.material-row select{font:inherit;font-size:12px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .material-row .mat-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;}
   .material-row .mat-remove:hover{color:var(--danger);}
+  .mat-date-wrap .mat-date-display{width:100%;}
+  .mat-date-wrap{display:block;}
   @media (max-width:560px){
     .material-row{
       grid-template-columns:1fr 26px;
@@ -178,11 +180,25 @@
     .material-row .mat-name{grid-area:name;}
     .material-row .mat-remove{grid-area:remove;justify-self:end;}
     .material-row .mat-status{grid-area:status;width:100%;}
-    .material-row .mat-date{grid-area:date;width:100%;}
+    .material-row .mat-date-wrap{grid-area:date;width:100%;}
   }
   .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
   .materials-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
 
+  .date-field{position:relative;display:block;}
+  .date-input{width:100%;cursor:pointer;background:var(--panel);}
+  #calendar-popup{position:fixed;z-index:150;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.2);padding:10px;display:none;}
+  .cal-pop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-family:var(--disp);font-weight:700;font-size:13px;}
+  .cal-pop-head button{border:none;background:var(--panel-alt);width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:14px;color:var(--text);}
+  .cal-pop-grid{display:grid;grid-template-columns:26px repeat(7,1fr);gap:2px;}
+  .cal-pop-grid .cal-wk{font-size:9.5px;color:#a9b2b8;display:flex;align-items:center;justify-content:center;}
+  .cal-pop-grid .cal-dh{font-size:10px;color:var(--text-muted);text-align:center;font-weight:600;padding-bottom:3px;}
+  .cal-pop-grid button.cal-day{border:none;background:transparent;font-size:11.5px;padding:5px 0;border-radius:5px;cursor:pointer;color:var(--text);}
+  .cal-pop-grid button.cal-day.out{color:#c3ccd1;}
+  .cal-pop-grid button.cal-day.today{box-shadow:inset 0 0 0 1px var(--accent);}
+  .cal-pop-grid button.cal-day.selected{background:var(--accent);color:#fff;}
+  .cal-pop-foot{display:flex;justify-content:space-between;margin-top:8px;border-top:1px solid var(--border);padding-top:7px;}
+  .cal-pop-foot button{border:none;background:transparent;color:var(--accent);font-size:11.5px;font-weight:600;cursor:pointer;}
   footer.status{text-align:center;font-size:11px;color:#a9b2b8;margin-top:24px;}
   .week-hint{display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2933;color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
@@ -262,8 +278,20 @@
         </div>
         <div class="field"><label for="f-projectLead">Projektleiter</label><input id="f-projectLead" placeholder="z. B. Joel Muster"></div>
       </div>
-      <div class="field"><label for="f-productionStart">Frühester Produktionsstart</label><input type="date" id="f-productionStart"><small class="week-hint" id="f-productionStart-week"></small></div>
-      <div class="field"><label for="f-assemblyDate">Montage-Termin</label><input type="date" id="f-assemblyDate"><small class="week-hint" id="f-assemblyDate-week"></small></div>
+      <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
+        <span class="date-field">
+          <input type="text" id="f-productionStart-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
+          <input type="hidden" id="f-productionStart">
+        </span>
+        <small class="week-hint" id="f-productionStart-week"></small>
+      </div>
+      <div class="field"><label for="f-assemblyDate-display">Montage-Termin</label>
+        <span class="date-field">
+          <input type="text" id="f-assemblyDate-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
+          <input type="hidden" id="f-assemblyDate">
+        </span>
+        <small class="week-hint" id="f-assemblyDate-week"></small>
+      </div>
       <div class="field">
         <label>Materialien</label>
         <div class="materials-box">
@@ -381,6 +409,7 @@ function todayISO(){ return toISO(new Date()); }
 function fmtDay(d){ return d.toLocaleDateString("de-CH", { weekday: "long" }); }
 function fmtDate(d){ return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function fmtShort(iso){ if(!iso) return ""; var d=fromISO(iso); return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }); }
+function isoToDisplay(iso){ if(!iso) return ""; var d=fromISO(iso); return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function isoWeek(iso){
   if(!iso) return null;
   var d = fromISO(iso);
@@ -524,7 +553,7 @@ function renderMaterialRows(){
     html += '<div class="material-row" data-idx="' + i + '">' +
       '<input class="mat-name" placeholder="z. B. Glas, Stahl, Beschläge" value="' + escapeHtml(m.name) + '">' +
       '<select class="mat-status"><option value="geliefert"' + (m.status==="geliefert"?" selected":"") + '>Geliefert</option><option value="ausstehend"' + (m.status==="ausstehend"?" selected":"") + '>Ausstehend</option></select>' +
-      '<input type="date" class="mat-date" value="' + (m.expectedDate||"") + '" title="' + (m.expectedDate ? "KW " + isoWeek(m.expectedDate) : "") + '">' +
+      '<span class="mat-date-wrap"><input type="text" class="mat-date-display date-input" readonly placeholder="TT.MM.JJJJ" value="' + (m.expectedDate ? isoToDisplay(m.expectedDate) : "") + '"><input type="hidden" class="mat-date" value="' + (m.expectedDate||"") + '"></span>' +
       '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button></div>';
   });
   list.innerHTML = html;
@@ -541,7 +570,6 @@ $("#materials-list").addEventListener("input", e=>{
   if(e.target.classList.contains("mat-name")) state.modalMaterials[idx].name = e.target.value;
   if(e.target.classList.contains("mat-date")){
     state.modalMaterials[idx].expectedDate = e.target.value;
-    e.target.title = e.target.value ? "KW " + isoWeek(e.target.value) : "";
   }
 });
 $("#materials-list").addEventListener("change", e=>{
@@ -565,6 +593,8 @@ function openModal(order, prefillDate){
   $("#f-projectLead").value = order ? (order.projectLead||"") : "";
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
+  $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
+  $("#f-assemblyDate-display").value = isoToDisplay($("#f-assemblyDate").value);
   updateWeekHint("#f-productionStart", "#f-productionStart-week");
   updateWeekHint("#f-assemblyDate", "#f-assemblyDate-week");
   state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:""}];
@@ -660,6 +690,100 @@ function toast(msg){
   setTimeout(()=>el.classList.remove("show"), 1800);
 }
 
+/* ---------- Custom-Datumsauswahl mit Kalenderwochen ---------- */
+
+var calPopup = null;
+var calState = { hiddenInput: null, displayInput: null, viewYear: 0, viewMonth: 0 };
+
+function buildCalendarPopup(){
+  calPopup = document.createElement("div");
+  calPopup.id = "calendar-popup";
+  document.body.appendChild(calPopup);
+  calPopup.addEventListener("click", e=>{
+    var nav = e.target.closest("[data-cal-nav]");
+    if(nav){
+      var dir = Number(nav.dataset.calNav);
+      calState.viewMonth += dir;
+      if(calState.viewMonth < 0){ calState.viewMonth = 11; calState.viewYear--; }
+      if(calState.viewMonth > 11){ calState.viewMonth = 0; calState.viewYear++; }
+      renderCalendarPopup();
+      return;
+    }
+    var dayBtn = e.target.closest("[data-cal-day]");
+    if(dayBtn){ setDateValue(dayBtn.dataset.calDay); closeCalendarPopup(); return; }
+    if(e.target.closest("[data-cal-today]")){ setDateValue(todayISO()); closeCalendarPopup(); return; }
+    if(e.target.closest("[data-cal-clear]")){ setDateValue(""); closeCalendarPopup(); return; }
+  });
+  document.addEventListener("click", e=>{
+    if(e.target.closest(".date-input")) return;
+    if(calPopup.style.display === "block" && !calPopup.contains(e.target)) closeCalendarPopup();
+  });
+  document.addEventListener("keydown", e=>{ if(e.key === "Escape") closeCalendarPopup(); });
+  document.addEventListener("click", e=>{
+    var trigger = e.target.closest(".date-input");
+    if(trigger) openCalendarPopup(trigger);
+  });
+}
+
+function openCalendarPopup(displayInput){
+  var hidden = displayInput.nextElementSibling;
+  if(!hidden) return;
+  calState.hiddenInput = hidden;
+  calState.displayInput = displayInput;
+  var base = hidden.value ? fromISO(hidden.value) : new Date();
+  calState.viewYear = base.getFullYear();
+  calState.viewMonth = base.getMonth();
+  renderCalendarPopup();
+  positionCalendarPopup(displayInput);
+  calPopup.style.display = "block";
+}
+function closeCalendarPopup(){ if(calPopup) calPopup.style.display = "none"; }
+
+function positionCalendarPopup(displayInput){
+  var rect = displayInput.getBoundingClientRect();
+  var w = 260;
+  var left = Math.min(Math.max(8, rect.left), window.innerWidth - w - 8);
+  calPopup.style.width = w + "px";
+  calPopup.style.left = left + "px";
+  calPopup.style.top = (rect.bottom + 6) + "px";
+  requestAnimationFrame(()=>{
+    var h = calPopup.offsetHeight;
+    if(rect.bottom + 6 + h > window.innerHeight - 8){
+      calPopup.style.top = Math.max(8, rect.top - h - 6) + "px";
+    }
+  });
+}
+
+function renderCalendarPopup(){
+  var grid = getMonthGrid(toISO(new Date(calState.viewYear, calState.viewMonth, 1)));
+  var monthNames = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  var selectedIso = calState.hiddenInput.value;
+  var todayIso = todayISO();
+  var html = '<div class="cal-pop-head"><button type="button" data-cal-nav="-1">‹</button><span>' + monthNames[calState.viewMonth] + " " + calState.viewYear + '</span><button type="button" data-cal-nav="1">›</button></div>';
+  html += '<div class="cal-pop-grid"><div class="cal-wk">KW</div><div class="cal-dh">Mo</div><div class="cal-dh">Di</div><div class="cal-dh">Mi</div><div class="cal-dh">Do</div><div class="cal-dh">Fr</div><div class="cal-dh">Sa</div><div class="cal-dh">So</div>';
+  for(var r=0;r<6;r++){
+    var rowDays = grid.days.slice(r*7, r*7+7);
+    html += '<div class="cal-wk">' + isoWeek(toISO(rowDays[0])) + "</div>";
+    rowDays.forEach(d=>{
+      var iso = toISO(d);
+      var out = d.getMonth() !== calState.viewMonth;
+      var cls = "cal-day" + (out?" out":"") + (iso===todayIso?" today":"") + (iso===selectedIso?" selected":"");
+      html += '<button type="button" class="' + cls + '" data-cal-day="' + iso + '">' + d.getDate() + "</button>";
+    });
+  }
+  html += "</div>";
+  html += '<div class="cal-pop-foot"><button type="button" data-cal-today="1">Heute</button><button type="button" data-cal-clear="1">Leeren</button></div>';
+  calPopup.innerHTML = html;
+}
+
+function setDateValue(iso){
+  calState.hiddenInput.value = iso;
+  calState.displayInput.value = isoToDisplay(iso);
+  calState.hiddenInput.dispatchEvent(new Event("input", { bubbles: true }));
+  calState.hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+buildCalendarPopup();
 render();
 </script>
 </body>
