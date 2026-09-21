@@ -173,7 +173,7 @@
   .mat-date-wrap{display:block;}
   @media (max-width:560px){
     .material-row{
-      grid-template-columns:1fr 26px;
+      grid-template-columns:1fr 1fr;
       grid-template-areas:"name remove" "status date";
       row-gap:6px;
     }
@@ -187,7 +187,7 @@
 
   .date-field{position:relative;display:block;}
   .date-input{width:100%;cursor:pointer;background:var(--panel);}
-  #calendar-popup{position:fixed;z-index:150;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.2);padding:10px;display:none;}
+  #calendar-popup{position:fixed;z-index:500;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.2);padding:10px;display:none;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow-y:auto;}
   .cal-pop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-family:var(--disp);font-weight:700;font-size:13px;}
   .cal-pop-head button{border:none;background:var(--panel-alt);width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:14px;color:var(--text);}
   .cal-pop-grid{display:grid;grid-template-columns:26px repeat(7,1fr);gap:2px;}
