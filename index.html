@@ -115,7 +115,8 @@
   .tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--accent-dim);color:#1c3b52;}
   .tag.tag-aluminium{background:#e4e8ea;color:#4b5a63;}
   .tag.tag-reparaturen{background:#f4e9d3;color:#8e6b1f;}
-  .tag.tag-montage{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
+  .tag.tag-montage{background:#efe6f5;color:#7b4fa0;font-weight:700;}
+  .tag.tag-werkstatt{background:#e3ebf3;color:var(--accent);font-weight:700;}
   .lead-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:color-mix(in srgb, var(--lead-color) 14%, white);color:var(--lead-color);}
   .lead-dot{width:6px;height:6px;border-radius:50%;background:var(--lead-color);flex:none;}
   .chip-lead-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle;}
@@ -126,7 +127,7 @@
   .material-line .mdot.ok{background:var(--success);}
   .material-line .mdot.warn{background:var(--warn);}
   .material-line.warn-text{color:var(--warn);font-weight:600;}
-  .montage-only{opacity:.92;}
+  .montage-only{opacity:.92;border-left-color:#7b4fa0 !important;}
   .montage-only .order-top .order-no::before{content:"Montage · ";font-weight:500;color:#a9b2b8;}
 
   .month-grid{display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:740px;}
@@ -140,7 +141,7 @@
   .chip{font-size:10px;padding:2px 6px;border-radius:4px;border-left:3px solid var(--accent);background:var(--accent-dim);color:#1c3b52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
   .chip.aluminium{border-left-color:#8b96a0;background:#e4e8ea;color:#4b5a63;}
   .chip.reparaturen{border-left-color:#8e6b1f;background:#f4e9d3;color:#8e6b1f;}
-  .chip.montage-chip{border-left-style:dotted;background:var(--panel-alt);border-left-color:#a9b2b8;}
+  .chip.montage-chip{border-left-style:solid;background:#efe6f5;border-left-color:#7b4fa0;color:#7b4fa0;}
   .chip.pending{outline:1px dashed var(--warn);outline-offset:-1px;}
 
   .sidebar{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px;position:sticky;top:78px;}
@@ -196,19 +197,35 @@
   }
   .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
   .todos-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
-  .todo-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+  .todo-row{display:grid;grid-template-columns:20px 1fr 108px 26px;gap:6px;margin-bottom:6px;align-items:center;}
   .todo-row input[type="checkbox"]{width:16px;height:16px;flex:none;accent-color:var(--accent);}
-  .todo-row input[type="text"]{flex:1;font:inherit;font-size:12.5px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .todo-row input[type="text"]{width:100%;font:inherit;font-size:12.5px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .todo-row input[type="text"].done{color:var(--text-muted);text-decoration:line-through;}
+  .todo-date-wrap{display:block;}
+  .todo-date-wrap .todo-date-display{width:100%;font-size:12px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .todo-row .todo-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
   .todo-row .todo-remove:hover{color:var(--danger);}
+  @media (max-width:560px){
+    .todo-row{
+      grid-template-columns:20px 1fr 26px;
+      grid-template-areas:"check text remove" "date date date";
+      row-gap:6px;
+    }
+    .todo-row input[type="checkbox"]{grid-area:check;}
+    .todo-row input[type="text"]{grid-area:text;}
+    .todo-row .todo-remove{grid-area:remove;}
+    .todo-row .todo-date-wrap{grid-area:date;width:100%;}
+  }
   .add-todo-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
   .todos-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
   .todo-progress{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
   .todo-progress.done-all{background:var(--ok-soft, #e3f2e9);color:var(--success);border-color:var(--success);}
   .card-todo-lines{margin-top:6px;display:flex;flex-direction:column;gap:2px;}
-  .card-todo-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
+  .card-todo-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;cursor:pointer;padding:1px 3px;margin:0 -3px;border-radius:3px;}
+  .card-todo-line:hover{background:var(--panel-alt);}
   .card-todo-line.done{text-decoration:line-through;color:#c3ccd1;}
+  .card-todo-line.overdue{color:var(--danger);font-weight:600;}
+  .todo-due{color:inherit;}
   .materials-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
 
   .date-field{position:relative;display:block;}
@@ -528,10 +545,10 @@ function orderCardHTML(o, isMontageOnly){
   var mats = orderMaterials(o);
   var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
   var tagClass = o.workshop==="aluminium" ? "tag-aluminium" : (o.workshop==="reparaturen" ? "tag-reparaturen" : "");
-  var tags = '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
+  var tags = '<span class="tag ' + (isMontageOnly ? "tag-montage" : "tag-werkstatt") + '">' + (isMontageOnly ? "Montage" : "Werkstatt") + '</span>';
+  tags += '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
   tags += leadTagHTML(o.projectLead);
   if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
-  if(isMontageOnly) tags += '<span class="tag tag-montage">Montage</span>';
   var prog = todoProgress(o);
   if(prog.total > 0) tags += '<span class="todo-progress' + (prog.done===prog.total?" done-all":"") + '">☑ ' + prog.done + '/' + prog.total + '</span>';
   var matLines = "";
@@ -542,7 +559,7 @@ function orderCardHTML(o, isMontageOnly){
   });
   var todoLines = "";
   orderTodos(o).forEach(t=>{
-    todoLines += '<div class="card-todo-line' + (t.done?" done":"") + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + "</div>";
+    todoLines += '<div class="card-todo-line' + (t.done?" done":"") + ((!t.done && t.dueDate && t.dueDate < todayISO())?" overdue":"") + '" data-order-id="' + o.id + '" data-todo-idx="' + i + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + (t.dueDate ? ' <span class="todo-due">· bis ' + fmtShort(t.dueDate) + '</span>' : "") + "</div>";
   });
   return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + (o.completed?" completed":"") + '" data-id="' + o.id + '">' +
     '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span>' + (isMontageOnly ? '<span class="dot ' + dotClass + '"></span>' : '<input type="checkbox" class="card-done-toggle" data-id="' + o.id + '"' + (o.completed?" checked":"") + '>') + '</div>' +
@@ -658,11 +675,12 @@ function renderTodoRows(){
     html += '<div class="todo-row" data-idx="' + i + '">' +
       '<input type="checkbox" class="todo-done"' + (t.done?" checked":"") + '>' +
       '<input type="text" class="todo-text' + (t.done?" done":"") + '" placeholder="z. B. Masse vor Ort prüfen" value="' + escapeHtml(t.text) + '">' +
+      '<span class="todo-date-wrap"><input type="text" class="todo-date-display date-input" readonly placeholder="TT.MM.JJJJ" value="' + (t.dueDate ? isoToDisplay(t.dueDate) : "") + '"><input type="hidden" class="todo-date" value="' + (t.dueDate||"") + '"></span>' +
       '<button type="button" class="todo-remove" aria-label="To-Do entfernen">✕</button></div>';
   });
   list.innerHTML = html;
 }
-$("#add-todo-btn").addEventListener("click", ()=>{ state.modalTodos.push({text:"",done:false}); renderTodoRows(); });
+$("#add-todo-btn").addEventListener("click", ()=>{ state.modalTodos.push({text:"",done:false,dueDate:""}); renderTodoRows(); });
 $("#todos-list").addEventListener("click", e=>{
   var btn = e.target.closest(".todo-remove"); if(!btn) return;
   var idx = Number(btn.closest(".todo-row").dataset.idx);
@@ -672,6 +690,7 @@ $("#todos-list").addEventListener("input", e=>{
   var row = e.target.closest(".todo-row"); if(!row) return;
   var idx = Number(row.dataset.idx); if(!state.modalTodos[idx]) return;
   if(e.target.classList.contains("todo-text")) state.modalTodos[idx].text = e.target.value;
+  if(e.target.classList.contains("todo-date")) state.modalTodos[idx].dueDate = e.target.value;
 });
 $("#todos-list").addEventListener("change", e=>{
   var row = e.target.closest(".todo-row"); if(!row) return;
@@ -727,7 +746,7 @@ form.addEventListener("submit", async e=>{
     .map(m=>({ name:(m.name||"").trim(), status:m.status, expectedDate:m.expectedDate||"" }))
     .filter(m=>m.name.length>0);
   var todos = state.modalTodos
-    .map(t=>({ text:(t.text||"").trim(), done: !!t.done }))
+    .map(t=>({ text:(t.text||"").trim(), done: !!t.done, dueDate: t.dueDate||"" }))
     .filter(t=>t.text.length>0);
   var payload = {
     orderNumber, customer,
@@ -785,6 +804,8 @@ function navigate(dir){
   state.refDate = toISO(d); render();
 }
 $("#calendar").addEventListener("click", e=>{
+  var todoLine = e.target.closest(".card-todo-line");
+  if(todoLine){ toggleCardTodo(todoLine.dataset.orderId, Number(todoLine.dataset.todoIdx)); return; }
   var toggle = e.target.closest(".card-done-toggle");
   if(toggle){ toggleCompleted(toggle.dataset.id, toggle.checked); return; }
   var addBtn = e.target.closest("[data-date]"); if(addBtn){ openModal(null, addBtn.dataset.date); return; }
@@ -792,6 +813,13 @@ $("#calendar").addEventListener("click", e=>{
   var card = e.target.closest("[data-id]");
   if(card){ var o = state.orders.find(x=>x.id===card.dataset.id); if(o) openModal(o,null); }
 });
+async function toggleCardTodo(orderId, idx){
+  var o = state.orders.find(x=>x.id===orderId);
+  if(!o) return;
+  var todos = orderTodos(o).map((t,i)=> i===idx ? Object.assign({}, t, { done: !t.done }) : t);
+  try{ await updateDoc(doc(db, COLLECTION, orderId), { todos: todos }); }
+  catch(err){ console.error(err); toast("Aktualisieren fehlgeschlagen."); }
+}
 async function toggleCompleted(id, done){
   try{ await updateDoc(doc(db, COLLECTION, id), { completed: done }); }
   catch(err){ console.error(err); toast("Aktualisieren fehlgeschlagen."); }
