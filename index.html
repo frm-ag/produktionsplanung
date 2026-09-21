@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PRODUKTION.PLAN</title>
+<meta name="theme-color" content="#2f6690">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3f5f7;
+    --panel:#ffffff;
+    --panel-alt:#eef1f4;
+    --accent:#2f6690;
+    --accent-dim:#a9c3d4;
+    --danger:#c0392b;
+    --success:#2f9e5c;
+    --warn:#b6650f;
+    --warn-soft:#fbe9d6;
+    --text:#1f2933;
+    --text-muted:#69737d;
+    --border:#dde2e7;
+    --on-accent:#ffffff;
+    --disp:'Space Grotesk',sans-serif;
+    --mono:'IBM Plex Mono',monospace;
+    --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased;min-height:100vh;}
+
+  /* ---------- Login ---------- */
+  #login-screen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .login-card{
+    width:100%;max-width:360px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:28px 26px;box-shadow:0 1px 2px rgba(30,42,50,.06),0 8px 30px rgba(30,42,50,.08);
+  }
+  .login-card h1{font-family:var(--disp);font-size:20px;margin:0 0 3px;}
+  .login-card .sub{font-size:12.5px;color:var(--text-muted);margin-bottom:20px;}
+  .login-card label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin:12px 0 4px;}
+  .login-card input{
+    width:100%;font:inherit;font-size:14px;padding:9px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);
+  }
+  .login-card .err{color:var(--danger);font-size:12.5px;min-height:16px;margin-top:10px;}
+  .login-card button{
+    width:100%;margin-top:6px;background:var(--accent);color:#fff;border:none;border-radius:7px;
+    font:inherit;font-size:14px;font-weight:600;padding:10px;cursor:pointer;
+  }
+  .login-card button:disabled{opacity:.6;cursor:default;}
+
+  /* ---------- App shell ---------- */
+  #app{display:none;max-width:1400px;margin:0 auto;padding:16px 18px 60px;}
+  .hazard-strip{height:5px;width:100%;background:repeating-linear-gradient(135deg, var(--accent) 0 10px, #1c3b52 10px 20px);}
+
+  header{
+    display:flex;flex-wrap:wrap;align-items:center;gap:12px;
+    padding:14px 0 12px;border-bottom:1px solid var(--border);margin-bottom:16px;
+    position:sticky;top:0;background:var(--bg);z-index:20;
+  }
+  .brand{margin-right:auto;}
+  .brand h1{font-family:var(--disp);font-size:19px;font-weight:700;margin:0;letter-spacing:.3px;}
+  .brand h1 span{color:var(--accent);}
+  .brand .sub{font-size:11.5px;color:var(--text-muted);margin-top:1px;}
+  .conn-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--text-muted);margin-right:5px;}
+  .conn-dot.ok{background:var(--success);}
+  .conn-dot.err{background:var(--danger);}
+
+  .seg{display:inline-flex;background:var(--panel-alt);border:1px solid var(--border);border-radius:7px;padding:2px;gap:2px;}
+  .seg button{border:none;background:transparent;color:var(--text-muted);font:inherit;font-size:13.5px;font-weight:600;padding:6px 13px;border-radius:5px;cursor:pointer;}
+  .seg button.active{background:var(--panel);color:var(--text);}
+
+  .nav-group{display:inline-flex;align-items:center;gap:8px;}
+  .nav-group button.round{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;font-size:15px;}
+  .nav-label{font-size:13.5px;font-weight:600;min-width:160px;text-align:center;}
+  .today-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:12.5px;padding:6px 10px;border-radius:6px;cursor:pointer;}
+
+  .filter-chips{display:inline-flex;gap:6px;}
+  .filter-chips button{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:12px;padding:5px 11px;border-radius:20px;cursor:pointer;}
+  .filter-chips button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+  .add-btn{background:var(--accent);color:#fff;border:none;border-radius:7px;font:inherit;font-size:13px;font-weight:600;padding:9px 15px;cursor:pointer;}
+  .logout-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:12.5px;padding:6px 10px;border-radius:6px;cursor:pointer;}
+
+  .layout{display:grid;grid-template-columns:1fr 270px;gap:16px;align-items:start;}
+  @media (max-width:980px){.layout{grid-template-columns:1fr;}}
+  .cal-scroll{overflow-x:auto;padding-bottom:4px;}
+
+  .week-grid{display:grid;grid-template-columns:repeat(5, minmax(206px, 1fr));gap:11px;min-width:840px;}
+  .day-col{display:flex;flex-direction:column;gap:8px;}
+  .day-head{padding:7px 3px 9px;border-bottom:2px solid var(--accent);}
+  .day-head.is-today{border-bottom-color:var(--warn);}
+  .day-name{font-family:var(--disp);font-weight:700;font-size:13.5px;}
+  .day-date{font-size:11.5px;color:var(--text-muted);margin-top:1px;}
+  .day-body{display:flex;flex-direction:column;gap:8px;min-height:60px;}
+  .day-empty{font-size:11.5px;color:#a9b2b8;padding:8px 2px;}
+  .day-add{border:1px dashed var(--border);background:transparent;color:#a9b2b8;border-radius:6px;font:inherit;font-size:11.5px;padding:6px;cursor:pointer;}
+  .day-add:hover{color:var(--text-muted);}
+
+  .order-card{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:2px;padding:9px 10px;cursor:pointer;}
+  .order-card.wk-aluminium{border-left-color:#8b96a0;}
+  .order-card.mat-pending{border-style:dashed;border-color:var(--warn);}
+  .order-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .order-no{font-family:var(--mono);font-size:11.5px;font-weight:600;}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .dot.ok{background:var(--success);}
+  .dot.warn{background:var(--warn);}
+  .dot.neutral{background:#c3ccd1;}
+  .order-customer{font-size:13px;font-weight:600;margin-top:3px;}
+  .order-desc{font-size:11.5px;color:var(--text-muted);margin-top:2px;line-height:1.35;}
+  .order-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+  .tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--accent-dim);color:#1c3b52;}
+  .tag.tag-aluminium{background:#e4e8ea;color:#4b5a63;}
+  .tag.tag-montage{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
+  .material-lines{margin-top:6px;display:flex;flex-direction:column;gap:3px;}
+  .material-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
+  .material-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
+  .material-line .mdot.ok{background:var(--success);}
+  .material-line .mdot.warn{background:var(--warn);}
+  .material-line.warn-text{color:var(--warn);font-weight:600;}
+  .montage-only{opacity:.92;}
+  .montage-only .order-top .order-no::before{content:"Montage · ";font-weight:500;color:#a9b2b8;}
+
+  .month-grid{display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:740px;}
+  .month-weekday{background:var(--panel-alt);font-size:11px;font-weight:600;color:var(--text-muted);padding:6px 7px;}
+  .month-cell{background:var(--panel);min-height:104px;padding:6px 6px 4px;display:flex;flex-direction:column;}
+  .month-cell.out{background:var(--panel-alt);}
+  .month-cell.is-today .month-daynum{color:var(--warn);}
+  .month-daynum{font-size:11.5px;font-weight:700;color:var(--text-muted);padding:2px 2px 4px;cursor:pointer;}
+  .out .month-daynum{color:#c3ccd1;}
+  .month-chips{display:flex;flex-direction:column;gap:3px;overflow-y:auto;max-height:74px;flex:1;cursor:pointer;}
+  .chip{font-size:10px;padding:2px 6px;border-radius:4px;border-left:3px solid var(--accent);background:var(--accent-dim);color:#1c3b52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+  .chip.aluminium{border-left-color:#8b96a0;background:#e4e8ea;color:#4b5a63;}
+  .chip.montage-chip{border-left-style:dotted;background:var(--panel-alt);border-left-color:#a9b2b8;}
+  .chip.pending{outline:1px dashed var(--warn);outline-offset:-1px;}
+
+  .sidebar{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px;position:sticky;top:78px;}
+  .sidebar h2{font-family:var(--disp);font-size:13px;margin:0 0 3px;}
+  .sidebar .count{font-size:11.5px;color:var(--text-muted);margin-bottom:10px;}
+  .pending-item{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:7px;padding:8px 9px;margin-bottom:8px;cursor:pointer;}
+  .pending-item .order-no{color:var(--warn);}
+  .pending-item .order-customer{font-size:12px;margin-top:2px;}
+  .pending-item .plan-hint{font-size:10.5px;color:var(--text-muted);margin-top:4px;}
+  .pending-item .mat-detail{font-size:10.5px;color:var(--warn);margin-top:3px;}
+  .empty-note{font-size:12px;color:var(--text-muted);padding:6px 2px;}
+
+  .modal-backdrop{position:fixed;inset:0;background:rgba(20,25,28,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:18px;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--panel);border-radius:10px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;padding:20px 22px 18px;}
+  .modal h3{font-family:var(--disp);margin:0 0 14px;font-size:16px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px;}
+  .field input,.field select{width:100%;font:inherit;font-size:13.5px;padding:8px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:8px;}
+  .btn{font:inherit;font-size:13px;font-weight:600;padding:8px 15px;border-radius:7px;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.danger{background:transparent;border-color:var(--danger);color:var(--danger);}
+
+  .materials-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
+  .material-row{display:grid;grid-template-columns:1fr 100px 122px 26px;gap:6px;margin-bottom:6px;align-items:center;}
+  .material-row input,.material-row select{font:inherit;font-size:12px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .material-row .mat-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;}
+  .material-row .mat-remove:hover{color:var(--danger);}
+  .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
+  .materials-empty{font-size:11.5px;color:#a9b2b8;padding:4px 2px 8px;}
+
+  footer.status{text-align:center;font-size:11px;color:#a9b2b8;margin-top:24px;}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2933;color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <h1>PRODUKTION<span>.PLAN</span></h1>
+    <div class="sub">FR Metallbau AG — gleiche Zugangsdaten wie Mat.Lager</div>
+    <label for="loginEmail">Benutzername</label>
+    <input type="text" id="loginEmail" placeholder="z. B. jmuster" autocomplete="username">
+    <label for="loginPassword">Passwort</label>
+    <input type="password" id="loginPassword" placeholder="Passwort" autocomplete="current-password">
+    <div class="err" id="loginErr"></div>
+    <button id="loginBtn">Anmelden</button>
+  </div>
+</div>
+
+<div class="hazard-strip" id="topStrip" style="display:none;"></div>
+<div id="app">
+  <header>
+    <div class="brand">
+      <h1>PRODUKTION<span>.PLAN</span></h1>
+      <div class="sub"><span class="conn-dot" id="connDot"></span>Übersicht für die Produktionsleitung</div>
+    </div>
+
+    <div class="seg" id="view-seg">
+      <button data-view="week" class="active">Woche</button>
+      <button data-view="month">Monat</button>
+    </div>
+
+    <div class="nav-group">
+      <button class="round" id="nav-prev" aria-label="Zurück">‹</button>
+      <div class="nav-label" id="nav-label"></div>
+      <button class="round" id="nav-next" aria-label="Weiter">›</button>
+      <button class="today-btn" id="nav-today">Heute</button>
+    </div>
+
+    <div class="filter-chips" id="filter-chips">
+      <button data-filter="alle" class="active">Alle</button>
+      <button data-filter="stahl">Stahl</button>
+      <button data-filter="aluminium">Aluminium</button>
+    </div>
+
+    <button class="add-btn" id="add-btn">+ Auftrag</button>
+    <button class="logout-btn" id="logout-btn">Abmelden</button>
+  </header>
+
+  <div class="layout">
+    <div class="cal-scroll"><div id="calendar"></div></div>
+    <aside class="sidebar">
+      <h2>Wartet auf Material</h2>
+      <div class="count" id="pending-count"></div>
+      <div id="pending-list"></div>
+    </aside>
+  </div>
+
+  <footer class="status" id="status-line"></footer>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h3 id="modal-title">Neuer Auftrag</h3>
+    <form id="order-form">
+      <div class="field-row">
+        <div class="field"><label for="f-orderNumber">Auftragsnummer</label><input id="f-orderNumber" required placeholder="z. B. 26246"></div>
+        <div class="field"><label for="f-customer">Kunde</label><input id="f-customer" required placeholder="Kundenname"></div>
+      </div>
+      <div class="field"><label for="f-description">Beschreibung</label><input id="f-description" placeholder="z. B. Eingang Tunnel, ohne Schloss"></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="f-workshop">Werkstatt</label>
+          <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option></select>
+        </div>
+        <div class="field"><label for="f-productionStart">Frühester Produktionsstart</label><input type="date" id="f-productionStart"></div>
+      </div>
+      <div class="field"><label for="f-assemblyDate">Montage-Termin</label><input type="date" id="f-assemblyDate"></div>
+      <div class="field">
+        <label>Materialien</label>
+        <div class="materials-box">
+          <div id="materials-list"></div>
+          <button type="button" class="add-material-btn" id="add-material-btn">+ Material hinzufügen</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="delete-btn" style="display:none;">Löschen</button>
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button type="button" class="btn" id="cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Speichern</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// ---- Gleiche Firebase-Konfiguration wie Mat.Lager ----
+const firebaseConfig = {
+  apiKey: "AIzaSyD6zaLeNU1ZY-JHFYr-JrbpEUz096m9bfo",
+  authDomain: "mat-lager.firebaseapp.com",
+  projectId: "mat-lager",
+  storageBucket: "mat-lager.firebasestorage.app",
+  messagingSenderId: "838703283009",
+  appId: "1:838703283009:web:97f4a2e59a3ab44c67bfc0"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const COLLECTION = "produktionsauftraege";
+
+// Gleiche Pseudo-Domain wie Mat.Lager, damit dieselben Benutzerkonten funktionieren.
+const AUTH_DOMAIN_SUFFIX = '@matlager.local';
+function usernameToAuthEmail(username){ return username.trim().toLowerCase().replace(/\s+/g,'') + AUTH_DOMAIN_SUFFIX; }
+
+const $ = sel => document.querySelector(sel);
+
+/* ---------- Login ---------- */
+$('#loginBtn').addEventListener('click', doLogin);
+$('#loginPassword').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+async function doLogin(){
+  const username = $('#loginEmail').value.trim();
+  const pass = $('#loginPassword').value;
+  const errEl = $('#loginErr');
+  errEl.textContent = '';
+  if(!username || !pass){ errEl.textContent = 'Bitte Benutzername und Passwort eingeben.'; return; }
+  const btn = $('#loginBtn');
+  btn.disabled = true; btn.textContent = 'Anmelden…';
+  try{
+    await signInWithEmailAndPassword(auth, usernameToAuthEmail(username), pass);
+  }catch(e){
+    errEl.textContent = 'Anmeldung fehlgeschlagen. Benutzername oder Passwort prüfen.';
+  }finally{
+    btn.disabled = false; btn.textContent = 'Anmelden';
+  }
+}
+$('#logout-btn').addEventListener('click', async ()=>{
+  if(unsubOrders) unsubOrders();
+  await signOut(auth);
+});
+
+let unsubOrders = null;
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    $('#login-screen').style.display = 'none';
+    $('#topStrip').style.display = 'block';
+    $('#app').style.display = 'block';
+    subscribeOrders();
+  }else{
+    if(unsubOrders) unsubOrders();
+    $('#login-screen').style.display = 'flex';
+    $('#topStrip').style.display = 'none';
+    $('#app').style.display = 'none';
+  }
+});
+
+function setConn(ok){
+  const dot = $('#connDot');
+  if(dot) dot.className = 'conn-dot ' + (ok ? 'ok' : 'err');
+}
+
+function subscribeOrders(){
+  const q = query(collection(db, COLLECTION), orderBy('orderNumber'));
+  unsubOrders = onSnapshot(q, snap => {
+    setConn(true);
+    state.orders = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => {
+    setConn(false);
+    console.error(err);
+    setStatus('Verbindung zur Datenbank fehlgeschlagen.');
+  });
+}
+
+/* ---------- App state & helpers ---------- */
+
+var state = { orders: [], view: "week", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [] };
+
+function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
+function fromISO(iso){ return new Date(iso + "T00:00:00"); }
+function todayISO(){ return toISO(new Date()); }
+function fmtDay(d){ return d.toLocaleDateString("de-CH", { weekday: "long" }); }
+function fmtDate(d){ return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function fmtShort(iso){ if(!iso) return ""; var d=fromISO(iso); return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" }); }
+function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+function getWeekDays(refISO){
+  var d=fromISO(refISO), day=d.getDay(), diff = day===0?-6:1-day;
+  var monday=new Date(d); monday.setDate(d.getDate()+diff);
+  var days=[]; for(var i=0;i<5;i++){ var dt=new Date(monday); dt.setDate(monday.getDate()+i); days.push(dt); }
+  return days;
+}
+function getMonthGrid(refISO){
+  var d=fromISO(refISO), year=d.getFullYear(), month=d.getMonth();
+  var firstOfMonth=new Date(year,month,1), startDay=firstOfMonth.getDay(), diff = startDay===0?-6:1-startDay;
+  var gridStart=new Date(firstOfMonth); gridStart.setDate(firstOfMonth.getDate()+diff);
+  var days=[]; for(var i=0;i<42;i++){ var dt=new Date(gridStart); dt.setDate(gridStart.getDate()+i); days.push(dt); }
+  return { days: days, month: month };
+}
+function filteredOrders(){ return state.filter==="alle" ? state.orders : state.orders.filter(o=>o.workshop===state.filter); }
+function ordersStartingOn(iso){ return filteredOrders().filter(o=>o.productionStart===iso); }
+function ordersAssemblyOn(iso){ return filteredOrders().filter(o=>o.assemblyDate===iso && o.assemblyDate!==o.productionStart); }
+function orderMaterials(o){ return Array.isArray(o.materials) ? o.materials : []; }
+function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
+function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
+
+/* ---------- Rendering ---------- */
+
+function render(){
+  renderHeader();
+  if(state.view==="week") renderWeek(); else renderMonth();
+  renderSidebar();
+}
+function renderHeader(){
+  document.querySelectorAll("#view-seg button").forEach(b=>b.classList.toggle("active", b.dataset.view===state.view));
+  document.querySelectorAll("#filter-chips button").forEach(b=>b.classList.toggle("active", b.dataset.filter===state.filter));
+  var label;
+  if(state.view==="week"){ var days=getWeekDays(state.refDate); label = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]); }
+  else{ var d=fromISO(state.refDate); label = d.toLocaleDateString("de-CH", { month: "long", year: "numeric" }); }
+  $("#nav-label").textContent = label;
+}
+function orderCardHTML(o, isMontageOnly){
+  var wsClass = o.workshop==="aluminium" ? "wk-aluminium" : "";
+  var pending = hasPendingMaterial(o);
+  var mats = orderMaterials(o);
+  var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
+  var tags = '<span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":"") + '">' + (o.workshop==="aluminium"?"Aluminium":"Stahl") + "</span>";
+  if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
+  if(isMontageOnly) tags += '<span class="tag tag-montage">Montage</span>';
+  var matLines = "";
+  mats.forEach(m=>{
+    var isOk = m.status==="geliefert";
+    var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
+    matLines += '<div class="material-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + " · " + line + "</div>";
+  });
+  return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + '" data-id="' + o.id + '">' +
+    '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span><span class="dot ' + dotClass + '"></span></div>' +
+    '<div class="order-customer">' + escapeHtml(o.customer) + '</div>' +
+    (o.description ? '<div class="order-desc">' + escapeHtml(o.description) + '</div>' : "") +
+    '<div class="order-tags">' + tags + '</div>' +
+    (matLines ? '<div class="material-lines">' + matLines + '</div>' : "") +
+    '</div>';
+}
+function renderWeek(){
+  var days = getWeekDays(state.refDate);
+  var html = '<div class="week-grid">';
+  days.forEach(d=>{
+    var iso=toISO(d), starting=ordersStartingOn(iso), montage=ordersAssemblyOn(iso), isToday=iso===todayISO();
+    html += '<div class="day-col"><div class="day-head' + (isToday?" is-today":"") + '"><div class="day-name">' + fmtDay(d) + '</div><div class="day-date">' + fmtDate(d) + '</div></div><div class="day-body">';
+    if(starting.length===0 && montage.length===0) html += '<div class="day-empty">Keine Aufträge</div>';
+    else{ starting.forEach(o=>html+=orderCardHTML(o,false)); montage.forEach(o=>html+=orderCardHTML(o,true)); }
+    html += '<button class="day-add" data-date="' + iso + '">+ Auftrag hier</button></div></div>';
+  });
+  html += "</div>";
+  $("#calendar").innerHTML = html;
+}
+function renderMonth(){
+  var grid = getMonthGrid(state.refDate);
+  var weekdayNames = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+  var html = '<div class="month-grid">';
+  weekdayNames.forEach(n=>html += '<div class="month-weekday">' + n + "</div>");
+  grid.days.forEach(d=>{
+    var iso=toISO(d), out=d.getMonth()!==grid.month, isToday=iso===todayISO();
+    var starting=ordersStartingOn(iso), montage=ordersAssemblyOn(iso);
+    html += '<div class="month-cell' + (out?" out":"") + (isToday?" is-today":"") + '"><div class="month-daynum" data-add-date="' + iso + '">' + d.getDate() + '</div><div class="month-chips">';
+    starting.forEach(o=>{
+      var cls = (o.workshop==="aluminium"?"aluminium":"") + (hasPendingMaterial(o)?" pending":"");
+      html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
+    });
+    montage.forEach(o=>html += '<div class="chip montage-chip" data-id="' + o.id + '">▲ ' + escapeHtml(o.orderNumber) + "</div>");
+    html += "</div></div>";
+  });
+  html += "</div>";
+  $("#calendar").innerHTML = html;
+}
+function renderSidebar(){
+  var pending = filteredOrders().filter(hasPendingMaterial);
+  $("#pending-count").textContent = pending.length + (pending.length===1 ? " Auftrag blockiert" : " Aufträge blockiert");
+  var html = "";
+  if(pending.length===0) html = '<div class="empty-note">Alle Aufträge haben Material.</div>';
+  else pending.forEach(o=>{
+    html += '<div class="pending-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
+    pendingMaterials(o).forEach(m=>{ html += '<div class="mat-detail">' + escapeHtml(m.name) + ": " + (m.expectedDate ? "erwartet ab " + fmtShort(m.expectedDate) : "kein Termin") + "</div>"; });
+    html += '<div class="plan-hint">' + (o.productionStart ? "Produktion geplant ab " + fmtShort(o.productionStart) : "Kein Starttermin geplant") + "</div></div>";
+  });
+  $("#pending-list").innerHTML = html;
+}
+
+/* ---------- Materials mini-form ---------- */
+
+function renderMaterialRows(){
+  var list = $("#materials-list");
+  if(state.modalMaterials.length===0){ list.innerHTML = '<div class="materials-empty">Noch kein Material erfasst.</div>'; return; }
+  var html = "";
+  state.modalMaterials.forEach((m,i)=>{
+    html += '<div class="material-row" data-idx="' + i + '">' +
+      '<input class="mat-name" placeholder="z. B. Glas, Stahl, Beschläge" value="' + escapeHtml(m.name) + '">' +
+      '<select class="mat-status"><option value="geliefert"' + (m.status==="geliefert"?" selected":"") + '>Geliefert</option><option value="ausstehend"' + (m.status==="ausstehend"?" selected":"") + '>Ausstehend</option></select>' +
+      '<input type="date" class="mat-date" value="' + (m.expectedDate||"") + '" title="Lieferdatum">' +
+      '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button></div>';
+  });
+  list.innerHTML = html;
+}
+$("#add-material-btn").addEventListener("click", ()=>{ state.modalMaterials.push({name:"",status:"ausstehend",expectedDate:""}); renderMaterialRows(); });
+$("#materials-list").addEventListener("click", e=>{
+  var btn = e.target.closest(".mat-remove"); if(!btn) return;
+  var idx = Number(btn.closest(".material-row").dataset.idx);
+  state.modalMaterials.splice(idx,1); renderMaterialRows();
+});
+$("#materials-list").addEventListener("input", e=>{
+  var row = e.target.closest(".material-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalMaterials[idx]) return;
+  if(e.target.classList.contains("mat-name")) state.modalMaterials[idx].name = e.target.value;
+  if(e.target.classList.contains("mat-date")) state.modalMaterials[idx].expectedDate = e.target.value;
+});
+$("#materials-list").addEventListener("change", e=>{
+  var row = e.target.closest(".material-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalMaterials[idx]) return;
+  if(e.target.classList.contains("mat-status")) state.modalMaterials[idx].status = e.target.value;
+});
+
+/* ---------- Modal ---------- */
+
+var backdrop = $("#modal-backdrop");
+var form = $("#order-form");
+
+function openModal(order, prefillDate){
+  state.editingId = order ? order.id : null;
+  $("#modal-title").textContent = order ? "Auftrag bearbeiten" : "Neuer Auftrag";
+  $("#f-orderNumber").value = order ? order.orderNumber : "";
+  $("#f-customer").value = order ? order.customer : "";
+  $("#f-description").value = order ? (order.description||"") : "";
+  $("#f-workshop").value = order ? order.workshop : "stahl";
+  $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
+  $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
+  state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:""}];
+  renderMaterialRows();
+  $("#delete-btn").style.display = order ? "inline-block" : "none";
+  backdrop.classList.add("open");
+  setTimeout(()=>$("#f-orderNumber").focus(), 30);
+}
+function closeModal(){ backdrop.classList.remove("open"); state.editingId = null; }
+
+$("#add-btn").addEventListener("click", ()=>openModal(null,null));
+$("#cancel-btn").addEventListener("click", closeModal);
+backdrop.addEventListener("click", e=>{ if(e.target===backdrop) closeModal(); });
+
+form.addEventListener("submit", async e=>{
+  e.preventDefault();
+  var orderNumber = $("#f-orderNumber").value.trim();
+  var customer = $("#f-customer").value.trim();
+  if(!orderNumber || !customer) return;
+  var materials = state.modalMaterials
+    .map(m=>({ name:(m.name||"").trim(), status:m.status, expectedDate:m.expectedDate||"" }))
+    .filter(m=>m.name.length>0);
+  var payload = {
+    orderNumber, customer,
+    description: $("#f-description").value.trim(),
+    workshop: $("#f-workshop").value,
+    productionStart: $("#f-productionStart").value,
+    assemblyDate: $("#f-assemblyDate").value,
+    materials,
+    updatedAt: Date.now()
+  };
+  var submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try{
+    if(state.editingId){
+      await updateDoc(doc(db, COLLECTION, state.editingId), payload);
+    }else{
+      payload.createdAt = Date.now();
+      await addDoc(collection(db, COLLECTION), payload);
+    }
+    closeModal();
+    toast("Gespeichert.");
+  }catch(err){
+    console.error(err);
+    toast("Speichern fehlgeschlagen — Verbindung prüfen.");
+  }finally{
+    submitBtn.disabled = false;
+  }
+});
+
+$("#delete-btn").addEventListener("click", async ()=>{
+  if(!state.editingId) return;
+  try{
+    await deleteDoc(doc(db, COLLECTION, state.editingId));
+    closeModal();
+    toast("Auftrag gelöscht.");
+  }catch(err){
+    console.error(err);
+    toast("Löschen fehlgeschlagen.");
+  }
+});
+
+/* ---------- Event delegation ---------- */
+
+$("#view-seg").addEventListener("click", e=>{ var b=e.target.closest("button[data-view]"); if(!b) return; state.view=b.dataset.view; render(); });
+$("#filter-chips").addEventListener("click", e=>{ var b=e.target.closest("button[data-filter]"); if(!b) return; state.filter=b.dataset.filter; render(); });
+$("#nav-prev").addEventListener("click", ()=>navigate(-1));
+$("#nav-next").addEventListener("click", ()=>navigate(1));
+$("#nav-today").addEventListener("click", ()=>{ state.refDate = todayISO(); render(); });
+function navigate(dir){
+  var d = fromISO(state.refDate);
+  if(state.view==="week") d.setDate(d.getDate()+dir*7); else d.setMonth(d.getMonth()+dir);
+  state.refDate = toISO(d); render();
+}
+$("#calendar").addEventListener("click", e=>{
+  var addBtn = e.target.closest("[data-date]"); if(addBtn){ openModal(null, addBtn.dataset.date); return; }
+  var dayNum = e.target.closest("[data-add-date]"); if(dayNum && !e.target.closest(".chip")){ openModal(null, dayNum.dataset.addDate); return; }
+  var card = e.target.closest("[data-id]");
+  if(card){ var o = state.orders.find(x=>x.id===card.dataset.id); if(o) openModal(o,null); }
+});
+$("#pending-list").addEventListener("click", e=>{
+  var item = e.target.closest("[data-id]"); if(!item) return;
+  var o = state.orders.find(x=>x.id===item.dataset.id); if(o) openModal(o,null);
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && backdrop.classList.contains("open")) closeModal(); });
+
+function setStatus(msg){ $("#status-line").textContent = msg; }
+function toast(msg){
+  var el = $("#toast"); el.textContent = msg; el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"), 1800);
+}
+
+render();
+</script>
+</body>
+</html>
