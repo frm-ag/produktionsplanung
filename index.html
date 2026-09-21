@@ -114,6 +114,10 @@
   .tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--accent-dim);color:#1c3b52;}
   .tag.tag-aluminium{background:#e4e8ea;color:#4b5a63;}
   .tag.tag-montage{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
+  .lead-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:color-mix(in srgb, var(--lead-color) 14%, white);color:var(--lead-color);}
+  .lead-dot{width:6px;height:6px;border-radius:50%;background:var(--lead-color);flex:none;}
+  .chip-lead-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+  .pending-item .lead-tag{margin-top:5px;}
   .material-lines{margin-top:6px;display:flex;flex-direction:column;gap:3px;}
   .material-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
   .material-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
@@ -243,8 +247,9 @@
           <label for="f-workshop">Werkstatt</label>
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option></select>
         </div>
-        <div class="field"><label for="f-productionStart">Frühester Produktionsstart</label><input type="date" id="f-productionStart"></div>
+        <div class="field"><label for="f-projectLead">Projektleiter</label><input id="f-projectLead" placeholder="z. B. Joel Muster"></div>
       </div>
+      <div class="field"><label for="f-productionStart">Frühester Produktionsstart</label><input type="date" id="f-productionStart"></div>
       <div class="field"><label for="f-assemblyDate">Montage-Termin</label><input type="date" id="f-assemblyDate"></div>
       <div class="field">
         <label>Materialien</label>
@@ -381,6 +386,19 @@ function getMonthGrid(refISO){
 function filteredOrders(){ return state.filter==="alle" ? state.orders : state.orders.filter(o=>o.workshop===state.filter); }
 function ordersStartingOn(iso){ return filteredOrders().filter(o=>o.productionStart===iso); }
 function ordersAssemblyOn(iso){ return filteredOrders().filter(o=>o.assemblyDate===iso && o.assemblyDate!==o.productionStart); }
+var LEAD_COLORS = ["#c0392b","#8e44ad","#2980b9","#16a085","#d35400","#27ae60","#2c3e50","#c2185b","#00838f","#6d4c41","#5d4037","#1565c0"];
+function leadColor(name){
+  var s = String(name||"").trim().toLowerCase();
+  if(!s) return "#8c99a1";
+  var hash = 0;
+  for(var i=0;i<s.length;i++){ hash = (hash*31 + s.charCodeAt(i)) >>> 0; }
+  return LEAD_COLORS[hash % LEAD_COLORS.length];
+}
+function leadTagHTML(name){
+  if(!name) return "";
+  var c = leadColor(name);
+  return '<span class="lead-tag" style="--lead-color:' + c + '"><span class="lead-dot"></span>' + escapeHtml(name) + '</span>';
+}
 function orderMaterials(o){ return Array.isArray(o.materials) ? o.materials : []; }
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
 function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
@@ -406,6 +424,7 @@ function orderCardHTML(o, isMontageOnly){
   var mats = orderMaterials(o);
   var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
   var tags = '<span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":"") + '">' + (o.workshop==="aluminium"?"Aluminium":"Stahl") + "</span>";
+  tags += leadTagHTML(o.projectLead);
   if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
   if(isMontageOnly) tags += '<span class="tag tag-montage">Montage</span>';
   var matLines = "";
@@ -446,7 +465,8 @@ function renderMonth(){
     html += '<div class="month-cell' + (out?" out":"") + (isToday?" is-today":"") + '"><div class="month-daynum" data-add-date="' + iso + '">' + d.getDate() + '</div><div class="month-chips">';
     starting.forEach(o=>{
       var cls = (o.workshop==="aluminium"?"aluminium":"") + (hasPendingMaterial(o)?" pending":"");
-      html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
+      var leadDot = o.projectLead ? '<span class="chip-lead-dot" style="background:' + leadColor(o.projectLead) + '"></span>' : "";
+      html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + leadDot + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
     });
     montage.forEach(o=>html += '<div class="chip montage-chip" data-id="' + o.id + '">▲ ' + escapeHtml(o.orderNumber) + "</div>");
     html += "</div></div>";
@@ -462,7 +482,9 @@ function renderSidebar(){
   else pending.forEach(o=>{
     html += '<div class="pending-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
     pendingMaterials(o).forEach(m=>{ html += '<div class="mat-detail">' + escapeHtml(m.name) + ": " + (m.expectedDate ? "erwartet ab " + fmtShort(m.expectedDate) : "kein Termin") + "</div>"; });
-    html += '<div class="plan-hint">' + (o.productionStart ? "Produktion geplant ab " + fmtShort(o.productionStart) : "Kein Starttermin geplant") + "</div></div>";
+    html += '<div class="plan-hint">' + (o.productionStart ? "Produktion geplant ab " + fmtShort(o.productionStart) : "Kein Starttermin geplant") + "</div>";
+    if(o.projectLead) html += leadTagHTML(o.projectLead);
+    html += "</div>";
   });
   $("#pending-list").innerHTML = html;
 }
@@ -512,6 +534,7 @@ function openModal(order, prefillDate){
   $("#f-customer").value = order ? order.customer : "";
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
+  $("#f-projectLead").value = order ? (order.projectLead||"") : "";
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
   state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:""}];
@@ -538,6 +561,7 @@ form.addEventListener("submit", async e=>{
     orderNumber, customer,
     description: $("#f-description").value.trim(),
     workshop: $("#f-workshop").value,
+    projectLead: $("#f-projectLead").value.trim(),
     productionStart: $("#f-productionStart").value,
     assemblyDate: $("#f-assemblyDate").value,
     materials,
