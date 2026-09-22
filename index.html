@@ -244,6 +244,20 @@
   .cal-pop-foot{display:flex;justify-content:space-between;margin-top:8px;border-top:1px solid var(--border);padding-top:7px;}
   .cal-pop-foot button{border:none;background:transparent;color:var(--accent);font-size:11.5px;font-weight:600;cursor:pointer;}
   footer.status{text-align:center;font-size:11px;color:#a9b2b8;margin-top:24px;}
+  #todos-page{max-width:640px;margin:0 auto;}
+  .gt-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .gt-form #gt-text{flex:1;min-width:180px;font:inherit;font-size:13.5px;padding:9px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .gt-date-field{width:150px;}
+  .gt-date-field .date-input{padding:9px 10px;font-size:13px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .gt-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:8px;}
+  .gt-item input[type="checkbox"]{width:17px;height:17px;flex:none;accent-color:var(--accent);cursor:pointer;}
+  .gt-item .gt-text{flex:1;font-size:13.5px;}
+  .gt-item.done .gt-text{color:var(--text-muted);text-decoration:line-through;}
+  .gt-item .gt-due{font-size:11px;color:var(--text-muted);white-space:nowrap;}
+  .gt-item.overdue .gt-due{color:var(--danger);font-weight:700;}
+  .gt-item .gt-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:16px;width:26px;height:26px;border-radius:5px;flex:none;}
+  .gt-item .gt-remove:hover{color:var(--danger);}
+  .gt-empty{text-align:center;color:var(--text-muted);font-size:13px;padding:30px 10px;}
   .week-hint{display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2933;color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
   .toast.show{opacity:1;}
@@ -275,9 +289,10 @@
     <div class="seg" id="view-seg">
       <button data-view="week" class="active">Woche</button>
       <button data-view="month">Monat</button>
+      <button data-view="todos">To-Dos</button>
     </div>
 
-    <div class="nav-group">
+    <div class="nav-group" id="nav-group">
       <button class="round" id="nav-prev" aria-label="Zurück">‹</button>
       <div class="nav-label" id="nav-label"></div>
       <button class="round" id="nav-next" aria-label="Weiter">›</button>
@@ -305,6 +320,18 @@
       <div class="count" id="pending-count"></div>
       <div id="pending-list"></div>
     </aside>
+  </div>
+
+  <div id="todos-page" style="display:none;">
+    <form id="general-todo-form" class="gt-form">
+      <input id="gt-text" placeholder="Neues To-Do…" required>
+      <span class="date-field gt-date-field">
+        <input type="text" id="gt-date-display" class="date-input" readonly placeholder="TT.MM.JJJJ (optional)" autocomplete="off">
+        <input type="hidden" id="gt-date">
+      </span>
+      <button type="submit" class="btn primary">+ Hinzufügen</button>
+    </form>
+    <div id="general-todos-list"></div>
   </div>
 
   <footer class="status" id="status-line"></footer>
@@ -399,6 +426,7 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const COLLECTION = "produktionsauftraege";
+const TODOS_COLLECTION = "allgemeine_todos";
 
 // Gleiche Pseudo-Domain wie Mat.Lager, damit dieselben Benutzerkonten funktionieren.
 const AUTH_DOMAIN_SUFFIX = '@matlager.local';
@@ -427,10 +455,12 @@ async function doLogin(){
 }
 $('#logout-btn').addEventListener('click', async ()=>{
   if(unsubOrders) unsubOrders();
+  if(unsubGeneralTodos) unsubGeneralTodos();
   await signOut(auth);
 });
 
 let unsubOrders = null;
+let unsubGeneralTodos = null;
 
 onAuthStateChanged(auth, user => {
   if(user){
@@ -438,9 +468,12 @@ onAuthStateChanged(auth, user => {
     $('#topStrip').style.display = 'block';
     $('#app').style.display = 'block';
     if(unsubOrders) unsubOrders();
+    if(unsubGeneralTodos) unsubGeneralTodos();
     subscribeOrders();
+    subscribeGeneralTodos();
   }else{
     if(unsubOrders) unsubOrders();
+    if(unsubGeneralTodos) unsubGeneralTodos();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -465,9 +498,17 @@ function subscribeOrders(){
   });
 }
 
+function subscribeGeneralTodos(){
+  const q = query(collection(db, TODOS_COLLECTION), orderBy('createdAt'));
+  unsubGeneralTodos = onSnapshot(q, snap => {
+    state.generalTodos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "todos") renderGeneralTodos();
+  }, err => { console.error(err); });
+}
+
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], view: "week", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [] };
+var state = { orders: [], generalTodos: [], view: "week", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [] };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -535,6 +576,13 @@ function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.prod
 
 function render(){
   renderHeader();
+  var isTodos = state.view === "todos";
+  $(".layout").style.display = isTodos ? "none" : "grid";
+  $("#todos-page").style.display = isTodos ? "block" : "none";
+  $("#nav-group").style.display = isTodos ? "none" : "inline-flex";
+  $("#filter-chips").style.display = isTodos ? "none" : "inline-flex";
+  $("#add-btn").style.display = isTodos ? "none" : "inline-block";
+  if(isTodos){ renderGeneralTodos(); return; }
   if(state.view==="week") renderWeek(); else renderMonth();
   renderSidebar();
 }
@@ -612,6 +660,48 @@ function renderMonth(){
   html += "</div>";
   $("#calendar").innerHTML = html;
 }
+function renderGeneralTodos(){
+  var list = $("#general-todos-list");
+  var todos = state.generalTodos.slice().sort((a,b)=>{
+    if(!!a.done !== !!b.done) return a.done ? 1 : -1;
+    return (a.createdAt||0) - (b.createdAt||0);
+  });
+  if(todos.length===0){ list.innerHTML = '<div class="gt-empty">Noch keine eigenen To-Dos.</div>'; return; }
+  var html = "";
+  todos.forEach(t=>{
+    var overdue = !t.done && t.dueDate && t.dueDate < todayISO();
+    html += '<div class="gt-item' + (t.done?" done":"") + (overdue?" overdue":"") + '" data-id="' + t.id + '">';
+    html += '<input type="checkbox" class="gt-check"' + (t.done?" checked":"") + '>';
+    html += '<span class="gt-text">' + escapeHtml(t.text) + '</span>';
+    if(t.dueDate) html += '<span class="gt-due">bis ' + fmtShort(t.dueDate) + '</span>';
+    html += '<button type="button" class="gt-remove" aria-label="Entfernen">✕</button>';
+    html += "</div>";
+  });
+  list.innerHTML = html;
+}
+$("#general-todo-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var text = $("#gt-text").value.trim();
+  if(!text) return;
+  var dueDate = $("#gt-date").value || "";
+  $("#gt-text").value = "";
+  $("#gt-date").value = "";
+  $("#gt-date-display").value = "";
+  try{ await addDoc(collection(db, TODOS_COLLECTION), { text: text, done: false, dueDate: dueDate, createdAt: Date.now() }); }
+  catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+$("#general-todos-list").addEventListener("click", async e=>{
+  var item = e.target.closest(".gt-item"); if(!item) return;
+  var id = item.dataset.id;
+  if(e.target.closest(".gt-remove")){
+    try{ await deleteDoc(doc(db, TODOS_COLLECTION, id)); } catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+    return;
+  }
+  if(e.target.classList.contains("gt-check")){
+    try{ await updateDoc(doc(db, TODOS_COLLECTION, id), { done: e.target.checked }); } catch(err){ console.error(err); toast("Aktualisieren fehlgeschlagen."); }
+  }
+});
+
 function renderSidebar(){
   var ready = filteredOrders().filter(isReadyNotDone).sort((a,b)=> a.productionStart < b.productionStart ? -1 : 1);
   $("#ready-count").textContent = ready.length + (ready.length===1 ? " Auftrag wartet" : " Aufträge warten");
