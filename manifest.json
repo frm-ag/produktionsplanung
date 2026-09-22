@@ -1,0 +1,19 @@
+{
+  "name": "FR Metallbau AG – Produktionsplanung",
+  "short_name": "Produktion.Plan",
+  "description": "Wochen- und Monatsplanung für die Produktionsleitung – Aufträge, Werkstatt, Material, To-Dos",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f5f7",
+  "theme_color": "#2f6690",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
