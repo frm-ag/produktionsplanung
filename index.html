@@ -120,10 +120,6 @@
   .tag.tag-reparaturen{background:#f4e9d3;color:#8e6b1f;}
   .tag.tag-montage{background:#efe6f5;color:#7b4fa0;font-weight:700;}
   .tag.tag-werkstatt{background:#e3ebf3;color:var(--accent);font-weight:700;}
-  .lead-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:color-mix(in srgb, var(--lead-color) 14%, white);color:var(--lead-color);}
-  .lead-dot{width:6px;height:6px;border-radius:50%;background:var(--lead-color);flex:none;}
-  .chip-lead-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle;}
-  .pending-item .lead-tag{margin-top:5px;}
   .material-lines{margin-top:6px;display:flex;flex-direction:column;gap:3px;}
   .material-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
   .material-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
@@ -359,9 +355,6 @@
           <select id="f-phase"><option value="werkstatt">Werkstatt</option><option value="montage">Montage</option></select>
         </div>
       </div>
-      <div class="field-row">
-        <div class="field"><label for="f-projectLead">Projektleiter</label><input id="f-projectLead" placeholder="z. B. Joel Muster"></div>
-      </div>
       <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
         <span class="date-field">
           <input type="text" id="f-productionStart-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
@@ -389,6 +382,10 @@
           <div id="todos-list"></div>
           <button type="button" class="add-todo-btn" id="add-todo-btn">+ To-Do hinzufügen</button>
         </div>
+      </div>
+      <div class="field" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="f-ready" style="width:16px;height:16px;">
+        <label for="f-ready" style="margin:0;">Bereit zur Ausführung (unabhängig vom Material-Status)</label>
       </div>
       <div class="field" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="f-completed" style="width:16px;height:16px;">
@@ -550,19 +547,6 @@ function getMonthGrid(refISO){
 function filteredOrders(){ return state.filter==="alle" ? state.orders : state.orders.filter(o=>o.workshop===state.filter); }
 function ordersStartingOn(iso){ return filteredOrders().filter(o=>o.productionStart===iso); }
 function ordersAssemblyOn(iso){ return filteredOrders().filter(o=>o.assemblyDate===iso && o.assemblyDate!==o.productionStart); }
-var LEAD_COLORS = ["#c0392b","#8e44ad","#2980b9","#16a085","#d35400","#27ae60","#2c3e50","#c2185b","#00838f","#6d4c41","#5d4037","#1565c0"];
-function leadColor(name){
-  var s = String(name||"").trim().toLowerCase();
-  if(!s) return "#8c99a1";
-  var hash = 0;
-  for(var i=0;i<s.length;i++){ hash = (hash*31 + s.charCodeAt(i)) >>> 0; }
-  return LEAD_COLORS[hash % LEAD_COLORS.length];
-}
-function leadTagHTML(name){
-  if(!name) return "";
-  var c = leadColor(name);
-  return '<span class="lead-tag" style="--lead-color:' + c + '"><span class="lead-dot"></span>' + escapeHtml(name) + '</span>';
-}
 function orderMaterials(o){ return Array.isArray(o.materials) ? o.materials : []; }
 function orderTodos(o){ return Array.isArray(o.todos) ? o.todos : []; }
 function todoProgress(o){
@@ -572,7 +556,7 @@ function todoProgress(o){
 }
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
 function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
-function isReadyNotDone(o){ return !!o.productionStart && o.productionStart <= todayISO() && !o.completed && !hasPendingMaterial(o); }
+function isReadyNotDone(o){ return !!o.ready && !o.completed; }
 function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.productionStart)) / 86400000); }
 
 /* ---------- Rendering ---------- */
@@ -607,7 +591,6 @@ function orderCardHTML(o, isMontageOnly){
   var phase = o.phase === "montage" ? "montage" : "werkstatt";
   var tags = '<span class="tag ' + (phase==="montage" ? "tag-montage" : "tag-werkstatt") + '">' + (phase==="montage" ? "Montage" : "Werkstatt") + '</span>';
   tags += '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
-  tags += leadTagHTML(o.projectLead);
   if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
   var prog = todoProgress(o);
   if(prog.total > 0) tags += '<span class="todo-progress' + (prog.done===prog.total?" done-all":"") + '">☑ ' + prog.done + '/' + prog.total + '</span>';
@@ -654,8 +637,7 @@ function renderMonth(){
     html += '<div class="month-cell' + (out?" out":"") + (isToday?" is-today":"") + '"><div class="month-daynum" data-add-date="' + iso + '">' + d.getDate() + '</div><div class="month-chips">';
     starting.forEach(o=>{
       var cls = (o.workshop==="aluminium"?"aluminium":(o.workshop==="reparaturen"?"reparaturen":"")) + (hasPendingMaterial(o)?" pending":"");
-      var leadDot = o.projectLead ? '<span class="chip-lead-dot" style="background:' + leadColor(o.projectLead) + '"></span>' : "";
-      html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + leadDot + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
+      html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
     });
     montage.forEach(o=>html += '<div class="chip montage-chip" data-id="' + o.id + '">▲ ' + escapeHtml(o.orderNumber) + "</div>");
     html += "</div></div>";
@@ -706,16 +688,19 @@ $("#general-todos-list").addEventListener("click", async e=>{
 });
 
 function renderSidebar(){
-  var ready = filteredOrders().filter(isReadyNotDone).sort((a,b)=> a.productionStart < b.productionStart ? -1 : 1);
+  var ready = filteredOrders().filter(isReadyNotDone).sort((a,b)=> (a.productionStart||"") < (b.productionStart||"") ? -1 : 1);
   $("#ready-count").textContent = ready.length + (ready.length===1 ? " Auftrag wartet" : " Aufträge warten");
   var readyHtml = "";
   if(ready.length===0) readyHtml = '<div class="empty-note">Nichts Offenes wartet.</div>';
   else ready.forEach(o=>{
-    var days = daysWaiting(o);
     readyHtml += '<div class="ready-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
     if(o.description) readyHtml += '<div class="ready-desc">' + escapeHtml(o.description) + '</div>';
-    readyHtml += '<div class="ready-since">bereit seit ' + fmtShort(o.productionStart) + (days>0 ? " · " + days + (days===1?" Tag":" Tage") : " · heute") + '</div>';
-    if(o.projectLead) readyHtml += leadTagHTML(o.projectLead);
+    if(o.productionStart){
+      var days = daysWaiting(o);
+      readyHtml += '<div class="ready-since">bereit seit ' + fmtShort(o.productionStart) + (days>0 ? " · " + days + (days===1?" Tag":" Tage") : " · heute") + '</div>';
+    } else {
+      readyHtml += '<div class="ready-since">Als bereit markiert</div>';
+    }
     readyHtml += "</div>";
   });
   $("#ready-list").innerHTML = readyHtml;
@@ -728,7 +713,6 @@ function renderSidebar(){
     html += '<div class="pending-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
     pendingMaterials(o).forEach(m=>{ html += '<div class="mat-detail">' + escapeHtml(m.name) + ": " + (m.expectedDate ? "erwartet ab " + fmtShort(m.expectedDate) : "kein Termin") + "</div>"; });
     html += '<div class="plan-hint">' + (o.productionStart ? "Produktion geplant ab " + fmtShort(o.productionStart) : "Kein Starttermin geplant") + "</div>";
-    if(o.projectLead) html += leadTagHTML(o.projectLead);
     html += "</div>";
   });
   $("#pending-list").innerHTML = html;
@@ -816,8 +800,8 @@ function openModal(order, prefillDate){
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
   $("#f-phase").value = order ? (order.phase || "werkstatt") : "werkstatt";
-  $("#f-projectLead").value = order ? (order.projectLead||"") : "";
   $("#f-completed").checked = order ? !!order.completed : false;
+  $("#f-ready").checked = order ? !!order.ready : false;
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
   $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
@@ -856,8 +840,8 @@ form.addEventListener("submit", async e=>{
     description: $("#f-description").value.trim(),
     workshop: $("#f-workshop").value,
     phase: $("#f-phase").value,
-    projectLead: $("#f-projectLead").value.trim(),
     completed: $("#f-completed").checked,
+    ready: $("#f-ready").checked,
     productionStart: $("#f-productionStart").value,
     assemblyDate: $("#f-assemblyDate").value,
     materials,
