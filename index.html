@@ -120,6 +120,8 @@
   .tag.tag-reparaturen{background:#f4e9d3;color:#8e6b1f;}
   .tag.tag-montage{background:#efe6f5;color:#7b4fa0;font-weight:700;}
   .tag.tag-werkstatt{background:#e3ebf3;color:var(--accent);font-weight:700;}
+  .tag.tag-ready{background:#e3f2e9;color:var(--success);}
+  .tag.tag-notready{background:var(--warn-soft);color:var(--warn);}
   .material-lines{margin-top:6px;display:flex;flex-direction:column;gap:3px;}
   .material-line{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
   .material-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
@@ -257,6 +259,58 @@
   .gt-item .gt-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:16px;width:26px;height:26px;border-radius:5px;flex:none;}
   .gt-item .gt-remove:hover{color:var(--danger);}
   .gt-empty{text-align:center;color:var(--text-muted);font-size:13px;padding:30px 10px;}
+  #table-page{max-width:1400px;margin:0 auto;}
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:9px;background:var(--panel);}
+  .overview-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:960px;}
+  .overview-table thead th{
+    position:sticky;top:0;background:var(--panel-alt);text-align:left;font-size:11px;font-weight:700;
+    color:var(--text-muted);padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;
+  }
+  .overview-table thead th:not([data-sort]){cursor:default;}
+  .overview-table thead th.sorted::after{content:" ▾";font-size:9px;}
+  .overview-table thead th.sorted.desc::after{content:" ▴";}
+  .overview-table tbody td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  .overview-table tbody tr{cursor:pointer;}
+  .overview-table tbody tr:hover{background:var(--panel-alt);}
+  .overview-table tbody tr.row-completed{opacity:.5;}
+  .overview-table tbody tr.row-completed .ov-customer{text-decoration:line-through;}
+  .ov-orderno{font-family:var(--mono);font-weight:700;}
+  .ov-customer{font-weight:600;}
+  .ov-desc{color:var(--text-muted);font-size:11px;margin-top:1px;}
+  .ov-mat-line{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;white-space:nowrap;}
+  .ov-mat-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
+  .ov-mat-line .mdot.ok{background:var(--success);}
+  .ov-mat-line .mdot.warn{background:var(--warn);}
+  .ov-mat-line.warn-text{color:var(--warn);font-weight:600;}
+  .ov-ready-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:700;}
+  .ov-ready-icon.yes{background:#e3f2e9;color:var(--success);}
+  .ov-ready-icon.no{background:var(--panel-alt);color:#c3ccd1;}
+  .ov-empty-row td{text-align:center;color:var(--text-muted);padding:40px 10px;}
+
+  @media (max-width:720px){
+    .table-scroll{overflow-x:visible;border:none;background:transparent;}
+    .overview-table{min-width:0;}
+    .overview-table thead{display:none;}
+    .overview-table, .overview-table tbody, .overview-table tr, .overview-table td{display:block;width:100%;}
+    .overview-table tr{
+      background:var(--panel);border:1px solid var(--border);border-radius:9px;
+      padding:11px 13px;margin-bottom:10px;
+    }
+    .overview-table tr.row-completed{opacity:.55;}
+    .overview-table td{
+      border-bottom:1px solid var(--panel-alt);padding:7px 0;
+      display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+    }
+    .overview-table td:last-child{border-bottom:none;}
+    .overview-table td::before{
+      content:attr(data-label);font-size:10.5px;font-weight:700;color:var(--text-muted);
+      flex:none;padding-top:1px;
+    }
+    .overview-table td.ov-orderno{font-size:14px;}
+    .overview-table td[data-label="Kunde"]{flex-direction:column;align-items:flex-start;gap:2px;}
+    .overview-table td[data-label="Kunde"]::before{padding-top:0;}
+    .overview-table td[data-label="Material"]{flex-direction:column;align-items:flex-start;gap:4px;}
+  }
   .week-hint{display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2933;color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;}
   .toast.show{opacity:1;}
@@ -286,7 +340,8 @@
     </div>
 
     <div class="seg" id="view-seg">
-      <button data-view="week" class="active">Woche</button>
+      <button data-view="table" class="active">Übersicht</button>
+      <button data-view="week">Woche</button>
       <button data-view="month">Monat</button>
       <button data-view="todos">To-Dos</button>
     </div>
@@ -333,6 +388,27 @@
     <div id="general-todos-list"></div>
   </div>
 
+  <div id="table-page" style="display:none;">
+    <div class="table-scroll">
+      <table class="overview-table" id="overview-table">
+        <thead>
+          <tr>
+            <th data-sort="orderNumber">Auftrag</th>
+            <th data-sort="customer">Kunde</th>
+            <th data-sort="workshop">Werkstatt</th>
+            <th>Material</th>
+            <th data-sort="productionStart">Start</th>
+            <th data-sort="assemblyDate">Montage</th>
+            <th>Werkstatt bereit</th>
+            <th>Montage bereit</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="overview-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <footer class="status" id="status-line"></footer>
 </div>
 
@@ -349,10 +425,6 @@
         <div class="field">
           <label for="f-workshop">Werkstatt</label>
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
-        </div>
-        <div class="field">
-          <label for="f-phase">Phase</label>
-          <select id="f-phase"><option value="werkstatt">Werkstatt</option><option value="montage">Montage</option></select>
         </div>
       </div>
       <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
@@ -383,9 +455,15 @@
           <button type="button" class="add-todo-btn" id="add-todo-btn">+ To-Do hinzufügen</button>
         </div>
       </div>
-      <div class="field" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="f-ready" style="width:16px;height:16px;">
-        <label for="f-ready" style="margin:0;">Bereit zur Ausführung (unabhängig vom Material-Status)</label>
+      <div class="field-row">
+        <div class="field" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="f-readyWerkstatt" style="width:16px;height:16px;">
+          <label for="f-readyWerkstatt" style="margin:0;">Bereit: Werkstatt/Produktion</label>
+        </div>
+        <div class="field" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="f-readyMontage" style="width:16px;height:16px;">
+          <label for="f-readyMontage" style="margin:0;">Bereit: Montage</label>
+        </div>
       </div>
       <div class="field" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="f-completed" style="width:16px;height:16px;">
@@ -508,7 +586,7 @@ function subscribeGeneralTodos(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], generalTodos: [], view: "week", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [] };
+var state = { orders: [], generalTodos: [], view: "table", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "productionStart", dir: "asc" } };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -556,7 +634,7 @@ function todoProgress(o){
 }
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
 function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
-function isReadyNotDone(o){ return !!o.ready && !o.completed; }
+function isReadyNotDone(o){ return (!!o.readyWerkstatt || !!o.readyMontage) && !o.completed; }
 function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.productionStart)) / 86400000); }
 
 /* ---------- Rendering ---------- */
@@ -564,12 +642,16 @@ function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.prod
 function render(){
   renderHeader();
   var isTodos = state.view === "todos";
-  $(".layout").style.display = isTodos ? "none" : "grid";
+  var isTable = state.view === "table";
+  var isCalendar = !isTodos && !isTable;
+  $(".layout").style.display = isCalendar ? "grid" : "none";
   $("#todos-page").style.display = isTodos ? "block" : "none";
-  $("#nav-group").style.display = isTodos ? "none" : "inline-flex";
+  $("#table-page").style.display = isTable ? "block" : "none";
+  $("#nav-group").style.display = isCalendar ? "inline-flex" : "none";
   $("#filter-chips").style.display = isTodos ? "none" : "inline-flex";
   $("#add-btn").style.display = isTodos ? "none" : "inline-block";
   if(isTodos){ renderGeneralTodos(); return; }
+  if(isTable){ renderTable(); return; }
   if(state.view==="week") renderWeek(); else renderMonth();
   renderSidebar();
 }
@@ -588,8 +670,10 @@ function orderCardHTML(o, isMontageOnly){
   var mats = orderMaterials(o);
   var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
   var tagClass = o.workshop==="aluminium" ? "tag-aluminium" : (o.workshop==="reparaturen" ? "tag-reparaturen" : "");
-  var phase = o.phase === "montage" ? "montage" : "werkstatt";
+  var phase = isMontageOnly ? "montage" : "werkstatt";
+  var phaseReady = phase==="montage" ? !!o.readyMontage : !!o.readyWerkstatt;
   var tags = '<span class="tag ' + (phase==="montage" ? "tag-montage" : "tag-werkstatt") + '">' + (phase==="montage" ? "Montage" : "Werkstatt") + '</span>';
+  tags += '<span class="tag ' + (phaseReady?"tag-ready":"tag-notready") + '">' + (phaseReady?"Bereit":"Nicht bereit") + '</span>';
   tags += '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
   if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
   var prog = todoProgress(o);
@@ -687,6 +771,57 @@ $("#general-todos-list").addEventListener("click", async e=>{
   }
 });
 
+function renderTable(){
+  var rows = filteredOrders().slice();
+  var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
+  rows.sort((a,b)=>{
+    var av = (a[f]||"").toString().toLowerCase(), bv = (b[f]||"").toString().toLowerCase();
+    if(av === bv) return 0;
+    if(av === "") return 1;
+    if(bv === "") return -1;
+    return av < bv ? -1*dir : 1*dir;
+  });
+  document.querySelectorAll("#overview-table thead th[data-sort]").forEach(th=>{
+    th.classList.toggle("sorted", th.dataset.sort === state.tableSort.field);
+    th.classList.toggle("desc", th.dataset.sort === state.tableSort.field && state.tableSort.dir === "desc");
+  });
+  var tbody = $("#overview-tbody");
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="9">Keine Aufträge in dieser Ansicht.</td></tr>'; return; }
+  var html = "";
+  rows.forEach(o=>{
+    var mats = orderMaterials(o);
+    var matHtml = mats.length===0 ? '<span style="color:#c3ccd1;">–</span>' : mats.map(m=>{
+      var isOk = m.status==="geliefert";
+      var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
+      return '<div class="ov-mat-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + " · " + line + "</div>";
+    }).join("");
+    html += '<tr class="' + (o.completed?"row-completed":"") + '" data-id="' + o.id + '">';
+    html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
+    html += '<td data-label="Kunde"><div class="ov-customer">' + escapeHtml(o.customer) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(o.description) + '</div>':'') + '</td>';
+    html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
+    html += '<td data-label="Material">' + matHtml + '</td>';
+    html += '<td data-label="Start">' + (o.productionStart ? fmtShort(o.productionStart) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
+    html += '<td data-label="Montage">' + (o.assemblyDate ? fmtShort(o.assemblyDate) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
+    html += '<td data-label="Werkstatt bereit"><span class="ov-ready-icon ' + (o.readyWerkstatt?"yes":"no") + '">' + (o.readyWerkstatt?"✓":"–") + '</span></td>';
+    html += '<td data-label="Montage bereit"><span class="ov-ready-icon ' + (o.readyMontage?"yes":"no") + '">' + (o.readyMontage?"✓":"–") + '</span></td>';
+    html += '<td data-label="Status">' + (o.completed ? "Erledigt" : "Offen") + '</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+$("#overview-table thead").addEventListener("click", e=>{
+  var th = e.target.closest("th[data-sort]"); if(!th) return;
+  var field = th.dataset.sort;
+  if(state.tableSort.field === field) state.tableSort.dir = state.tableSort.dir === "asc" ? "desc" : "asc";
+  else state.tableSort = { field: field, dir: "asc" };
+  renderTable();
+});
+$("#overview-tbody").addEventListener("click", e=>{
+  var tr = e.target.closest("tr[data-id]"); if(!tr) return;
+  var o = state.orders.find(x=>x.id===tr.dataset.id);
+  if(o) openModal(o, null);
+});
+
 function renderSidebar(){
   var ready = filteredOrders().filter(isReadyNotDone).sort((a,b)=> (a.productionStart||"") < (b.productionStart||"") ? -1 : 1);
   $("#ready-count").textContent = ready.length + (ready.length===1 ? " Auftrag wartet" : " Aufträge warten");
@@ -701,6 +836,10 @@ function renderSidebar(){
     } else {
       readyHtml += '<div class="ready-since">Als bereit markiert</div>';
     }
+    var readyTags = "";
+    if(o.readyWerkstatt) readyTags += '<span class="tag tag-werkstatt">Werkstatt</span>';
+    if(o.readyMontage) readyTags += '<span class="tag tag-montage">Montage</span>';
+    if(readyTags) readyHtml += '<div class="order-tags" style="margin-top:5px;">' + readyTags + '</div>';
     readyHtml += "</div>";
   });
   $("#ready-list").innerHTML = readyHtml;
@@ -799,9 +938,9 @@ function openModal(order, prefillDate){
   $("#f-customer").value = order ? order.customer : "";
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
-  $("#f-phase").value = order ? (order.phase || "werkstatt") : "werkstatt";
+  $("#f-readyWerkstatt").checked = order ? !!order.readyWerkstatt : false;
+  $("#f-readyMontage").checked = order ? !!order.readyMontage : false;
   $("#f-completed").checked = order ? !!order.completed : false;
-  $("#f-ready").checked = order ? !!order.ready : false;
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
   $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
@@ -839,9 +978,9 @@ form.addEventListener("submit", async e=>{
     orderNumber, customer,
     description: $("#f-description").value.trim(),
     workshop: $("#f-workshop").value,
-    phase: $("#f-phase").value,
+    readyWerkstatt: $("#f-readyWerkstatt").checked,
+    readyMontage: $("#f-readyMontage").checked,
     completed: $("#f-completed").checked,
-    ready: $("#f-ready").checked,
     productionStart: $("#f-productionStart").value,
     assemblyDate: $("#f-assemblyDate").value,
     materials,
