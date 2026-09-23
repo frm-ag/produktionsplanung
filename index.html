@@ -260,6 +260,10 @@
   .gt-item .gt-remove:hover{color:var(--danger);}
   .gt-empty{text-align:center;color:var(--text-muted);font-size:13px;padding:30px 10px;}
   #table-page{max-width:1400px;margin:0 auto;}
+  .table-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .table-toolbar #table-search{flex:1;min-width:180px;font:inherit;font-size:13px;padding:8px 11px;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .ready-filter-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:12px;padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;}
+  .ready-filter-btn.active{background:var(--success);border-color:var(--success);color:#fff;}
   .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:9px;background:var(--panel);}
   .overview-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:960px;}
   .overview-table thead th{
@@ -389,6 +393,11 @@
   </div>
 
   <div id="table-page" style="display:none;">
+    <div class="table-toolbar">
+      <input type="text" id="table-search" placeholder="Auftragsnummer suchen…" autocomplete="off">
+      <button type="button" class="ready-filter-btn" id="rf-werkstatt" data-ready-filter="readyWerkstatt">Werkstatt bereit</button>
+      <button type="button" class="ready-filter-btn" id="rf-montage" data-ready-filter="readyMontage">Montage bereit</button>
+    </div>
     <div class="table-scroll">
       <table class="overview-table" id="overview-table">
         <thead>
@@ -586,7 +595,7 @@ function subscribeGeneralTodos(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], generalTodos: [], view: "table", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "productionStart", dir: "asc" } };
+var state = { orders: [], generalTodos: [], view: "table", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false } };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -773,13 +782,19 @@ $("#general-todos-list").addEventListener("click", async e=>{
 
 function renderTable(){
   var rows = filteredOrders().slice();
+  var search = state.tableSearch.trim().toLowerCase();
+  if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search));
+  if(state.readyFilter.readyWerkstatt) rows = rows.filter(o=>!!o.readyWerkstatt);
+  if(state.readyFilter.readyMontage) rows = rows.filter(o=>!!o.readyMontage);
   var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
   rows.sort((a,b)=>{
-    var av = (a[f]||"").toString().toLowerCase(), bv = (b[f]||"").toString().toLowerCase();
+    var av = (a[f]||"").toString(), bv = (b[f]||"").toString();
     if(av === bv) return 0;
     if(av === "") return 1;
     if(bv === "") return -1;
-    return av < bv ? -1*dir : 1*dir;
+    var an = Number(av), bn = Number(bv);
+    if(!isNaN(an) && !isNaN(bn)) return an < bn ? -1*dir : 1*dir;
+    return av.toLowerCase() < bv.toLowerCase() ? -1*dir : 1*dir;
   });
   document.querySelectorAll("#overview-table thead th[data-sort]").forEach(th=>{
     th.classList.toggle("sorted", th.dataset.sort === state.tableSort.field);
@@ -809,6 +824,15 @@ function renderTable(){
   });
   tbody.innerHTML = html;
 }
+$("#table-search").addEventListener("input", e=>{ state.tableSearch = e.target.value; renderTable(); });
+document.querySelectorAll(".ready-filter-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    var key = btn.dataset.readyFilter;
+    state.readyFilter[key] = !state.readyFilter[key];
+    btn.classList.toggle("active", state.readyFilter[key]);
+    renderTable();
+  });
+});
 $("#overview-table thead").addEventListener("click", e=>{
   var th = e.target.closest("th[data-sort]"); if(!th) return;
   var field = th.dataset.sort;
