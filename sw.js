@@ -1,4 +1,4 @@
-const CACHE = 'produktionsplanung-v1';
+const CACHE = 'produktionsplanung-v2';
 const SHELL = ['./index.html', './manifest.json', './icon.png'];
 
 self.addEventListener('install', event => {
@@ -17,12 +17,19 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Nur die App-Shell (HTML/CSS/JS) aus dem Cache bedienen.
+// Erst Netzwerk versuchen (damit Änderungen sofort ankommen, ohne hartes Neuladen),
+// nur bei fehlendem Internet auf die zuletzt gespeicherte Version zurückfallen.
 // Firestore-Anfragen laufen immer live über das Netzwerk (kein Caching der Daten).
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  if(url.origin !== self.location.origin) return; // externe Requests (Firebase, Fonts) nicht anfassen
+  if(url.origin !== self.location.origin) return; // externe Requests (Firebase, Fonts, pdf.js) nicht anfassen
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    fetch(event.request)
+      .then(resp => {
+        const clone = resp.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, clone));
+        return resp;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
