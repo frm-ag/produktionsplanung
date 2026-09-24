@@ -495,9 +495,9 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -625,13 +625,23 @@ function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({ "&":"&a
 
 /* ---------- PDF-Liefertermin-Erkennung (läuft komplett im Browser, via pdf.js) ---------- */
 
-if(window.pdfjsLib){
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
-}
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+
+var pdfWorkerReady = (async function(){
+  // Manche Browser blockieren das direkte Laden eines "Workers" von einer fremden Adresse (CDN).
+  // Als Absicherung wird das Worker-Skript stattdessen geladen und als lokale Kopie bereitgestellt.
+  try{
+    var resp = await fetch(pdfjsLib.GlobalWorkerOptions.workerSrc);
+    var code = await resp.text();
+    var blob = new Blob([code], { type: "text/javascript" });
+    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+  }catch(e){ /* Fallback: Original-CDN-Adresse bleibt bestehen */ }
+})();
 
 async function extractPdfText(file){
+  await pdfWorkerReady;
   var buf = await file.arrayBuffer();
-  var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   var text = "";
   for(var i=1; i<=pdf.numPages; i++){
     var page = await pdf.getPage(i);
@@ -663,7 +673,6 @@ function findLieferdatum(text){
 }
 
 async function extractLieferdatumFromPdf(file){
-  if(!window.pdfjsLib) throw new Error("pdf.js nicht geladen");
   var text = await extractPdfText(file);
   return findLieferdatum(text);
 }
