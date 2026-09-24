@@ -180,22 +180,26 @@
   .btn.danger{background:transparent;border-color:var(--danger);color:var(--danger);}
 
   .materials-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
-  .material-row{display:grid;grid-template-columns:1fr 100px 122px 26px;gap:6px;margin-bottom:6px;align-items:center;}
+  .material-row{display:grid;grid-template-columns:1fr 100px 122px 30px 26px;gap:6px;margin-bottom:6px;align-items:center;}
   .material-row input,.material-row select{font:inherit;font-size:12px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .material-row .mat-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;}
   .material-row .mat-remove:hover{color:var(--danger);}
+  .material-row .mat-pdf-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);cursor:pointer;font-size:13px;width:30px;height:28px;border-radius:5px;}
+  .material-row .mat-pdf-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .material-row .mat-pdf-btn.busy{opacity:.5;pointer-events:none;}
   .mat-date-wrap .mat-date-display{width:100%;}
   .mat-date-wrap{display:block;}
   @media (max-width:560px){
     .material-row{
-      grid-template-columns:1fr 1fr;
-      grid-template-areas:"name remove" "status date";
+      grid-template-columns:1fr 1fr 30px;
+      grid-template-areas:"name name remove" "status date pdf";
       row-gap:6px;
     }
     .material-row .mat-name{grid-area:name;}
     .material-row .mat-remove{grid-area:remove;justify-self:end;}
     .material-row .mat-status{grid-area:status;width:100%;}
     .material-row .mat-date-wrap{grid-area:date;width:100%;}
+    .material-row .mat-pdf-btn{grid-area:pdf;justify-self:end;}
   }
   .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
   .todos-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
@@ -491,6 +495,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -617,6 +622,51 @@ function updateWeekHint(inputId, hintId){
   $(hintId).textContent = val ? "KW " + isoWeek(val) : "";
 }
 function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+/* ---------- PDF-Liefertermin-Erkennung (läuft komplett im Browser, via pdf.js) ---------- */
+
+if(window.pdfjsLib){
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+}
+
+async function extractPdfText(file){
+  var buf = await file.arrayBuffer();
+  var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  var text = "";
+  for(var i=1; i<=pdf.numPages; i++){
+    var page = await pdf.getPage(i);
+    var content = await page.getTextContent();
+    text += content.items.map(it=>it.str).join(" ") + "\n";
+  }
+  return text;
+}
+
+function germanDateToIso(dateStr){
+  var m = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if(!m) return null;
+  var day = m[1].padStart(2,"0"), month = m[2].padStart(2,"0");
+  var year = m[3].length === 2 ? "20" + m[3] : m[3];
+  return year + "-" + month + "-" + day;
+}
+
+// Sucht gezielt nach "Liefertermin" (bzw. gängigen Varianten) und dem nächstgelegenen Datum danach.
+function findLieferdatum(text){
+  var labels = ["Liefertermin", "Liefertermin ca", "Liefertermin:", "voraussichtlicher Liefertermin", "Lieferdatum", "Liefertag", "Lieferwoche"];
+  for(var i=0; i<labels.length; i++){
+    var idx = text.toLowerCase().indexOf(labels[i].toLowerCase());
+    if(idx === -1) continue;
+    var window_ = text.slice(idx, idx + 60);
+    var iso = germanDateToIso(window_);
+    if(iso) return iso;
+  }
+  return null;
+}
+
+async function extractLieferdatumFromPdf(file){
+  if(!window.pdfjsLib) throw new Error("pdf.js nicht geladen");
+  var text = await extractPdfText(file);
+  return findLieferdatum(text);
+}
 
 function getWeekDays(refISO){
   var d=fromISO(refISO), day=d.getDay(), diff = day===0?-6:1-day;
@@ -892,15 +942,43 @@ function renderMaterialRows(){
       '<input class="mat-name" placeholder="z. B. Glas, Stahl, Beschläge" value="' + escapeHtml(m.name) + '">' +
       '<select class="mat-status"><option value="geliefert"' + (m.status==="geliefert"?" selected":"") + '>Geliefert</option><option value="ausstehend"' + (m.status==="ausstehend"?" selected":"") + '>Ausstehend</option></select>' +
       '<span class="mat-date-wrap"><input type="text" class="mat-date-display date-input" readonly placeholder="TT.MM.JJJJ" value="' + (m.expectedDate ? isoToDisplay(m.expectedDate) : "") + '"><input type="hidden" class="mat-date" value="' + (m.expectedDate||"") + '"></span>' +
+      '<button type="button" class="mat-pdf-btn" title="Auftragsbestätigung (PDF) einlesen">📄</button>' +
+      '<input type="file" accept="application/pdf" class="mat-pdf-input" style="display:none;">' +
       '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button></div>';
   });
   list.innerHTML = html;
 }
 $("#add-material-btn").addEventListener("click", ()=>{ state.modalMaterials.push({name:"",status:"ausstehend",expectedDate:""}); renderMaterialRows(); });
 $("#materials-list").addEventListener("click", e=>{
+  var pdfBtn = e.target.closest(".mat-pdf-btn");
+  if(pdfBtn){ pdfBtn.closest(".material-row").querySelector(".mat-pdf-input").click(); return; }
   var btn = e.target.closest(".mat-remove"); if(!btn) return;
   var idx = Number(btn.closest(".material-row").dataset.idx);
   state.modalMaterials.splice(idx,1); renderMaterialRows();
+});
+$("#materials-list").addEventListener("change", async e=>{
+  if(!e.target.classList.contains("mat-pdf-input")) return;
+  var file = e.target.files[0]; if(!file) return;
+  var row = e.target.closest(".material-row");
+  var idx = Number(row.dataset.idx);
+  var btn = row.querySelector(".mat-pdf-btn");
+  btn.classList.add("busy"); btn.textContent = "…";
+  try{
+    var iso = await extractLieferdatumFromPdf(file);
+    if(iso){
+      state.modalMaterials[idx].expectedDate = iso;
+      state.modalMaterials[idx].status = "ausstehend";
+      renderMaterialRows();
+      toast("Liefertermin erkannt: " + isoToDisplay(iso));
+    }else{
+      toast("Kein Liefertermin im PDF gefunden — bitte manuell eintragen.");
+    }
+  }catch(err){
+    console.error(err);
+    toast("PDF konnte nicht gelesen werden.");
+  }finally{
+    e.target.value = "";
+  }
 });
 $("#materials-list").addEventListener("input", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
