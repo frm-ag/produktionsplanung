@@ -180,27 +180,20 @@
   .btn.danger{background:transparent;border-color:var(--danger);color:var(--danger);}
 
   .materials-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
-  .material-row{display:grid;grid-template-columns:1fr 100px 122px 30px 26px;gap:6px;margin-bottom:6px;align-items:center;}
+  .material-row{border:1px solid var(--border);border-radius:7px;padding:8px;margin-bottom:8px;background:var(--panel);}
   .material-row input,.material-row select{font:inherit;font-size:12px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
-  .material-row .mat-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;}
+  .mat-row1{display:flex;gap:6px;margin-bottom:6px;}
+  .mat-row1 .mat-name{flex:1;}
+  .mat-row2{display:flex;gap:6px;flex-wrap:wrap;}
+  .mat-row2 .mat-phase,.mat-row2 .mat-status{flex:1 1 100px;min-width:90px;}
+  .mat-row2 .mat-date-wrap{flex:1 1 110px;min-width:100px;}
+  .material-row .mat-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
   .material-row .mat-remove:hover{color:var(--danger);}
-  .material-row .mat-pdf-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);cursor:pointer;font-size:13px;width:30px;height:28px;border-radius:5px;}
+  .material-row .mat-pdf-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);cursor:pointer;font-size:13px;width:30px;height:28px;border-radius:5px;flex:none;}
   .material-row .mat-pdf-btn:hover{border-color:var(--accent);color:var(--accent);}
   .material-row .mat-pdf-btn.busy{opacity:.5;pointer-events:none;}
   .mat-date-wrap .mat-date-display{width:100%;}
   .mat-date-wrap{display:block;}
-  @media (max-width:560px){
-    .material-row{
-      grid-template-columns:1fr 1fr 30px;
-      grid-template-areas:"name name remove" "status date pdf";
-      row-gap:6px;
-    }
-    .material-row .mat-name{grid-area:name;}
-    .material-row .mat-remove{grid-area:remove;justify-self:end;}
-    .material-row .mat-status{grid-area:status;width:100%;}
-    .material-row .mat-date-wrap{grid-area:date;width:100%;}
-    .material-row .mat-pdf-btn{grid-area:pdf;justify-self:end;}
-  }
   .add-material-btn{border:1px dashed var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:11.5px;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;}
   .todos-box{border:1px solid var(--border);border-radius:7px;padding:8px;background:var(--panel-alt);}
   .todo-row{display:grid;grid-template-columns:20px 1fr 108px 26px;gap:6px;margin-bottom:6px;align-items:center;}
@@ -292,7 +285,8 @@
   .ov-mat-line.warn-text{color:var(--warn);font-weight:600;}
   .ov-ready-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:700;}
   .ov-ready-icon.yes{background:#e3f2e9;color:var(--success);}
-  .ov-ready-icon.no{background:var(--panel-alt);color:#c3ccd1;}
+  .ov-ready-icon.no{background:var(--warn-soft);color:var(--warn);}
+  .ov-ready-icon.na{background:var(--panel-alt);color:#c3ccd1;}
   .ov-empty-row td{text-align:center;color:var(--text-muted);padding:40px 10px;}
 
   @media (max-width:720px){
@@ -466,16 +460,6 @@
         <div class="todos-box">
           <div id="todos-list"></div>
           <button type="button" class="add-todo-btn" id="add-todo-btn">+ To-Do hinzufügen</button>
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field" style="display:flex;align-items:center;gap:8px;">
-          <input type="checkbox" id="f-readyWerkstatt" style="width:16px;height:16px;">
-          <label for="f-readyWerkstatt" style="margin:0;">Bereit: Werkstatt/Produktion</label>
-        </div>
-        <div class="field" style="display:flex;align-items:center;gap:8px;">
-          <input type="checkbox" id="f-readyMontage" style="width:16px;height:16px;">
-          <label for="f-readyMontage" style="margin:0;">Bereit: Montage</label>
         </div>
       </div>
       <div class="field" style="display:flex;align-items:center;gap:8px;">
@@ -828,7 +812,11 @@ function todoProgress(o){
 }
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
 function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
-function isReadyNotDone(o){ return (!!o.readyWerkstatt || !!o.readyMontage) && !o.completed; }
+function materialBlocksPhase(m, phase){ return m.status==="ausstehend" && ((m.phase||"beide")===phase || (m.phase||"beide")==="beide"); }
+function hasPendingMaterialForPhase(o, phase){ return orderMaterials(o).some(m=>materialBlocksPhase(m, phase)); }
+function isWerkstattReady(o){ return !!o.productionStart && !hasPendingMaterialForPhase(o, "werkstatt"); }
+function isMontageReady(o){ return !!o.assemblyDate && !hasPendingMaterialForPhase(o, "montage"); }
+function isReadyNotDone(o){ return (isWerkstattReady(o) || isMontageReady(o)) && !o.completed; }
 function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.productionStart)) / 86400000); }
 
 /* ---------- Rendering ---------- */
@@ -865,7 +853,7 @@ function orderCardHTML(o, isMontageOnly){
   var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
   var tagClass = o.workshop==="aluminium" ? "tag-aluminium" : (o.workshop==="reparaturen" ? "tag-reparaturen" : "");
   var phase = isMontageOnly ? "montage" : "werkstatt";
-  var phaseReady = phase==="montage" ? !!o.readyMontage : !!o.readyWerkstatt;
+  var phaseReady = phase==="montage" ? isMontageReady(o) : isWerkstattReady(o);
   var tags = '<span class="tag ' + (phase==="montage" ? "tag-montage" : "tag-werkstatt") + '">' + (phase==="montage" ? "Montage" : "Werkstatt") + '</span>';
   tags += '<span class="tag ' + (phaseReady?"tag-ready":"tag-notready") + '">' + (phaseReady?"Bereit":"Nicht bereit") + '</span>';
   tags += '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
@@ -876,7 +864,8 @@ function orderCardHTML(o, isMontageOnly){
   mats.forEach(m=>{
     var isOk = m.status==="geliefert";
     var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
-    matLines += '<div class="material-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + " · " + line + "</div>";
+    var forTag = m.phase==="werkstatt" ? " (Werkstatt)" : (m.phase==="montage" ? " (Montage)" : "");
+    matLines += '<div class="material-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + forTag + " · " + line + "</div>";
   });
   var todoLines = "";
   orderTodos(o).forEach((t,i)=>{
@@ -969,8 +958,8 @@ function renderTable(){
   var rows = filteredOrders().slice();
   var search = state.tableSearch.trim().toLowerCase();
   if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search));
-  if(state.readyFilter.readyWerkstatt) rows = rows.filter(o=>!!o.readyWerkstatt);
-  if(state.readyFilter.readyMontage) rows = rows.filter(o=>!!o.readyMontage);
+  if(state.readyFilter.readyWerkstatt) rows = rows.filter(o=>isWerkstattReady(o));
+  if(state.readyFilter.readyMontage) rows = rows.filter(o=>isMontageReady(o));
   var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
   rows.sort((a,b)=>{
     var av = (a[f]||"").toString(), bv = (b[f]||"").toString();
@@ -993,7 +982,8 @@ function renderTable(){
     var matHtml = mats.length===0 ? '<span style="color:#c3ccd1;">–</span>' : mats.map(m=>{
       var isOk = m.status==="geliefert";
       var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
-      return '<div class="ov-mat-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + " · " + line + "</div>";
+      var forTag = m.phase==="werkstatt" ? " (W)" : (m.phase==="montage" ? " (M)" : "");
+      return '<div class="ov-mat-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + forTag + " · " + line + "</div>";
     }).join("");
     html += '<tr class="' + (o.completed?"row-completed":"") + '" data-id="' + o.id + '">';
     html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
@@ -1002,8 +992,10 @@ function renderTable(){
     html += '<td data-label="Material">' + matHtml + '</td>';
     html += '<td data-label="Start">' + (o.productionStart ? fmtShort(o.productionStart) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
     html += '<td data-label="Montage">' + (o.assemblyDate ? fmtShort(o.assemblyDate) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
-    html += '<td data-label="Werkstatt bereit"><span class="ov-ready-icon ' + (o.readyWerkstatt?"yes":"no") + '">' + (o.readyWerkstatt?"✓":"–") + '</span></td>';
-    html += '<td data-label="Montage bereit"><span class="ov-ready-icon ' + (o.readyMontage?"yes":"no") + '">' + (o.readyMontage?"✓":"–") + '</span></td>';
+    var wReady = o.productionStart ? (isWerkstattReady(o)?"yes":"no") : "na";
+    var mReady = o.assemblyDate ? (isMontageReady(o)?"yes":"no") : "na";
+    html += '<td data-label="Werkstatt bereit"><span class="ov-ready-icon ' + wReady + '">' + (wReady==="yes"?"✓":(wReady==="no"?"✗":"–")) + '</span></td>';
+    html += '<td data-label="Montage bereit"><span class="ov-ready-icon ' + mReady + '">' + (mReady==="yes"?"✓":(mReady==="no"?"✗":"–")) + '</span></td>';
     html += '<td data-label="Status">' + (o.completed ? "Erledigt" : "Offen") + '</td>';
     html += '</tr>';
   });
@@ -1046,8 +1038,8 @@ function renderSidebar(){
       readyHtml += '<div class="ready-since">Als bereit markiert</div>';
     }
     var readyTags = "";
-    if(o.readyWerkstatt) readyTags += '<span class="tag tag-werkstatt">Werkstatt</span>';
-    if(o.readyMontage) readyTags += '<span class="tag tag-montage">Montage</span>';
+    if(isWerkstattReady(o)) readyTags += '<span class="tag tag-werkstatt">Werkstatt</span>';
+    if(isMontageReady(o)) readyTags += '<span class="tag tag-montage">Montage</span>';
     if(readyTags) readyHtml += '<div class="order-tags" style="margin-top:5px;">' + readyTags + '</div>';
     readyHtml += "</div>";
   });
@@ -1073,17 +1065,22 @@ function renderMaterialRows(){
   if(state.modalMaterials.length===0){ list.innerHTML = '<div class="materials-empty">Noch kein Material erfasst.</div>'; return; }
   var html = "";
   state.modalMaterials.forEach((m,i)=>{
+    var phase = m.phase || "beide";
     html += '<div class="material-row" data-idx="' + i + '">' +
+      '<div class="mat-row1">' +
       '<input class="mat-name" placeholder="z. B. Glas, Stahl, Beschläge" value="' + escapeHtml(m.name) + '">' +
+      '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button>' +
+      '</div><div class="mat-row2">' +
+      '<select class="mat-phase" title="Benötigt für"><option value="werkstatt"' + (phase==="werkstatt"?" selected":"") + '>Werkstatt</option><option value="montage"' + (phase==="montage"?" selected":"") + '>Montage</option><option value="beide"' + (phase==="beide"?" selected":"") + '>Werkstatt + Montage</option></select>' +
       '<select class="mat-status"><option value="geliefert"' + (m.status==="geliefert"?" selected":"") + '>Geliefert</option><option value="ausstehend"' + (m.status==="ausstehend"?" selected":"") + '>Ausstehend</option></select>' +
       '<span class="mat-date-wrap"><input type="text" class="mat-date-display date-input" readonly placeholder="TT.MM.JJJJ" value="' + (m.expectedDate ? isoToDisplay(m.expectedDate) : "") + '"><input type="hidden" class="mat-date" value="' + (m.expectedDate||"") + '"></span>' +
       '<button type="button" class="mat-pdf-btn" title="Auftragsbestätigung (PDF) einlesen">📄</button>' +
       '<input type="file" accept="application/pdf" class="mat-pdf-input" style="display:none;">' +
-      '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button></div>';
+      '</div></div>';
   });
   list.innerHTML = html;
 }
-$("#add-material-btn").addEventListener("click", ()=>{ state.modalMaterials.push({name:"",status:"ausstehend",expectedDate:""}); renderMaterialRows(); });
+$("#add-material-btn").addEventListener("click", ()=>{ state.modalMaterials.push({name:"",status:"ausstehend",expectedDate:"",phase:"beide"}); renderMaterialRows(); });
 $("#materials-list").addEventListener("click", e=>{
   var pdfBtn = e.target.closest(".mat-pdf-btn");
   if(pdfBtn){ pdfBtn.closest(".material-row").querySelector(".mat-pdf-input").click(); return; }
@@ -1127,6 +1124,7 @@ $("#materials-list").addEventListener("change", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
   var idx = Number(row.dataset.idx); if(!state.modalMaterials[idx]) return;
   if(e.target.classList.contains("mat-status")) state.modalMaterials[idx].status = e.target.value;
+  if(e.target.classList.contains("mat-phase")) state.modalMaterials[idx].phase = e.target.value;
 });
 
 function renderTodoRows(){
@@ -1175,8 +1173,6 @@ function openModal(order, prefillDate){
   $("#f-customer").value = order ? order.customer : "";
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
-  $("#f-readyWerkstatt").checked = order ? !!order.readyWerkstatt : false;
-  $("#f-readyMontage").checked = order ? !!order.readyMontage : false;
   $("#f-completed").checked = order ? !!order.completed : false;
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
@@ -1184,7 +1180,7 @@ function openModal(order, prefillDate){
   $("#f-assemblyDate-display").value = isoToDisplay($("#f-assemblyDate").value);
   updateWeekHint("#f-productionStart", "#f-productionStart-week");
   updateWeekHint("#f-assemblyDate", "#f-assemblyDate-week");
-  state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:""}];
+  state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:"",phase:"beide"}];
   renderMaterialRows();
   state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
   renderTodoRows();
@@ -1206,7 +1202,7 @@ form.addEventListener("submit", async e=>{
   var customer = $("#f-customer").value.trim();
   if(!orderNumber || !customer) return;
   var materials = state.modalMaterials
-    .map(m=>({ name:(m.name||"").trim(), status:m.status, expectedDate:m.expectedDate||"" }))
+    .map(m=>({ name:(m.name||"").trim(), status:m.status, expectedDate:m.expectedDate||"", phase: m.phase||"beide" }))
     .filter(m=>m.name.length>0);
   var todos = state.modalTodos
     .map(t=>({ text:(t.text||"").trim(), done: !!t.done, dueDate: t.dueDate||"" }))
@@ -1215,8 +1211,6 @@ form.addEventListener("submit", async e=>{
     orderNumber, customer,
     description: $("#f-description").value.trim(),
     workshop: $("#f-workshop").value,
-    readyWerkstatt: $("#f-readyWerkstatt").checked,
-    readyMontage: $("#f-readyMontage").checked,
     completed: $("#f-completed").checked,
     productionStart: $("#f-productionStart").value,
     assemblyDate: $("#f-assemblyDate").value,
