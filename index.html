@@ -398,7 +398,7 @@
 
   <div id="table-page" style="display:none;">
     <div class="table-toolbar">
-      <input type="text" id="table-search" placeholder="Auftragsnummer suchen…" autocomplete="off">
+      <input type="text" id="table-search" placeholder="Auftragsnummer oder Kunde suchen…" autocomplete="off">
       <button type="button" class="ready-filter-btn" id="rf-werkstatt" data-ready-filter="readyWerkstatt">Werkstatt bereit</button>
       <button type="button" class="ready-filter-btn" id="rf-montage" data-ready-filter="readyMontage">Montage bereit</button>
     </div>
@@ -968,7 +968,7 @@ $("#general-todos-list").addEventListener("click", async e=>{
 function renderTable(){
   var rows = filteredOrders().slice();
   var search = state.tableSearch.trim().toLowerCase();
-  if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search));
+  if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search));
   if(state.readyFilter.readyWerkstatt) rows = rows.filter(o=>!!o.readyWerkstatt);
   if(state.readyFilter.readyMontage) rows = rows.filter(o=>!!o.readyMontage);
   var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
