@@ -261,6 +261,24 @@
   .gt-item .gt-remove:hover{color:var(--danger);}
   .gt-empty{text-align:center;color:var(--text-muted);font-size:13px;padding:30px 10px;}
   #table-page{max-width:1400px;margin:0 auto;}
+  #verwaltung-page{max-width:520px;margin:0 auto;}
+  #verwaltung-main label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted);margin:14px 0 4px;}
+  #verwaltung-main input[type="text"],#verwaltung-main select{width:100%;font:inherit;font-size:14px;padding:9px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  #verwaltung-main .section-title{font-family:var(--disp);font-size:14px;margin:0 0 10px;}
+  #verwaltung-main .movement-row{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;}
+  #verwaltung-main .m-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex:none;background:var(--panel-alt);}
+  #verwaltung-main .m-icon.in{background:var(--ok-soft,#e3f2e9);color:var(--success);}
+  #verwaltung-main .m-icon.out{background:var(--panel-alt);color:var(--text-muted);}
+  #verwaltung-main .m-info{flex:1;min-width:0;}
+  #verwaltung-main .m-name{font-size:13px;font-weight:600;}
+  #verwaltung-main .m-meta{font-size:11px;color:var(--text-muted);}
+  #verwaltung-main .role-badge{font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid var(--accent-dim);padding:1px 6px;border-radius:3px;margin-left:6px;}
+  #verwaltung-main .btn-row{margin-top:10px;}
+  #verwaltung-main .btn-block{width:100%;}
+  #verwaltung-main .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:7px;font:inherit;font-size:13.5px;font-weight:600;padding:10px;cursor:pointer;}
+  #verwaltung-main .btn-secondary{background:var(--panel-alt);color:var(--text);border:1px solid var(--border);border-radius:6px;font:inherit;cursor:pointer;}
+  #verwaltung-main .empty-state{text-align:center;color:var(--text-muted);padding:40px 10px;}
+  #verwaltung-main .empty-state .disp{font-family:var(--disp);font-weight:700;color:var(--text);margin-bottom:6px;}
 
   /* ---------- Stempeluhr ---------- */
   #zeit-page{max-width:900px;margin:0 auto;}
@@ -287,6 +305,13 @@
   .zeit-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
   .zeit-toolbar #zeit-admin-date{width:140px;padding:8px 10px;font-size:13px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .overview-table tbody tr.zeit-row{cursor:pointer;}
+  .overview-table tbody tr.zeit-row-unlinked{opacity:.6;}
+  .zeit-nolink{font-size:10px;color:var(--warn);font-weight:600;}
+  .zeit-status-pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+  .zeit-status-pill.da{background:var(--ok-soft, #e3f2e9);color:var(--success);}
+  .zeit-status-pill.pause{background:var(--warn-soft);color:var(--warn);}
+  .zeit-status-pill.nicht-da{background:var(--panel-alt);color:var(--text-muted);}
+  .zeit-status-pill.abwesend{background:#e3ebf3;color:var(--accent);}
   .zeit-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;}
   .zeit-edit-row select{flex:1 1 130px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row input[type="time"]{flex:1 1 90px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
@@ -303,7 +328,13 @@
   .staff-grid-header > div:first-child{border-left:none;}
   .staff-row{display:grid;grid-template-columns:160px repeat(5,1fr);border-bottom:1px solid var(--border);}
   .staff-row:last-child{border-bottom:none;}
-  .staff-row-name{padding:10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel-alt);cursor:grab;}
+  .staff-row-name{padding:10px;font-size:12.5px;font-weight:600;display:flex;flex-direction:column;gap:5px;background:var(--panel-alt);cursor:grab;}
+  .staff-name-line{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .staff-link-select{font-size:10px;font-weight:500;padding:3px 4px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);width:100%;cursor:pointer;}
+  .absence-banner{font-size:10.5px;font-weight:700;text-align:center;padding:5px 4px;border-radius:5px;margin-bottom:4px;}
+  .absence-ferien{background:#e3ebf3;color:var(--accent);}
+  .absence-krank{background:var(--warn-soft);color:var(--warn);}
+  .absence-sonstiges{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
   .staff-row-name:active{cursor:grabbing;}
   .staff-row-name.drag-over-row{outline:2px solid var(--accent);outline-offset:-2px;}
   .staff-row-name .staff-name-group{display:flex;align-items:center;gap:6px;min-width:0;}
@@ -967,6 +998,7 @@
       <button data-view="staff">Personal</button>
       <button data-view="todos">To-Dos</button>
       <button data-view="lager">Lager</button>
+      <button data-view="verwaltung">Verwaltung</button>
     </div>
 
     <div class="filter-chips" id="filter-chips">
@@ -1036,16 +1068,22 @@
         <h2 class="zeit-h2" style="margin:0;">Alle Mitarbeiter</h2>
         <input type="text" id="zeit-admin-date" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
         <input type="hidden" id="zeit-admin-date-hidden">
+        <span style="flex:1;"></span>
+        <button type="button" class="btn" id="zeit-absence-add-btn">+ Abwesenheit eintragen</button>
       </div>
       <div class="table-scroll">
         <table class="overview-table" id="zeit-admin-table">
           <thead>
-            <tr><th>Mitarbeiter</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th></tr>
+            <tr><th>Mitarbeiter</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th></tr>
           </thead>
           <tbody id="zeit-admin-tbody"></tbody>
         </table>
       </div>
     </div>
+  </div>
+
+  <div id="verwaltung-page" style="display:none;">
+    <div id="verwaltung-main"></div>
   </div>
 
   <div id="lager-page" style="display:none;">
@@ -1092,7 +1130,7 @@
     </button>
     <button data-tab="admin" id="navAdmin" style="display:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Verwaltung
+      Lager-Tools
     </button>
   </nav>
 </div>
@@ -1162,6 +1200,48 @@
         <div style="display:flex;gap:8px;margin-left:auto;">
           <button type="button" class="btn" id="staff-add-cancel-btn">Abbrechen</button>
           <button type="submit" class="btn primary">Hinzufügen</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="absence-modal-backdrop">
+  <div class="modal" style="max-width:380px;">
+    <h3>Abwesenheit eintragen</h3>
+    <form id="absence-form">
+      <div class="field">
+        <label for="absence-staff">Mitarbeiter</label>
+        <select id="absence-staff" required></select>
+      </div>
+      <div class="field">
+        <label for="absence-type">Art</label>
+        <select id="absence-type">
+          <option value="ferien">Ferien</option>
+          <option value="krank">Krank</option>
+          <option value="sonstiges">Sonstiges</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="absence-start-display">Von</label>
+          <span class="date-field">
+            <input type="text" id="absence-start-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
+            <input type="hidden" id="absence-start">
+          </span>
+        </div>
+        <div class="field">
+          <label for="absence-end-display">Bis</label>
+          <span class="date-field">
+            <input type="text" id="absence-end-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
+            <input type="hidden" id="absence-end">
+          </span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button type="button" class="btn" id="absence-cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Speichern</button>
         </div>
       </div>
     </form>
@@ -1268,6 +1348,7 @@ const TODOS_COLLECTION = "allgemeine_todos";
 const STAFF_COLLECTION = "mitarbeiter";
 const ASSIGNMENTS_COLLECTION = "einsaetze";
 const TIME_COLLECTION = "zeiterfassung";
+const ABSENCES_COLLECTION = "abwesenheiten";
 
 // Gleiche Pseudo-Domain wie Mat.Lager, damit dieselben Benutzerkonten funktionieren.
 const AUTH_DOMAIN_SUFFIX = '@matlager.local';
@@ -1308,6 +1389,8 @@ let unsubStaff = null;
 let unsubAssignments = null;
 let unsubMyTime = null;
 let unsubAllTime = null;
+let unsubProfiles2 = null;
+let unsubAbsences = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -1326,12 +1409,16 @@ onAuthStateChanged(auth, async user => {
     if(unsubStaff) unsubStaff();
     if(unsubAssignments) unsubAssignments();
     if(unsubMyTime) unsubMyTime();
+    if(unsubProfiles2) unsubProfiles2();
+    if(unsubAbsences) unsubAbsences();
     subscribeOrders();
     subscribeGeneralTodos();
     subscribeStaff();
     subscribeAssignments();
     subscribeMyTime();
-    if(state.isAdmin) subscribeAllTime(); else if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; }
+    subscribeAbsences();
+    if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
+    else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
     if(unsubOrders) unsubOrders();
     if(unsubGeneralTodos) unsubGeneralTodos();
@@ -1339,6 +1426,8 @@ onAuthStateChanged(auth, async user => {
     if(unsubAssignments) unsubAssignments();
     if(unsubMyTime) unsubMyTime();
     if(unsubAllTime) unsubAllTime();
+    if(unsubProfiles2) unsubProfiles2();
+    if(unsubAbsences) unsubAbsences();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -1348,7 +1437,7 @@ onAuthStateChanged(auth, async user => {
 // Blendet Reiter je nach Rolle ein/aus: Mitarbeiter sehen nur Stempeluhr, Lager, Personal;
 // Admin/Produktionsleitung sieht weiterhin alles.
 function applyRoleVisibility(){
-  var adminOnlyTabs = ["table","todos"];
+  var adminOnlyTabs = ["table","todos","verwaltung"];
   document.querySelectorAll("#view-seg button[data-view]").forEach(b=>{
     var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
     b.style.display = (isAdminOnly && !state.isAdmin) ? "none" : "inline-block";
@@ -1399,6 +1488,13 @@ function subscribeStaff(){
     });
     state.staff = list;
     if(state.view === "staff") renderStaffPage();
+    if(state.view === "zeit") renderZeitPage();
+  }, err => { console.error(err); });
+}
+function subscribeProfiles(){
+  const q = query(collection(db, "profiles"));
+  unsubProfiles2 = onSnapshot(q, snap => {
+    state.profiles = snap.docs.map(d => Object.assign({ uid: d.id }, d.data()));
   }, err => { console.error(err); });
 }
 function subscribeAssignments(){
@@ -1420,13 +1516,21 @@ function subscribeAllTime(){
   const q = query(collection(db, TIME_COLLECTION), orderBy('timestamp'));
   unsubAllTime = onSnapshot(q, snap => {
     state.allTime = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-    if(state.view === "zeit") renderZeitAdminTable();
+    if(state.view === "zeit") renderZeitOverview();
+  }, err => { console.error(err); });
+}
+function subscribeAbsences(){
+  const q = query(collection(db, ABSENCES_COLLECTION), orderBy('startDate'));
+  unsubAbsences = onSnapshot(q, snap => {
+    state.absences = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "zeit") renderZeitOverview();
+    if(state.view === "staff") renderStaffPage();
   }, err => { console.error(err); });
 }
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], generalTodos: [], staff: [], assignments: [], myTime: [], allTime: [], isAdmin: false, currentUid: null, currentName: "", view: "table", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
+var state = { orders: [], generalTodos: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], isAdmin: false, currentUid: null, currentName: "", view: "table", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -1665,18 +1769,21 @@ function render(){
   var isStaff = state.view === "staff";
   var isLager = state.view === "lager";
   var isZeit = state.view === "zeit";
+  var isVerwaltung = state.view === "verwaltung";
   $("#todos-page").style.display = isTodos ? "block" : "none";
   $("#table-page").style.display = isTable ? "block" : "none";
   $("#staff-page").style.display = isStaff ? "block" : "none";
   $("#lager-page").style.display = isLager ? "block" : "none";
   $("#zeit-page").style.display = isZeit ? "block" : "none";
-  $("#filter-chips").style.display = (isTodos || isStaff || isLager || isZeit) ? "none" : "inline-flex";
-  $("#add-btn").style.display = (isTodos || isStaff || isLager || isZeit) ? "none" : "inline-block";
+  $("#verwaltung-page").style.display = isVerwaltung ? "block" : "none";
+  $("#filter-chips").style.display = (isTodos || isStaff || isLager || isZeit || isVerwaltung) ? "none" : "inline-flex";
+  $("#add-btn").style.display = (isTodos || isStaff || isLager || isZeit || isVerwaltung) ? "none" : "inline-block";
   if(isTodos){ renderGeneralTodos(); return; }
   if(isTable){ renderTable(); return; }
   if(isStaff){ renderStaffPage(); return; }
   if(isLager){ return; }
   if(isZeit){ renderZeitPage(); return; }
+  if(isVerwaltung){ return; }
 }
 function renderHeader(){
   document.querySelectorAll("#view-seg button").forEach(b=>b.classList.toggle("active", b.dataset.view===state.view));
@@ -1802,6 +1909,11 @@ var STAFF_SEED_NAMES = [
   "Müller Mika","Sollberger Luca","Pacitto Livio"
 ];
 
+function absenceForDay(employeeId, iso){
+  return state.absences.find(a=> a.employeeId===employeeId && iso >= a.startDate && iso <= a.endDate) || null;
+}
+function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : "Abwesend"; }
+
 function renderStaffHeaderLabel(){
   var days = getWeekDays(state.staffRefDate);
   $("#staff-nav-label").textContent = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]) + " · KW " + isoWeek(toISO(days[0]));
@@ -1861,7 +1973,7 @@ function renderZeitPage(){
       $("#zeit-admin-date-hidden").value = iso;
       $("#zeit-admin-date").value = isoToDisplay(iso);
     }
-    renderZeitAdminTable();
+    renderZeitOverview();
   }
 }
 
@@ -1877,33 +1989,30 @@ $("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
 $("#zeit-pause-start").addEventListener("click", ()=>zeitPunch("pause_start"));
 $("#zeit-pause-ende").addEventListener("click", ()=>zeitPunch("pause_ende"));
 $("#zeit-gehen").addEventListener("click", ()=>zeitPunch("gehen"));
-$("#zeit-admin-date-hidden").addEventListener("input", renderZeitAdminTable);
+$("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 
-function renderZeitAdminTable(){
+function renderZeitOverview(){
   var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
-  var dayEntries = state.allTime.filter(t=>t.date===dateIso);
-  var byEmployee = {};
-  dayEntries.forEach(e=>{
-    if(!byEmployee[e.uid]) byEmployee[e.uid] = { name: e.name || e.uid, entries: [] };
-    byEmployee[e.uid].entries.push(e);
-  });
-  var rows = Object.keys(byEmployee).map(uid=>{
-    var g = byEmployee[uid];
-    g.entries.sort((a,b)=>a.timestamp-b.timestamp);
+  var tbody = $("#zeit-admin-tbody");
+  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="6">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
+  var rows = state.staff.map(emp=>{
+    var absence = absenceForDay(emp.id, dateIso);
+    var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
     var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
-    g.entries.forEach(e=>{
+    entries.forEach(e=>{
       if(e.type==="kommen" && !kommen) kommen = e.timestamp;
       else if(e.type==="pause_start") pauseStart = e.timestamp;
       else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
       else if(e.type==="gehen") gehen = e.timestamp;
     });
     var totalMs = (kommen && gehen) ? (gehen - kommen - pauseMs) : null;
-    return { uid: uid, name: g.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs };
-  }).sort((a,b)=> a.name.localeCompare(b.name));
-  var tbody = $("#zeit-admin-tbody");
-  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="5">Keine Einträge an diesem Tag.</td></tr>'; return; }
+    var status = absence ? absenceLabel(absence.type) : (pauseStart ? "In Pause" : (kommen && !gehen) ? "Anwesend" : (kommen && gehen) ? "Fertig" : "Nicht eingestempelt");
+    var statusClass = absence ? "abwesend" : (pauseStart ? "pause" : (kommen && !gehen) ? "da" : "nicht-da");
+    return { uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid };
+  });
   tbody.innerHTML = rows.map(r=>
-    '<tr class="zeit-row" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
+    '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + (r.linked?"":' <span class="zeit-nolink">kein Konto</span>') + '</td>' +
+    '<td data-label="Status"><span class="zeit-status-pill ' + r.statusClass + '">' + r.status + '</span></td>' +
     '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + '</td>' +
     '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
     '<td data-label="Pause">' + (r.pauseMs?fmtDuration(r.pauseMs):"–") + '</td>' +
@@ -1912,6 +2021,7 @@ function renderZeitAdminTable(){
 }
 $("#zeit-admin-tbody").addEventListener("click", e=>{
   var tr = e.target.closest("tr.zeit-row"); if(!tr) return;
+  if(!tr.dataset.uid){ toast("Für " + tr.dataset.name + " ist noch kein Konto verknüpft (unter \"Personal\")."); return; }
   openZeitEditModal(tr.dataset.uid, tr.dataset.name);
 });
 
@@ -1970,11 +2080,39 @@ $("#zeit-edit-rows").addEventListener("change", async e=>{
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
 });
 // Während das Bearbeiten-Fenster offen ist, Liste bei neuen Daten aktuell halten.
-var _origRenderZeitAdminTable = renderZeitAdminTable;
-renderZeitAdminTable = function(){
-  _origRenderZeitAdminTable();
+var _origRenderZeitOverview = renderZeitOverview;
+renderZeitOverview = function(){
+  _origRenderZeitOverview();
   if(zeitEditBackdrop.classList.contains("open")) renderZeitEditRows();
 };
+
+/* ---------- Abwesenheiten ---------- */
+
+var absenceBackdrop = $("#absence-modal-backdrop");
+$("#zeit-absence-add-btn").addEventListener("click", ()=>{
+  $("#absence-staff").innerHTML = state.staff.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("");
+  $("#absence-type").value = "ferien";
+  var todayIso = todayISO();
+  $("#absence-start").value = todayIso; $("#absence-start-display").value = isoToDisplay(todayIso);
+  $("#absence-end").value = todayIso; $("#absence-end-display").value = isoToDisplay(todayIso);
+  absenceBackdrop.classList.add("open");
+});
+$("#absence-cancel-btn").addEventListener("click", ()=> absenceBackdrop.classList.remove("open"));
+absenceBackdrop.addEventListener("click", e=>{ if(e.target===absenceBackdrop) absenceBackdrop.classList.remove("open"); });
+$("#absence-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var employeeId = $("#absence-staff").value;
+  var type = $("#absence-type").value;
+  var startDate = $("#absence-start").value;
+  var endDate = $("#absence-end").value || startDate;
+  if(!employeeId || !startDate){ toast("Bitte Mitarbeiter und Datum wählen."); return; }
+  if(endDate < startDate){ toast('"Bis" darf nicht vor "Von" liegen.'); return; }
+  try{
+    await addDoc(collection(db, ABSENCES_COLLECTION), { employeeId: employeeId, type: type, startDate: startDate, endDate: endDate, createdAt: Date.now() });
+    absenceBackdrop.classList.remove("open");
+    toast("Abwesenheit eingetragen.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
 
 function renderStaffPage(){
   renderStaffHeaderLabel();
@@ -1990,11 +2128,22 @@ function renderStaffGrid(){
   html += '</div>';
   state.staff.forEach(emp=>{
     html += '<div class="staff-row">';
-    html += '<div class="staff-row-name" draggable="true" data-staff-id="' + emp.id + '"><span class="staff-name-group"><span class="staff-drag-handle">⠿</span><span>' + escapeHtml(emp.name) + '</span></span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
+    html += '<div class="staff-row-name" draggable="true" data-staff-id="' + emp.id + '">';
+    html += '<div class="staff-name-line"><span class="staff-name-group"><span class="staff-drag-handle">⠿</span><span>' + escapeHtml(emp.name) + '</span></span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
+    if(state.isAdmin){
+      html += '<select class="staff-link-select" data-staff-id="' + emp.id + '"><option value="">— kein Konto —</option>' +
+        state.profiles.map(p=>'<option value="'+p.uid+'"'+(emp.uid===p.uid?' selected':'')+'>'+escapeHtml(p.username||p.uid)+'</option>').join('') +
+        '</select>';
+    }
+    html += '</div>';
     days.forEach(d=>{
       var iso = toISO(d);
+      var absence = absenceForDay(emp.id, iso);
       var assigns = state.assignments.filter(a=>a.employeeId===emp.id && a.date===iso);
       html += '<div class="staff-cell" data-employee-id="' + emp.id + '" data-date="' + iso + '">';
+      if(absence){
+        html += '<div class="absence-banner absence-' + absence.type + '" data-absence-id="' + absence.id + '">' + absenceLabel(absence.type) + '</div>';
+      }
       assigns.forEach(a=>{
         var o = state.orders.find(x=>x.id===a.orderId);
         var typ = a.type || "werkstatt";
@@ -2052,7 +2201,25 @@ $("#staff-grid").addEventListener("click", async e=>{
   if(addBtn){
     var cell = addBtn.closest(".staff-cell");
     openAssignModal(null, { employeeId: cell.dataset.employeeId, date: cell.dataset.date }, null);
+    return;
   }
+  var absBanner = e.target.closest(".absence-banner");
+  if(absBanner){
+    if(confirm("Diese Abwesenheit wirklich löschen?")){
+      try{ await deleteDoc(doc(db, ABSENCES_COLLECTION, absBanner.dataset.absenceId)); }
+      catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+    }
+    return;
+  }
+});
+$("#staff-grid").addEventListener("change", async e=>{
+  if(!e.target.classList.contains("staff-link-select")) return;
+  var staffId = e.target.dataset.staffId;
+  var uid = e.target.value;
+  try{
+    await updateDoc(doc(db, STAFF_COLLECTION, staffId), { uid: uid || null });
+    toast(uid ? "Konto verknüpft." : "Verknüpfung entfernt.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
 });
 
 /* Drag & Drop: Auftragskarte aus dem Pool auf eine Mitarbeiter-/Tageszelle ziehen */
@@ -2664,11 +2831,13 @@ function startListeners(){
   unsubProfiles = onSnapshot(collection(db, 'profiles'), snap => {
     profiles = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
     if(currentTab==='admin') render();
+    renderUserAdmin();
   }, err => { console.error(err); });
 
   unsubRoles = onSnapshot(collection(db, 'roles'), snap => {
     rolesList = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
     if(currentTab==='admin') render();
+    renderUserAdmin();
   }, err => { console.error(err); });
 
   unsubSettings = onSnapshot(doc(db, 'settings', 'notifications'), snap => {
@@ -2967,34 +3136,6 @@ function openAddWishSheet(){
 function renderAdmin(){
   if(!isAdmin){ main.innerHTML = `<div class="empty-state"><div class="disp">Kein Zugriff</div>Dieser Bereich ist nur für Admins.</div>`; return; }
 
-  const roleByUid = {};
-  rolesList.forEach(r => roleByUid[r.uid] = r.role);
-
-  const userRows = profiles.length ? profiles.map(p => {
-    const role = roleByUid[p.uid] || 'user';
-    const last = p.lastLogin ? fmtDate(p.lastLogin) : '—';
-    const isBlocked = !!p.blocked;
-    const isSelf = p.uid === currentUid;
-    let actionBtn = '';
-    if(!isSelf){
-      actionBtn = isBlocked
-        ? `<button class="btn btn-secondary" data-unblock="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;">Freischalten</button>`
-        : `<button class="btn btn-secondary" data-remove="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;color:var(--danger);">Entfernen</button>`;
-    }
-    return `
-    <div class="movement-row">
-      <div class="m-icon ${role==='admin'?'in':'out'}">${role==='admin'?'A':'M'}</div>
-      <div class="m-info">
-        <div class="m-name">${escapeHtml(p.username||p.uid)}${isBlocked ? ' <span class="role-badge" style="border-color:var(--danger);color:var(--danger);">Gesperrt</span>' : ''}</div>
-        <div class="m-meta">Letzter Login: ${last}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;">
-        <span class="role-badge" style="margin-left:0;">${role==='admin'?'Admin':'Mitarbeiter'}</span>
-        ${actionBtn}
-      </div>
-    </div>`;
-  }).join('') : `<div style="font-size:12.5px;color:var(--text-muted);padding:10px 0;">Noch keine Nutzer haben sich angemeldet. Neu angelegte Nutzer erscheinen hier, sobald sie sich das erste Mal einloggen.</div>`;
-
   const importRows = imports.length ? imports.map(imp => `
     <div class="movement-row">
       <div class="m-icon in">${imp.count}</div>
@@ -3008,25 +3149,9 @@ function renderAdmin(){
     </div>`).join('') : `<div style="font-size:12.5px;color:var(--text-muted);padding:10px 0;">Noch keine Excel-Importe durchgeführt.</div>`;
 
   main.innerHTML = `
-    <h2 class="section-title">Nutzer (${profiles.length})</h2>
-    ${userRows}
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Nutzerverwaltung findest du jetzt in der Hauptnavigation oben unter "Verwaltung". Hier bleiben die lagerspezifischen Werkzeuge.</div>
 
-    <h2 class="section-title" style="margin-top:22px;">Neuen Nutzer anlegen</h2>
-    <label>Benutzername</label>
-    <input type="text" id="nu-username" placeholder="z. B. anna">
-    <label>Passwort</label>
-    <input type="text" id="nu-password" placeholder="Passwort (mind. 6 Zeichen)">
-    <label>Rolle</label>
-    <select id="nu-role">
-      <option value="user">Mitarbeiter</option>
-      <option value="admin">Admin</option>
-    </select>
-    <div class="btn-row">
-      <button class="btn btn-primary btn-block" id="nu-create">Nutzer anlegen</button>
-    </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Der Nutzer taucht oben erst nach dem ersten Login auf, ist aber ab sofort anmeldefähig.</div>
-
-    <h2 class="section-title" style="margin-top:26px;">Excel-Importe (${imports.length})</h2>
+    <h2 class="section-title">Excel-Importe (${imports.length})</h2>
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
       "Löschen" entfernt den kompletten Import inklusive aller dabei angelegten Artikel. Bereits gebuchte Ein-/Auslagerungen im Verlauf bleiben davon unberührt.
     </div>
@@ -3077,20 +3202,6 @@ function renderAdmin(){
     $('#ns-key').value = notifSettings.publicKey || '';
   }
 
-  main.querySelectorAll('[data-remove]').forEach(btn=>{
-    btn.onclick = ()=> openRemoveUserSheet(btn.dataset.remove);
-  });
-  main.querySelectorAll('[data-unblock]').forEach(btn=>{
-    btn.onclick = async ()=>{
-      try{
-        await setDoc(doc(db, 'profiles', btn.dataset.unblock), { blocked: false }, { merge: true });
-        toast('Zugang wieder freigeschaltet');
-      }catch(e){
-        toast('Freischalten fehlgeschlagen');
-        console.error(e);
-      }
-    };
-  });
   main.querySelectorAll('[data-delimport]').forEach(btn=>{
     btn.onclick = ()=> openDeleteImportSheet(btn.dataset.delimport);
   });
@@ -3098,34 +3209,6 @@ function renderAdmin(){
     const cat = $('#bulk-cat-select').value;
     if(!cat){ toast('Bitte eine Kategorie wählen'); return; }
     openDeleteCategorySheet(cat);
-  };
-
-  $('#nu-create').onclick = async ()=>{
-    const btn = $('#nu-create');
-    const username = $('#nu-username').value.trim();
-    const password = $('#nu-password').value;
-    const role = $('#nu-role').value;
-    if(!username || !/^[a-zA-Z0-9_-]+$/.test(username)){ toast('Benutzername: nur Buchstaben, Zahlen, - und _'); return; }
-    if(!password || password.length < 6){ toast('Passwort braucht mindestens 6 Zeichen'); return; }
-    btn.disabled = true; btn.textContent = 'Lege an…';
-    try{
-      const email = usernameToAuthEmail(username);
-      const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
-      const newUid = cred.user.uid;
-      await setDoc(doc(db, 'profiles', newUid), { username: username.toLowerCase(), createdAt: Date.now(), createdBy: currentUserEmail });
-      if(role === 'admin'){
-        await setDoc(doc(db, 'roles', newUid), { role: 'admin' });
-      }
-      await signOut(authSecondary);
-      toast('Nutzer "' + username + '" angelegt');
-      $('#nu-username').value = ''; $('#nu-password').value = ''; $('#nu-role').value = 'user';
-    }catch(e){
-      console.error(e);
-      const map = { 'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.', 'auth/weak-password': 'Passwort zu schwach (mind. 6 Zeichen).' };
-      toast(map[e.code] || ('Anlegen fehlgeschlagen: ' + (e.code || e.message)));
-    }finally{
-      btn.disabled = false; btn.textContent = 'Nutzer anlegen';
-    }
   };
 
   $('#ns-save').onclick = async ()=>{
@@ -3146,6 +3229,105 @@ function renderAdmin(){
       console.error(e);
     }finally{
       btn.disabled = false; btn.textContent = 'Einstellungen speichern';
+    }
+  };
+}
+
+// Nutzerverwaltung — rendert in die Hauptnavigation (Reiter "Verwaltung"), ausserhalb von #lagerApp,
+// damit sie dort erreichbar ist, auch wenn man gerade nicht im Lager-Reiter ist.
+function renderUserAdmin(){
+  const container = document.getElementById('verwaltung-main');
+  if(!container) return;
+  if(!isAdmin){ container.innerHTML = `<div class="empty-state"><div class="disp">Kein Zugriff</div>Dieser Bereich ist nur für Admins.</div>`; return; }
+
+  const roleByUid = {};
+  rolesList.forEach(r => roleByUid[r.uid] = r.role);
+
+  const userRows = profiles.length ? profiles.map(p => {
+    const role = roleByUid[p.uid] || 'user';
+    const last = p.lastLogin ? fmtDate(p.lastLogin) : '—';
+    const isBlocked = !!p.blocked;
+    const isSelf = p.uid === currentUid;
+    let actionBtn = '';
+    if(!isSelf){
+      actionBtn = isBlocked
+        ? `<button class="btn btn-secondary" data-unblock="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;">Freischalten</button>`
+        : `<button class="btn btn-secondary" data-remove="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;color:var(--danger);">Entfernen</button>`;
+    }
+    return `
+    <div class="movement-row">
+      <div class="m-icon ${role==='admin'?'in':'out'}">${role==='admin'?'A':'M'}</div>
+      <div class="m-info">
+        <div class="m-name">${escapeHtml(p.username||p.uid)}${isBlocked ? ' <span class="role-badge" style="border-color:var(--danger);color:var(--danger);">Gesperrt</span>' : ''}</div>
+        <div class="m-meta">Letzter Login: ${last}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span class="role-badge" style="margin-left:0;">${role==='admin'?'Admin':'Mitarbeiter'}</span>
+        ${actionBtn}
+      </div>
+    </div>`;
+  }).join('') : `<div style="font-size:12.5px;color:var(--text-muted);padding:10px 0;">Noch keine Nutzer haben sich angemeldet. Neu angelegte Nutzer erscheinen hier, sobald sie sich das erste Mal einloggen.</div>`;
+
+  container.innerHTML = `
+    <h2 class="section-title">Nutzer (${profiles.length})</h2>
+    ${userRows}
+
+    <h2 class="section-title" style="margin-top:22px;">Neuen Nutzer anlegen</h2>
+    <label>Benutzername</label>
+    <input type="text" id="nu-username" placeholder="z. B. anna">
+    <label>Passwort</label>
+    <input type="text" id="nu-password" placeholder="Passwort (mind. 6 Zeichen)">
+    <label>Rolle</label>
+    <select id="nu-role">
+      <option value="user">Mitarbeiter</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-block" id="nu-create">Nutzer anlegen</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Der Nutzer taucht oben erst nach dem ersten Login auf, ist aber ab sofort anmeldefähig.</div>
+  `;
+
+  container.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.onclick = ()=> openRemoveUserSheet(btn.dataset.remove);
+  });
+  container.querySelectorAll('[data-unblock]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      try{
+        await setDoc(doc(db, 'profiles', btn.dataset.unblock), { blocked: false }, { merge: true });
+        toast('Zugang wieder freigeschaltet');
+      }catch(e){
+        toast('Freischalten fehlgeschlagen');
+        console.error(e);
+      }
+    };
+  });
+
+  container.querySelector('#nu-create').onclick = async ()=>{
+    const btn = container.querySelector('#nu-create');
+    const username = container.querySelector('#nu-username').value.trim();
+    const password = container.querySelector('#nu-password').value;
+    const role = container.querySelector('#nu-role').value;
+    if(!username || !/^[a-zA-Z0-9_-]+$/.test(username)){ toast('Benutzername: nur Buchstaben, Zahlen, - und _'); return; }
+    if(!password || password.length < 6){ toast('Passwort braucht mindestens 6 Zeichen'); return; }
+    btn.disabled = true; btn.textContent = 'Lege an…';
+    try{
+      const email = usernameToAuthEmail(username);
+      const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
+      const newUid = cred.user.uid;
+      await setDoc(doc(db, 'profiles', newUid), { username: username.toLowerCase(), createdAt: Date.now(), createdBy: currentUserEmail });
+      if(role === 'admin'){
+        await setDoc(doc(db, 'roles', newUid), { role: 'admin' });
+      }
+      await signOut(authSecondary);
+      toast('Nutzer "' + username + '" angelegt');
+      container.querySelector('#nu-username').value = ''; container.querySelector('#nu-password').value = ''; container.querySelector('#nu-role').value = 'user';
+    }catch(e){
+      console.error(e);
+      const map = { 'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.', 'auth/weak-password': 'Passwort zu schwach (mind. 6 Zeichen).' };
+      toast(map[e.code] || ('Anlegen fehlgeschlagen: ' + (e.code || e.message)));
+    }finally{
+      btn.disabled = false; btn.textContent = 'Nutzer anlegen';
     }
   };
 }
