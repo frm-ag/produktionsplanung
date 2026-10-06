@@ -257,6 +257,44 @@
   .gt-item .gt-remove:hover{color:var(--danger);}
   .gt-empty{text-align:center;color:var(--text-muted);font-size:13px;padding:30px 10px;}
   #table-page{max-width:1400px;margin:0 auto;}
+
+  /* ---------- Personaleinsatzplanung ---------- */
+  .staff-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .staff-layout{display:grid;grid-template-columns:230px 1fr;gap:14px;align-items:start;}
+  @media (max-width:900px){ .staff-layout{grid-template-columns:1fr;} }
+  .staff-pool{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:12px;position:sticky;top:78px;max-height:80vh;overflow-y:auto;}
+  .staff-pool h2{font-family:var(--disp);font-size:13px;margin:0 0 3px;}
+  .staff-pool .count{font-size:11.5px;color:var(--text-muted);margin-bottom:10px;}
+  .pool-card{
+    background:var(--panel-alt);border:1px solid var(--border);border-left:4px solid var(--accent);
+    border-radius:6px;padding:8px 9px;margin-bottom:8px;cursor:grab;font-size:12px;
+  }
+  .pool-card.wk-aluminium{border-left-color:#8b96a0;}
+  .pool-card.wk-reparaturen{border-left-color:#8e6b1f;}
+  .pool-card:active{cursor:grabbing;}
+  .pool-card .order-no{font-family:var(--mono);font-weight:700;font-size:11.5px;}
+  .pool-card .order-customer{font-weight:600;margin-top:2px;}
+  .pool-card .order-dates{color:var(--text-muted);font-size:10.5px;margin-top:3px;}
+
+  .staff-grid-scroll{overflow-x:auto;}
+  #staff-grid{min-width:900px;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--panel);}
+  .staff-grid-header{display:grid;grid-template-columns:160px repeat(5,1fr);background:var(--panel-alt);border-bottom:1px solid var(--border);}
+  .staff-grid-header > div{padding:9px 10px;font-size:11.5px;font-weight:700;color:var(--text-muted);border-left:1px solid var(--border);}
+  .staff-grid-header > div:first-child{border-left:none;}
+  .staff-row{display:grid;grid-template-columns:160px repeat(5,1fr);border-bottom:1px solid var(--border);}
+  .staff-row:last-child{border-bottom:none;}
+  .staff-row-name{padding:10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel-alt);}
+  .staff-row-name .staff-remove{border:none;background:transparent;color:#c3ccd1;cursor:pointer;font-size:13px;}
+  .staff-row-name .staff-remove:hover{color:var(--danger);}
+  .staff-cell{border-left:1px solid var(--border);padding:6px;min-height:64px;display:flex;flex-direction:column;gap:5px;}
+  .staff-cell.drag-over{background:var(--steel-soft, #e3ebf3);}
+  .assign-chip{
+    background:var(--accent-dim);border-left:3px solid var(--accent);border-radius:5px;
+    padding:4px 6px;font-size:10.5px;cursor:pointer;line-height:1.3;
+  }
+  .assign-chip .a-order{font-family:var(--mono);font-weight:700;}
+  .assign-chip .a-hours{color:var(--text-muted);}
+  .staff-empty-note{font-size:12px;color:var(--text-muted);padding:20px 10px;text-align:center;}
   .table-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
   .table-toolbar #table-search{flex:1;min-width:180px;font:inherit;font-size:13px;padding:8px 11px;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .ready-filter-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:12px;padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;}
@@ -346,6 +384,7 @@
       <button data-view="week">Woche</button>
       <button data-view="month">Monat</button>
       <button data-view="todos">To-Dos</button>
+      <button data-view="staff">Personal</button>
     </div>
 
     <div class="nav-group" id="nav-group">
@@ -416,7 +455,64 @@
     </div>
   </div>
 
+  <div id="staff-page" style="display:none;">
+    <div class="staff-toolbar">
+      <button class="round" id="staff-nav-prev" aria-label="Zurück">‹</button>
+      <div class="nav-label" id="staff-nav-label"></div>
+      <button class="round" id="staff-nav-next" aria-label="Weiter">›</button>
+      <button class="today-btn" id="staff-nav-today">Heute</button>
+      <span style="flex:1;"></span>
+      <button class="btn" id="staff-seed-btn" title="Mitarbeiterliste einmalig mit Standardnamen befüllen">Mitarbeiter importieren</button>
+      <button class="btn primary" id="staff-add-btn">+ Mitarbeiter</button>
+    </div>
+    <div class="staff-layout">
+      <aside class="staff-pool">
+        <h2>Offene Aufträge</h2>
+        <div class="count" id="staff-pool-count"></div>
+        <div id="staff-pool-list"></div>
+      </aside>
+      <div class="staff-grid-scroll">
+        <div id="staff-grid"></div>
+      </div>
+    </div>
+  </div>
+
   <footer class="status" id="status-line"></footer>
+</div>
+
+<div class="modal-backdrop" id="assign-modal-backdrop">
+  <div class="modal" style="max-width:360px;">
+    <h3 id="assign-modal-title">Einsatz eintragen</h3>
+    <form id="assign-form">
+      <div class="field"><label id="assign-info" style="font-weight:600;color:var(--text);"></label></div>
+      <div class="field">
+        <label for="assign-hours">Dauer (Stunden)</label>
+        <input type="number" id="assign-hours" min="0.5" step="0.5" value="8" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="assign-delete-btn" style="display:none;">Entfernen</button>
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button type="button" class="btn" id="assign-cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Speichern</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="staff-add-modal-backdrop">
+  <div class="modal" style="max-width:320px;">
+    <h3>Mitarbeiter hinzufügen</h3>
+    <form id="staff-add-form">
+      <div class="field"><label for="staff-add-name">Name</label><input id="staff-add-name" required placeholder="z. B. Muster Hans"></div>
+      <div class="modal-actions">
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button type="button" class="btn" id="staff-add-cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Hinzufügen</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="modal-backdrop" id="modal-backdrop">
@@ -503,6 +599,8 @@ const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const COLLECTION = "produktionsauftraege";
 const TODOS_COLLECTION = "allgemeine_todos";
+const STAFF_COLLECTION = "mitarbeiter";
+const ASSIGNMENTS_COLLECTION = "einsaetze";
 
 // Gleiche Pseudo-Domain wie Mat.Lager, damit dieselben Benutzerkonten funktionieren.
 const AUTH_DOMAIN_SUFFIX = '@matlager.local';
@@ -532,11 +630,15 @@ async function doLogin(){
 $('#logout-btn').addEventListener('click', async ()=>{
   if(unsubOrders) unsubOrders();
   if(unsubGeneralTodos) unsubGeneralTodos();
+  if(unsubStaff) unsubStaff();
+  if(unsubAssignments) unsubAssignments();
   await signOut(auth);
 });
 
 let unsubOrders = null;
 let unsubGeneralTodos = null;
+let unsubStaff = null;
+let unsubAssignments = null;
 
 onAuthStateChanged(auth, user => {
   if(user){
@@ -545,11 +647,17 @@ onAuthStateChanged(auth, user => {
     $('#app').style.display = 'block';
     if(unsubOrders) unsubOrders();
     if(unsubGeneralTodos) unsubGeneralTodos();
+    if(unsubStaff) unsubStaff();
+    if(unsubAssignments) unsubAssignments();
     subscribeOrders();
     subscribeGeneralTodos();
+    subscribeStaff();
+    subscribeAssignments();
   }else{
     if(unsubOrders) unsubOrders();
     if(unsubGeneralTodos) unsubGeneralTodos();
+    if(unsubStaff) unsubStaff();
+    if(unsubAssignments) unsubAssignments();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -582,9 +690,24 @@ function subscribeGeneralTodos(){
   }, err => { console.error(err); });
 }
 
+function subscribeStaff(){
+  const q = query(collection(db, STAFF_COLLECTION), orderBy('name'));
+  unsubStaff = onSnapshot(q, snap => {
+    state.staff = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "staff") renderStaffPage();
+  }, err => { console.error(err); });
+}
+function subscribeAssignments(){
+  const q = query(collection(db, ASSIGNMENTS_COLLECTION));
+  unsubAssignments = onSnapshot(q, snap => {
+    state.assignments = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "staff") renderStaffPage();
+  }, err => { console.error(err); });
+}
+
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], generalTodos: [], view: "table", filter: "alle", refDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false } };
+var state = { orders: [], generalTodos: [], staff: [], assignments: [], view: "table", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -825,15 +948,18 @@ function render(){
   renderHeader();
   var isTodos = state.view === "todos";
   var isTable = state.view === "table";
-  var isCalendar = !isTodos && !isTable;
+  var isStaff = state.view === "staff";
+  var isCalendar = !isTodos && !isTable && !isStaff;
   $(".layout").style.display = isCalendar ? "grid" : "none";
   $("#todos-page").style.display = isTodos ? "block" : "none";
   $("#table-page").style.display = isTable ? "block" : "none";
+  $("#staff-page").style.display = isStaff ? "block" : "none";
   $("#nav-group").style.display = isCalendar ? "inline-flex" : "none";
-  $("#filter-chips").style.display = isTodos ? "none" : "inline-flex";
-  $("#add-btn").style.display = isTodos ? "none" : "inline-block";
+  $("#filter-chips").style.display = (isTodos || isStaff) ? "none" : "inline-flex";
+  $("#add-btn").style.display = (isTodos || isStaff) ? "none" : "inline-block";
   if(isTodos){ renderGeneralTodos(); return; }
   if(isTable){ renderTable(); return; }
+  if(isStaff){ renderStaffPage(); return; }
   if(state.view==="week") renderWeek(); else renderMonth();
   renderSidebar();
 }
@@ -1021,6 +1147,185 @@ $("#overview-tbody").addEventListener("click", e=>{
   var tr = e.target.closest("tr[data-id]"); if(!tr) return;
   var o = state.orders.find(x=>x.id===tr.dataset.id);
   if(o) openModal(o, null);
+});
+
+/* ---------- Personaleinsatzplanung ---------- */
+
+var STAFF_SEED_NAMES = [
+  "Stettler Hansrudolf","Moser Simone","Sägesser Sylvan","Lauener Raphael","Marti Stefan",
+  "Zuber Patrick","Di Gregorio Fabrizio","Kühni Mathias","Zimmerli Nico","Minder Jonas",
+  "Müller Mika","Sollberger Luca","Pacitto Livio"
+];
+
+function renderStaffHeaderLabel(){
+  var days = getWeekDays(state.staffRefDate);
+  $("#staff-nav-label").textContent = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]) + " · KW " + isoWeek(toISO(days[0]));
+}
+
+function renderStaffPage(){
+  renderStaffHeaderLabel();
+  renderStaffPool();
+  renderStaffGrid();
+}
+
+function renderStaffPool(){
+  var open = state.orders.filter(o=>!o.completed).slice().sort((a,b)=> (a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
+  $("#staff-pool-count").textContent = open.length + (open.length===1 ? " Auftrag" : " Aufträge");
+  if(open.length===0){ $("#staff-pool-list").innerHTML = '<div class="staff-empty-note">Keine offenen Aufträge.</div>'; return; }
+  var html = "";
+  open.forEach(o=>{
+    var wsClass = o.workshop==="aluminium" ? "wk-aluminium" : (o.workshop==="reparaturen" ? "wk-reparaturen" : "");
+    var dates = [];
+    if(o.productionStart) dates.push("Start " + fmtShort(o.productionStart));
+    if(o.assemblyDate) dates.push("Mont. " + fmtShort(o.assemblyDate));
+    html += '<div class="pool-card ' + wsClass + '" draggable="true" data-order-id="' + o.id + '">' +
+      '<div class="order-no">' + escapeHtml(o.orderNumber) + '</div>' +
+      '<div class="order-customer">' + escapeHtml(o.customer) + '</div>' +
+      (dates.length ? '<div class="order-dates">' + dates.join(" · ") + '</div>' : '') +
+      '</div>';
+  });
+  $("#staff-pool-list").innerHTML = html;
+}
+
+function renderStaffGrid(){
+  var grid = $("#staff-grid");
+  if(state.staff.length===0){ grid.innerHTML = '<div class="staff-empty-note">Noch keine Mitarbeiter erfasst. Mit "Mitarbeiter importieren" oder "+ Mitarbeiter" hinzufügen.</div>'; return; }
+  var days = getWeekDays(state.staffRefDate);
+  var html = '<div class="staff-grid-header"><div>Mitarbeiter</div>';
+  days.forEach(d=> html += '<div>' + fmtDay(d) + ' ' + fmtShort(toISO(d)) + '</div>');
+  html += '</div>';
+  state.staff.forEach(emp=>{
+    html += '<div class="staff-row">';
+    html += '<div class="staff-row-name"><span>' + escapeHtml(emp.name) + '</span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
+    days.forEach(d=>{
+      var iso = toISO(d);
+      var assigns = state.assignments.filter(a=>a.employeeId===emp.id && a.date===iso);
+      html += '<div class="staff-cell" data-employee-id="' + emp.id + '" data-date="' + iso + '">';
+      assigns.forEach(a=>{
+        var o = state.orders.find(x=>x.id===a.orderId);
+        html += '<div class="assign-chip" data-assign-id="' + a.id + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-hours">' + (a.hours||0) + ' Std.</div></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+$("#staff-nav-prev").addEventListener("click", ()=>{ var d=fromISO(state.staffRefDate); d.setDate(d.getDate()-7); state.staffRefDate=toISO(d); renderStaffPage(); });
+$("#staff-nav-next").addEventListener("click", ()=>{ var d=fromISO(state.staffRefDate); d.setDate(d.getDate()+7); state.staffRefDate=toISO(d); renderStaffPage(); });
+$("#staff-nav-today").addEventListener("click", ()=>{ state.staffRefDate=todayISO(); renderStaffPage(); });
+
+/* Mitarbeiter hinzufügen / entfernen */
+var staffAddBackdrop = $("#staff-add-modal-backdrop");
+$("#staff-add-btn").addEventListener("click", ()=>{ $("#staff-add-name").value=""; staffAddBackdrop.classList.add("open"); setTimeout(()=>$("#staff-add-name").focus(),30); });
+$("#staff-add-cancel-btn").addEventListener("click", ()=> staffAddBackdrop.classList.remove("open"));
+staffAddBackdrop.addEventListener("click", e=>{ if(e.target===staffAddBackdrop) staffAddBackdrop.classList.remove("open"); });
+$("#staff-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var name = $("#staff-add-name").value.trim();
+  if(!name) return;
+  try{ await addDoc(collection(db, STAFF_COLLECTION), { name: name, createdAt: Date.now() }); staffAddBackdrop.classList.remove("open"); }
+  catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+
+$("#staff-seed-btn").addEventListener("click", async ()=>{
+  if(state.staff.length>0){
+    if(!confirm("Es sind bereits Mitarbeiter erfasst. Trotzdem die Standardliste zusätzlich importieren?")) return;
+  }
+  var existingNames = state.staff.map(s=>s.name.toLowerCase());
+  var toAdd = STAFF_SEED_NAMES.filter(n=>existingNames.indexOf(n.toLowerCase())===-1);
+  if(toAdd.length===0){ toast("Alle Namen sind bereits erfasst."); return; }
+  try{
+    for(var i=0;i<toAdd.length;i++){ await addDoc(collection(db, STAFF_COLLECTION), { name: toAdd[i], createdAt: Date.now() }); }
+    toast(toAdd.length + " Mitarbeiter importiert.");
+  }catch(err){ console.error(err); toast("Import fehlgeschlagen."); }
+});
+
+$("#staff-grid").addEventListener("click", async e=>{
+  var rmBtn = e.target.closest(".staff-remove");
+  if(rmBtn){
+    if(!confirm("Diesen Mitarbeiter wirklich entfernen? Zugewiesene Einsätze bleiben als verwaiste Einträge bestehen.")) return;
+    try{ await deleteDoc(doc(db, STAFF_COLLECTION, rmBtn.dataset.staffId)); } catch(err){ console.error(err); toast("Entfernen fehlgeschlagen."); }
+    return;
+  }
+  var chip = e.target.closest(".assign-chip");
+  if(chip){ openAssignModal(null, null, chip.dataset.assignId); return; }
+});
+
+/* Drag & Drop: Auftragskarte aus dem Pool auf eine Mitarbeiter-/Tageszelle ziehen */
+$("#staff-pool-list").addEventListener("dragstart", e=>{
+  var card = e.target.closest(".pool-card"); if(!card) return;
+  e.dataTransfer.setData("text/plain", card.dataset.orderId);
+  e.dataTransfer.effectAllowed = "copy";
+});
+$("#staff-grid").addEventListener("dragover", e=>{
+  var cell = e.target.closest(".staff-cell"); if(!cell) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+  cell.classList.add("drag-over");
+});
+$("#staff-grid").addEventListener("dragleave", e=>{
+  var cell = e.target.closest(".staff-cell"); if(!cell) return;
+  cell.classList.remove("drag-over");
+});
+$("#staff-grid").addEventListener("drop", e=>{
+  var cell = e.target.closest(".staff-cell"); if(!cell) return;
+  e.preventDefault();
+  cell.classList.remove("drag-over");
+  var orderId = e.dataTransfer.getData("text/plain");
+  if(!orderId) return;
+  openAssignModal(orderId, { employeeId: cell.dataset.employeeId, date: cell.dataset.date }, null);
+});
+
+/* Einsatz-Modal (Stunden eintragen / bearbeiten / löschen) */
+var assignBackdrop = $("#assign-modal-backdrop");
+function openAssignModal(orderId, cellInfo, assignId){
+  if(assignId){
+    var a = state.assignments.find(x=>x.id===assignId);
+    if(!a) return;
+    state.editingAssignId = assignId;
+    state.assignEmployeeId = a.employeeId; state.assignDate = a.date;
+    var o = state.orders.find(x=>x.id===a.orderId);
+    var emp = state.staff.find(x=>x.id===a.employeeId);
+    $("#assign-modal-title").textContent = "Einsatz bearbeiten";
+    $("#assign-info").textContent = (o?o.orderNumber + " · " + o.customer:"?") + " — " + (emp?emp.name:"?") + " · " + fmtShort(a.date);
+    $("#assign-hours").value = a.hours || 8;
+    $("#assign-delete-btn").style.display = "inline-block";
+  }else{
+    state.editingAssignId = null;
+    state.assignEmployeeId = cellInfo.employeeId; state.assignDate = cellInfo.date;
+    state.pendingOrderId = orderId;
+    var o2 = state.orders.find(x=>x.id===orderId);
+    var emp2 = state.staff.find(x=>x.id===cellInfo.employeeId);
+    $("#assign-modal-title").textContent = "Einsatz eintragen";
+    $("#assign-info").textContent = (o2?o2.orderNumber + " · " + o2.customer:"?") + " — " + (emp2?emp2.name:"?") + " · " + fmtShort(cellInfo.date);
+    $("#assign-hours").value = 8;
+    $("#assign-delete-btn").style.display = "none";
+  }
+  assignBackdrop.classList.add("open");
+  setTimeout(()=>$("#assign-hours").focus(),30);
+}
+function closeAssignModal(){ assignBackdrop.classList.remove("open"); state.editingAssignId=null; state.pendingOrderId=null; }
+$("#assign-cancel-btn").addEventListener("click", closeAssignModal);
+assignBackdrop.addEventListener("click", e=>{ if(e.target===assignBackdrop) closeAssignModal(); });
+$("#assign-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var hours = parseFloat($("#assign-hours").value) || 0;
+  try{
+    if(state.editingAssignId){
+      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId), { hours: hours });
+    }else{
+      await addDoc(collection(db, ASSIGNMENTS_COLLECTION), {
+        orderId: state.pendingOrderId, employeeId: state.assignEmployeeId, date: state.assignDate, hours: hours, createdAt: Date.now()
+      });
+    }
+    closeAssignModal();
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+$("#assign-delete-btn").addEventListener("click", async ()=>{
+  if(!state.editingAssignId) return;
+  try{ await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId)); closeAssignModal(); }
+  catch(err){ console.error(err); toast("Entfernen fehlgeschlagen."); }
 });
 
 function renderSidebar(){
