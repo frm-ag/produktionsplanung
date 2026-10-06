@@ -260,22 +260,7 @@
 
   /* ---------- Personaleinsatzplanung ---------- */
   .staff-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
-  .staff-layout{display:grid;grid-template-columns:230px 1fr;gap:14px;align-items:start;}
-  @media (max-width:900px){ .staff-layout{grid-template-columns:1fr;} }
-  .staff-pool{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:12px;position:sticky;top:78px;max-height:80vh;overflow-y:auto;}
-  .staff-pool h2{font-family:var(--disp);font-size:13px;margin:0 0 3px;}
-  .staff-pool .count{font-size:11.5px;color:var(--text-muted);margin-bottom:10px;}
-  .pool-card{
-    background:var(--panel-alt);border:1px solid var(--border);border-left:4px solid var(--accent);
-    border-radius:6px;padding:8px 9px;margin-bottom:8px;cursor:grab;font-size:12px;
-  }
-  .pool-card.wk-aluminium{border-left-color:#8b96a0;}
-  .pool-card.wk-reparaturen{border-left-color:#8e6b1f;}
-  .pool-card:active{cursor:grabbing;}
-  .pool-card .order-no{font-family:var(--mono);font-weight:700;font-size:11.5px;}
-  .pool-card .order-customer{font-weight:600;margin-top:2px;}
-  .pool-card .order-dates{color:var(--text-muted);font-size:10.5px;margin-top:3px;}
-
+  .staff-layout{display:block;}
   .staff-grid-scroll{overflow-x:auto;}
   #staff-grid{min-width:900px;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--panel);}
   .staff-grid-header{display:grid;grid-template-columns:160px repeat(5,1fr);background:var(--panel-alt);border-bottom:1px solid var(--border);}
@@ -283,8 +268,12 @@
   .staff-grid-header > div:first-child{border-left:none;}
   .staff-row{display:grid;grid-template-columns:160px repeat(5,1fr);border-bottom:1px solid var(--border);}
   .staff-row:last-child{border-bottom:none;}
-  .staff-row-name{padding:10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel-alt);}
-  .staff-row-name .staff-remove{border:none;background:transparent;color:#c3ccd1;cursor:pointer;font-size:13px;}
+  .staff-row-name{padding:10px;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel-alt);cursor:grab;}
+  .staff-row-name:active{cursor:grabbing;}
+  .staff-row-name.drag-over-row{outline:2px solid var(--accent);outline-offset:-2px;}
+  .staff-row-name .staff-name-group{display:flex;align-items:center;gap:6px;min-width:0;}
+  .staff-row-name .staff-drag-handle{color:#c3ccd1;font-size:12px;flex:none;}
+  .staff-row-name .staff-remove{border:none;background:transparent;color:#c3ccd1;cursor:pointer;font-size:13px;flex:none;}
   .staff-row-name .staff-remove:hover{color:var(--danger);}
   .staff-cell{border-left:1px solid var(--border);padding:6px;min-height:64px;display:flex;flex-direction:column;gap:5px;}
   .staff-cell-add{border:1px dashed var(--border);background:transparent;color:#c3ccd1;border-radius:5px;font-size:13px;padding:3px;cursor:pointer;line-height:1;}
@@ -472,11 +461,6 @@
       <button class="btn primary" id="staff-add-btn">+ Mitarbeiter</button>
     </div>
     <div class="staff-layout">
-      <aside class="staff-pool">
-        <h2>Offene Aufträge</h2>
-        <div class="count" id="staff-pool-count"></div>
-        <div id="staff-pool-list"></div>
-      </aside>
       <div class="staff-grid-scroll">
         <div id="staff-grid"></div>
       </div>
@@ -712,7 +696,15 @@ function subscribeGeneralTodos(){
 function subscribeStaff(){
   const q = query(collection(db, STAFF_COLLECTION), orderBy('name'));
   unsubStaff = onSnapshot(q, snap => {
-    state.staff = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    var list = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    list.sort((a,b)=>{
+      var av = a.sortOrder, bv = b.sortOrder;
+      if(av==null && bv==null) return a.name.localeCompare(b.name);
+      if(av==null) return 1;
+      if(bv==null) return -1;
+      return av - bv;
+    });
+    state.staff = list;
     if(state.view === "staff") renderStaffPage();
   }, err => { console.error(err); });
 }
@@ -1183,27 +1175,7 @@ function renderStaffHeaderLabel(){
 
 function renderStaffPage(){
   renderStaffHeaderLabel();
-  renderStaffPool();
   renderStaffGrid();
-}
-
-function renderStaffPool(){
-  var open = state.orders.filter(o=>!o.completed).slice().sort((a,b)=> (a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
-  $("#staff-pool-count").textContent = open.length + (open.length===1 ? " Auftrag" : " Aufträge");
-  if(open.length===0){ $("#staff-pool-list").innerHTML = '<div class="staff-empty-note">Keine offenen Aufträge.</div>'; return; }
-  var html = "";
-  open.forEach(o=>{
-    var wsClass = o.workshop==="aluminium" ? "wk-aluminium" : (o.workshop==="reparaturen" ? "wk-reparaturen" : "");
-    var dates = [];
-    if(o.productionStart) dates.push("Start " + fmtShort(o.productionStart));
-    if(o.assemblyDate) dates.push("Mont. " + fmtShort(o.assemblyDate));
-    html += '<div class="pool-card ' + wsClass + '" draggable="true" data-order-id="' + o.id + '">' +
-      '<div class="order-no">' + escapeHtml(o.orderNumber) + '</div>' +
-      '<div class="order-customer">' + escapeHtml(o.customer) + '</div>' +
-      (dates.length ? '<div class="order-dates">' + dates.join(" · ") + '</div>' : '') +
-      '</div>';
-  });
-  $("#staff-pool-list").innerHTML = html;
 }
 
 function renderStaffGrid(){
@@ -1215,7 +1187,7 @@ function renderStaffGrid(){
   html += '</div>';
   state.staff.forEach(emp=>{
     html += '<div class="staff-row">';
-    html += '<div class="staff-row-name"><span>' + escapeHtml(emp.name) + '</span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
+    html += '<div class="staff-row-name" draggable="true" data-staff-id="' + emp.id + '"><span class="staff-name-group"><span class="staff-drag-handle">⠿</span><span>' + escapeHtml(emp.name) + '</span></span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
     days.forEach(d=>{
       var iso = toISO(d);
       var assigns = state.assignments.filter(a=>a.employeeId===emp.id && a.date===iso);
@@ -1281,26 +1253,38 @@ $("#staff-grid").addEventListener("click", async e=>{
 });
 
 /* Drag & Drop: Auftragskarte aus dem Pool auf eine Mitarbeiter-/Tageszelle ziehen */
-$("#staff-pool-list").addEventListener("dragstart", e=>{
-  var card = e.target.closest(".pool-card"); if(!card) return;
-  e.dataTransfer.setData("text/plain", "order:" + card.dataset.orderId);
-  e.dataTransfer.effectAllowed = "copy";
-});
 $("#staff-grid").addEventListener("dragstart", e=>{
-  var chip = e.target.closest(".assign-chip"); if(!chip) return;
-  e.dataTransfer.setData("text/plain", "assign:" + chip.dataset.assignId);
-  e.dataTransfer.effectAllowed = "move";
+  var chip = e.target.closest(".assign-chip");
+  if(chip){ e.dataTransfer.setData("text/plain", "assign:" + chip.dataset.assignId); e.dataTransfer.effectAllowed = "move"; return; }
+  var rowName = e.target.closest(".staff-row-name");
+  if(rowName){ e.dataTransfer.setData("text/plain", "staffmove:" + rowName.dataset.staffId); e.dataTransfer.effectAllowed = "move"; return; }
 });
 $("#staff-grid").addEventListener("dragover", e=>{
+  var rowName = e.target.closest(".staff-row-name");
+  if(rowName){ e.preventDefault(); e.dataTransfer.dropEffect = "move"; rowName.classList.add("drag-over-row"); return; }
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
   e.preventDefault(); e.dataTransfer.dropEffect = "move";
   cell.classList.add("drag-over");
 });
 $("#staff-grid").addEventListener("dragleave", e=>{
+  var rowName = e.target.closest(".staff-row-name");
+  if(rowName){ rowName.classList.remove("drag-over-row"); return; }
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
   cell.classList.remove("drag-over");
 });
 $("#staff-grid").addEventListener("drop", async e=>{
+  var rowName = e.target.closest(".staff-row-name");
+  if(rowName){
+    e.preventDefault();
+    rowName.classList.remove("drag-over-row");
+    var rowPayload = e.dataTransfer.getData("text/plain");
+    if(!rowPayload || rowPayload.indexOf("staffmove:")!==0) return;
+    var draggedId = rowPayload.slice("staffmove:".length);
+    var targetId = rowName.dataset.staffId;
+    if(draggedId===targetId) return;
+    await reorderStaff(draggedId, targetId);
+    return;
+  }
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
   e.preventDefault();
   cell.classList.remove("drag-over");
@@ -1315,6 +1299,18 @@ $("#staff-grid").addEventListener("drop", async e=>{
     }catch(err){ console.error(err); toast("Verschieben fehlgeschlagen."); }
   }
 });
+async function reorderStaff(draggedId, targetId){
+  var order = state.staff.map(s=>s.id);
+  var fromIdx = order.indexOf(draggedId);
+  if(fromIdx===-1) return;
+  order.splice(fromIdx, 1);
+  var toIdx = order.indexOf(targetId);
+  if(toIdx===-1) toIdx = order.length;
+  order.splice(toIdx, 0, draggedId);
+  try{
+    await Promise.all(order.map((id,idx)=> updateDoc(doc(db, STAFF_COLLECTION, id), { sortOrder: idx*10 })));
+  }catch(err){ console.error(err); toast("Reihenfolge speichern fehlgeschlagen."); }
+}
 
 /* Einsatz-Modal (Stunden eintragen / bearbeiten / löschen) */
 var assignBackdrop = $("#assign-modal-backdrop");
