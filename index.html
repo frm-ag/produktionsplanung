@@ -262,6 +262,37 @@
   .gt-empty{text-align:center;color:var(--text-muted);font-size:13px;padding:30px 10px;}
   #table-page{max-width:1400px;margin:0 auto;}
 
+  /* ---------- Stempeluhr ---------- */
+  #zeit-page{max-width:900px;margin:0 auto;}
+  .zeit-punch-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;margin-bottom:22px;}
+  .zeit-status{font-family:var(--disp);font-size:20px;font-weight:700;margin-bottom:16px;}
+  .zeit-status.on{color:var(--success);}
+  .zeit-status.pause{color:var(--warn);}
+  .zeit-status.off{color:var(--text-muted);}
+  .zeit-buttons{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .zeit-btn{font:inherit;font-size:14px;font-weight:700;padding:14px 20px;border-radius:9px;border:none;cursor:pointer;min-width:130px;color:#fff;}
+  .zeit-btn:disabled{opacity:.35;cursor:default;}
+  .zeit-btn-go{background:var(--success);}
+  .zeit-btn-pause{background:var(--warn);}
+  .zeit-btn-stop{background:var(--danger);}
+  .zeit-h2{font-family:var(--disp);font-size:14px;margin:18px 0 10px;}
+  .zeit-log-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-bottom:6px;font-size:13px;}
+  .zeit-log-item .zt-time{font-family:var(--mono);font-weight:700;width:52px;flex:none;}
+  .zeit-log-item .zt-label{flex:1;}
+  .zeit-log-item .zt-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .zeit-log-item .zt-dot.go{background:var(--success);}
+  .zeit-log-item .zt-dot.pause{background:var(--warn);}
+  .zeit-log-item .zt-dot.stop{background:var(--danger);}
+  #zeit-admin-section{margin-top:28px;border-top:1px solid var(--border);padding-top:18px;}
+  .zeit-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .zeit-toolbar #zeit-admin-date{width:140px;padding:8px 10px;font-size:13px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .overview-table tbody tr.zeit-row{cursor:pointer;}
+  .zeit-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;}
+  .zeit-edit-row select{flex:1 1 130px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .zeit-edit-row input[type="time"]{flex:1 1 90px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .zeit-edit-row .zeit-edit-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
+  .zeit-edit-row .zeit-edit-remove:hover{color:var(--danger);}
+
   /* ---------- Personaleinsatzplanung ---------- */
   .staff-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
   .staff-layout{display:block;}
@@ -931,6 +962,7 @@
     </div>
 
     <div class="seg" id="view-seg">
+      <button data-view="zeit">Stempeluhr</button>
       <button data-view="table" class="active">Übersicht</button>
       <button data-view="staff">Personal</button>
       <button data-view="todos">To-Dos</button>
@@ -983,6 +1015,36 @@
         </thead>
         <tbody id="overview-tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <div id="zeit-page" style="display:none;">
+    <div class="zeit-punch-card">
+      <div class="zeit-status" id="zeit-status">–</div>
+      <div class="zeit-buttons">
+        <button type="button" class="zeit-btn zeit-btn-go" id="zeit-kommen">Kommen</button>
+        <button type="button" class="zeit-btn zeit-btn-pause" id="zeit-pause-start">Pause Start</button>
+        <button type="button" class="zeit-btn zeit-btn-pause" id="zeit-pause-ende">Pause Ende</button>
+        <button type="button" class="zeit-btn zeit-btn-stop" id="zeit-gehen">Gehen</button>
+      </div>
+    </div>
+    <h2 class="zeit-h2">Heute</h2>
+    <div id="zeit-today-list"></div>
+
+    <div id="zeit-admin-section" style="display:none;">
+      <div class="zeit-toolbar">
+        <h2 class="zeit-h2" style="margin:0;">Alle Mitarbeiter</h2>
+        <input type="text" id="zeit-admin-date" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
+        <input type="hidden" id="zeit-admin-date-hidden">
+      </div>
+      <div class="table-scroll">
+        <table class="overview-table" id="zeit-admin-table">
+          <thead>
+            <tr><th>Mitarbeiter</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th></tr>
+          </thead>
+          <tbody id="zeit-admin-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -1106,6 +1168,19 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="zeit-edit-backdrop">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="zeit-edit-title">Zeiten bearbeiten</h3>
+    <div id="zeit-edit-rows"></div>
+    <button type="button" class="btn" id="zeit-edit-add-btn" style="width:100%;margin-bottom:14px;">+ Eintrag hinzufügen</button>
+    <div class="modal-actions">
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button type="button" class="btn" id="zeit-edit-close-btn">Schliessen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-backdrop">
   <div class="modal">
     <h3 id="modal-title">Neuer Auftrag</h3>
@@ -1170,7 +1245,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy
+  getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -1192,6 +1267,7 @@ const COLLECTION = "produktionsauftraege";
 const TODOS_COLLECTION = "allgemeine_todos";
 const STAFF_COLLECTION = "mitarbeiter";
 const ASSIGNMENTS_COLLECTION = "einsaetze";
+const TIME_COLLECTION = "zeiterfassung";
 
 // Gleiche Pseudo-Domain wie Mat.Lager, damit dieselben Benutzerkonten funktionieren.
 const AUTH_DOMAIN_SUFFIX = '@matlager.local';
@@ -1230,30 +1306,59 @@ let unsubOrders = null;
 let unsubGeneralTodos = null;
 let unsubStaff = null;
 let unsubAssignments = null;
+let unsubMyTime = null;
+let unsubAllTime = null;
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   if(user){
     $('#login-screen').style.display = 'none';
     $('#topStrip').style.display = 'block';
     $('#app').style.display = 'block';
+    state.currentUid = user.uid;
+    state.currentName = usernameToAuthEmail ? (user.email||'').replace(AUTH_DOMAIN_SUFFIX,'') : '';
+    try{
+      const roleSnap = await getDoc(doc(db, 'roles', user.uid));
+      state.isAdmin = !!(roleSnap.exists() && roleSnap.data().role === 'admin');
+    }catch(e){ console.error('Rolle konnte nicht geladen werden', e); state.isAdmin = false; }
+    applyRoleVisibility();
     if(unsubOrders) unsubOrders();
     if(unsubGeneralTodos) unsubGeneralTodos();
     if(unsubStaff) unsubStaff();
     if(unsubAssignments) unsubAssignments();
+    if(unsubMyTime) unsubMyTime();
     subscribeOrders();
     subscribeGeneralTodos();
     subscribeStaff();
     subscribeAssignments();
+    subscribeMyTime();
+    if(state.isAdmin) subscribeAllTime(); else if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; }
   }else{
     if(unsubOrders) unsubOrders();
     if(unsubGeneralTodos) unsubGeneralTodos();
     if(unsubStaff) unsubStaff();
     if(unsubAssignments) unsubAssignments();
+    if(unsubMyTime) unsubMyTime();
+    if(unsubAllTime) unsubAllTime();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
   }
 });
+
+// Blendet Reiter je nach Rolle ein/aus: Mitarbeiter sehen nur Stempeluhr, Lager, Personal;
+// Admin/Produktionsleitung sieht weiterhin alles.
+function applyRoleVisibility(){
+  var adminOnlyTabs = ["table","todos"];
+  document.querySelectorAll("#view-seg button[data-view]").forEach(b=>{
+    var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
+    b.style.display = (isAdminOnly && !state.isAdmin) ? "none" : "inline-block";
+  });
+  // Falls ein Mitarbeiter gerade auf einer für ihn ausgeblendeten Ansicht steht, auf die Stempeluhr wechseln.
+  if(!state.isAdmin && adminOnlyTabs.indexOf(state.view) !== -1){
+    state.view = "zeit";
+  }
+  render();
+}
 
 function setConn(ok){
   const dot = $('#connDot');
@@ -1304,9 +1409,24 @@ function subscribeAssignments(){
   }, err => { console.error(err); });
 }
 
+function subscribeMyTime(){
+  const q = query(collection(db, TIME_COLLECTION), orderBy('timestamp'));
+  unsubMyTime = onSnapshot(q, snap => {
+    state.myTime = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(t=>t.uid === state.currentUid);
+    if(state.view === "zeit") renderZeitPage();
+  }, err => { console.error(err); });
+}
+function subscribeAllTime(){
+  const q = query(collection(db, TIME_COLLECTION), orderBy('timestamp'));
+  unsubAllTime = onSnapshot(q, snap => {
+    state.allTime = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "zeit") renderZeitAdminTable();
+  }, err => { console.error(err); });
+}
+
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], generalTodos: [], staff: [], assignments: [], view: "table", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
+var state = { orders: [], generalTodos: [], staff: [], assignments: [], myTime: [], allTime: [], isAdmin: false, currentUid: null, currentName: "", view: "table", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -1544,16 +1664,19 @@ function render(){
   var isTable = state.view === "table";
   var isStaff = state.view === "staff";
   var isLager = state.view === "lager";
+  var isZeit = state.view === "zeit";
   $("#todos-page").style.display = isTodos ? "block" : "none";
   $("#table-page").style.display = isTable ? "block" : "none";
   $("#staff-page").style.display = isStaff ? "block" : "none";
   $("#lager-page").style.display = isLager ? "block" : "none";
-  $("#filter-chips").style.display = (isTodos || isStaff || isLager) ? "none" : "inline-flex";
-  $("#add-btn").style.display = (isTodos || isStaff || isLager) ? "none" : "inline-block";
+  $("#zeit-page").style.display = isZeit ? "block" : "none";
+  $("#filter-chips").style.display = (isTodos || isStaff || isLager || isZeit) ? "none" : "inline-flex";
+  $("#add-btn").style.display = (isTodos || isStaff || isLager || isZeit) ? "none" : "inline-block";
   if(isTodos){ renderGeneralTodos(); return; }
   if(isTable){ renderTable(); return; }
   if(isStaff){ renderStaffPage(); return; }
   if(isLager){ return; }
+  if(isZeit){ renderZeitPage(); return; }
 }
 function renderHeader(){
   document.querySelectorAll("#view-seg button").forEach(b=>b.classList.toggle("active", b.dataset.view===state.view));
@@ -1683,6 +1806,175 @@ function renderStaffHeaderLabel(){
   var days = getWeekDays(state.staffRefDate);
   $("#staff-nav-label").textContent = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]) + " · KW " + isoWeek(toISO(days[0]));
 }
+
+/* ---------- Stempeluhr ---------- */
+
+function zeitTodayEntries(list){
+  var today = todayISO();
+  return list.filter(t=>t.date===today).slice().sort((a,b)=>a.timestamp-b.timestamp);
+}
+function zeitCurrentStatus(entriesToday){
+  if(entriesToday.length===0) return "off";
+  var last = entriesToday[entriesToday.length-1];
+  if(last.type==="pause_start") return "pause";
+  if(last.type==="gehen") return "off";
+  return "on"; // kommen oder pause_ende
+}
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"}); }
+function fmtDuration(ms){
+  if(ms==null || ms<0) return "–";
+  var totalMin = Math.round(ms/60000);
+  var h = Math.floor(totalMin/60), m = totalMin%60;
+  return h + "h " + String(m).padStart(2,"0") + "m";
+}
+function zeitLabel(type){
+  return type==="kommen" ? "Gekommen" : type==="gehen" ? "Gegangen" : type==="pause_start" ? "Pause Start" : type==="pause_ende" ? "Pause Ende" : type;
+}
+function zeitDotClass(type){
+  return (type==="kommen" || type==="pause_ende") ? "go" : type==="gehen" ? "stop" : "pause";
+}
+
+function renderZeitPage(){
+  var todayEntries = zeitTodayEntries(state.myTime);
+  var status = zeitCurrentStatus(todayEntries);
+  var statusEl = $("#zeit-status");
+  statusEl.className = "zeit-status " + (status==="on"?"on":status==="pause"?"pause":"off");
+  statusEl.textContent = status==="on" ? "Eingestempelt" : status==="pause" ? "In Pause" : "Nicht eingestempelt";
+
+  $("#zeit-kommen").disabled = status !== "off";
+  $("#zeit-pause-start").disabled = status !== "on";
+  $("#zeit-pause-ende").disabled = status !== "pause";
+  $("#zeit-gehen").disabled = status === "off";
+
+  var listEl = $("#zeit-today-list");
+  if(todayEntries.length===0){ listEl.innerHTML = '<div class="empty-note">Heute noch keine Einträge.</div>'; }
+  else{
+    listEl.innerHTML = todayEntries.map(e=>
+      '<div class="zeit-log-item"><span class="zt-time">' + fmtTime(e.timestamp) + '</span><span class="zt-dot ' + zeitDotClass(e.type) + '"></span><span class="zt-label">' + zeitLabel(e.type) + '</span></div>'
+    ).join("");
+  }
+
+  $("#zeit-admin-section").style.display = state.isAdmin ? "block" : "none";
+  if(state.isAdmin){
+    if(!$("#zeit-admin-date-hidden").value){
+      var iso = todayISO();
+      $("#zeit-admin-date-hidden").value = iso;
+      $("#zeit-admin-date").value = isoToDisplay(iso);
+    }
+    renderZeitAdminTable();
+  }
+}
+
+async function zeitPunch(type){
+  if(!state.currentUid) return;
+  try{
+    await addDoc(collection(db, TIME_COLLECTION), {
+      uid: state.currentUid, name: state.currentName, type: type, timestamp: Date.now(), date: todayISO()
+    });
+  }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
+}
+$("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
+$("#zeit-pause-start").addEventListener("click", ()=>zeitPunch("pause_start"));
+$("#zeit-pause-ende").addEventListener("click", ()=>zeitPunch("pause_ende"));
+$("#zeit-gehen").addEventListener("click", ()=>zeitPunch("gehen"));
+$("#zeit-admin-date-hidden").addEventListener("input", renderZeitAdminTable);
+
+function renderZeitAdminTable(){
+  var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
+  var dayEntries = state.allTime.filter(t=>t.date===dateIso);
+  var byEmployee = {};
+  dayEntries.forEach(e=>{
+    if(!byEmployee[e.uid]) byEmployee[e.uid] = { name: e.name || e.uid, entries: [] };
+    byEmployee[e.uid].entries.push(e);
+  });
+  var rows = Object.keys(byEmployee).map(uid=>{
+    var g = byEmployee[uid];
+    g.entries.sort((a,b)=>a.timestamp-b.timestamp);
+    var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
+    g.entries.forEach(e=>{
+      if(e.type==="kommen" && !kommen) kommen = e.timestamp;
+      else if(e.type==="pause_start") pauseStart = e.timestamp;
+      else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
+      else if(e.type==="gehen") gehen = e.timestamp;
+    });
+    var totalMs = (kommen && gehen) ? (gehen - kommen - pauseMs) : null;
+    return { uid: uid, name: g.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs };
+  }).sort((a,b)=> a.name.localeCompare(b.name));
+  var tbody = $("#zeit-admin-tbody");
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="5">Keine Einträge an diesem Tag.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r=>
+    '<tr class="zeit-row" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
+    '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + '</td>' +
+    '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
+    '<td data-label="Pause">' + (r.pauseMs?fmtDuration(r.pauseMs):"–") + '</td>' +
+    '<td data-label="Total">' + fmtDuration(r.totalMs) + '</td></tr>'
+  ).join("");
+}
+$("#zeit-admin-tbody").addEventListener("click", e=>{
+  var tr = e.target.closest("tr.zeit-row"); if(!tr) return;
+  openZeitEditModal(tr.dataset.uid, tr.dataset.name);
+});
+
+/* ---------- Zeiten korrigieren (nur Admin) ---------- */
+
+var zeitEditBackdrop = $("#zeit-edit-backdrop");
+var zeitEditUid = null, zeitEditDate = null;
+function openZeitEditModal(uid, name){
+  zeitEditUid = uid;
+  zeitEditDate = $("#zeit-admin-date-hidden").value || todayISO();
+  $("#zeit-edit-title").textContent = "Zeiten bearbeiten — " + name + " · " + fmtShort(zeitEditDate);
+  renderZeitEditRows();
+  zeitEditBackdrop.classList.add("open");
+}
+function closeZeitEditModal(){ zeitEditBackdrop.classList.remove("open"); zeitEditUid=null; }
+$("#zeit-edit-close-btn").addEventListener("click", closeZeitEditModal);
+zeitEditBackdrop.addEventListener("click", e=>{ if(e.target===zeitEditBackdrop) closeZeitEditModal(); });
+
+function tsToTimeInput(ts){ var d=new Date(ts); return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0"); }
+function timeInputToTs(dateIso, hhmm){
+  var parts = hhmm.split(":"); var d = fromISO(dateIso);
+  d.setHours(parseInt(parts[0],10)||0, parseInt(parts[1],10)||0, 0, 0);
+  return d.getTime();
+}
+function renderZeitEditRows(){
+  var entries = state.allTime.filter(t=>t.uid===zeitEditUid && t.date===zeitEditDate).sort((a,b)=>a.timestamp-b.timestamp);
+  var list = $("#zeit-edit-rows");
+  if(entries.length===0){ list.innerHTML = '<div class="empty-note">Keine Einträge an diesem Tag.</div>'; return; }
+  list.innerHTML = entries.map(e=>
+    '<div class="zeit-edit-row" data-id="' + e.id + '">' +
+    '<select class="ze-type"><option value="kommen"' + (e.type==="kommen"?" selected":"") + '>Kommen</option><option value="pause_start"' + (e.type==="pause_start"?" selected":"") + '>Pause Start</option><option value="pause_ende"' + (e.type==="pause_ende"?" selected":"") + '>Pause Ende</option><option value="gehen"' + (e.type==="gehen"?" selected":"") + '>Gehen</option></select>' +
+    '<input type="time" class="ze-time" value="' + tsToTimeInput(e.timestamp) + '">' +
+    '<button type="button" class="zeit-edit-remove" aria-label="Eintrag löschen">✕</button>' +
+    '</div>'
+  ).join("");
+}
+$("#zeit-edit-add-btn").addEventListener("click", async ()=>{
+  if(!zeitEditUid) return;
+  var name = (state.allTime.find(t=>t.uid===zeitEditUid) || {}).name || "";
+  try{
+    await addDoc(collection(db, TIME_COLLECTION), { uid: zeitEditUid, name: name, type: "kommen", timestamp: timeInputToTs(zeitEditDate, "08:00"), date: zeitEditDate });
+  }catch(err){ console.error(err); toast("Hinzufügen fehlgeschlagen."); }
+});
+$("#zeit-edit-rows").addEventListener("click", async e=>{
+  var rmBtn = e.target.closest(".zeit-edit-remove"); if(!rmBtn) return;
+  var id = rmBtn.closest(".zeit-edit-row").dataset.id;
+  try{ await deleteDoc(doc(db, TIME_COLLECTION, id)); } catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+});
+$("#zeit-edit-rows").addEventListener("change", async e=>{
+  var row = e.target.closest(".zeit-edit-row"); if(!row) return;
+  var id = row.dataset.id;
+  var type = row.querySelector(".ze-type").value;
+  var time = row.querySelector(".ze-time").value;
+  try{
+    await updateDoc(doc(db, TIME_COLLECTION, id), { type: type, timestamp: timeInputToTs(zeitEditDate, time) });
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+// Während das Bearbeiten-Fenster offen ist, Liste bei neuen Daten aktuell halten.
+var _origRenderZeitAdminTable = renderZeitAdminTable;
+renderZeitAdminTable = function(){
+  _origRenderZeitAdminTable();
+  if(zeitEditBackdrop.classList.contains("open")) renderZeitEditRows();
+};
 
 function renderStaffPage(){
   renderStaffHeaderLabel();
