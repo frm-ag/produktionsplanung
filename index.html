@@ -10,6 +10,10 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#f3f5f7;
@@ -349,6 +353,558 @@
   .week-hint{display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2933;color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;max-width:90vw;text-align:center;}
   .toast.show{opacity:1;}
+
+  /* ================= mat-lager (Lager-Reiter, eingegliedert) ================= */
+  
+  #lager-page *{box-sizing:border-box;}
+  #lager-page html, #lager-page body{margin:0;padding:0;}
+  #lager-page body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  #lager-page #lagerApp{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    background:var(--bg);
+    position:relative;
+  }
+  #lager-page .hazard-strip{
+    height:6px;
+    width:100%;
+    background:repeating-linear-gradient(135deg, var(--accent) 0 10px, #1c3b52 10px 20px);
+    flex-shrink:0;
+  }
+  #lager-page header{
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #lager-page .brand{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+  }
+  #lager-page .brand h1{
+    font-family:var(--disp);
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    margin:0;
+  }
+  #lager-page .brand h1 span{color:var(--accent);}
+  #lager-page .brand .count{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--text-muted);
+    border:1px solid var(--border);
+    padding:3px 8px;
+    border-radius:3px;
+  }
+  #lager-page .conn-dot{
+    display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--text-muted);margin-right:5px;
+  }
+  #lager-page .conn-dot.ok{background:var(--success);}
+  #lager-page .conn-dot.err{background:var(--danger);}
+  #lager-page main{
+    flex:1;
+    overflow-y:auto;
+    padding:16px 16px 90px;
+  }
+  #lager-page nav.tabs{
+    position:sticky;
+    bottom:0;
+    display:flex;
+    background:var(--panel);
+    border-top:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #lager-page nav.tabs button{
+    flex:1;
+    background:none;
+    border:none;
+    color:var(--text-muted);
+    font-family:var(--body);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:0.3px;
+    padding:10px 4px 12px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    cursor:pointer;
+  }
+  #lager-page nav.tabs button.active{color:var(--accent);}
+  #lager-page nav.tabs svg{width:20px;height:20px;}
+
+  #lager-page .stat-row{display:flex;gap:10px;margin-bottom:18px;}
+  #lager-page .stat-card{
+    flex:1;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px 14px;
+  }
+  #lager-page .stat-card .num{font-family:var(--disp);font-size:26px;font-weight:700;}
+  #lager-page .stat-card.warn .num{color:var(--danger);}
+  #lager-page .stat-card .label{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+  #lager-page h2.section-title{
+    font-family:var(--disp);
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--text-muted);
+    margin:0 0 10px;
+  }
+
+  #lager-page .tag-card{
+    position:relative;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:2px;
+    margin-bottom:10px;
+    padding:12px 14px 12px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    cursor:pointer;
+    clip-path:polygon(0 10px, 10px 0, 100% 0, 100% 100%, 0 100%);
+  }
+  #lager-page .tag-card::before{
+    content:'';
+    position:absolute;
+    left:6px;top:6px;
+    width:4px;height:4px;
+    border-radius:50%;
+    background:var(--border);
+  }
+  #lager-page .tag-card.low{border-left:3px solid var(--danger);}
+  #lager-page .tag-card .info{flex:1;min-width:0;}
+  #lager-page .tag-card .name{font-weight:600;font-size:14.5px;margin-bottom:3px;}
+  #lager-page .tag-card .meta{font-family:var(--mono);font-size:11px;color:var(--text-muted);}
+  #lager-page .tag-card .stock{
+    font-family:var(--mono);
+    font-size:18px;
+    font-weight:600;
+    text-align:right;
+  }
+  #lager-page .tag-card .stock small{display:block;font-size:9px;color:var(--text-muted);font-weight:400;}
+  #lager-page .tag-card.low .stock{color:var(--danger);}
+
+  #lager-page .filter-row{
+    display:flex;
+    gap:6px;
+    overflow-x:auto;
+    padding-bottom:4px;
+    margin-bottom:14px;
+  }
+  #lager-page .filter-row::-webkit-scrollbar{display:none;}
+  #lager-page .chip-filter{
+    flex-shrink:0;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text-muted);
+    font-family:var(--body);
+    font-size:12.5px;
+    font-weight:600;
+    padding:7px 13px;
+    border-radius:20px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  #lager-page .chip-filter.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--on-accent);
+  }
+  #lager-page .search-bar{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:6px;
+    font-family:var(--body);
+    font-size:14px;
+    margin-bottom:14px;
+  }
+  #lager-page .search-bar::placeholder{color:var(--text-muted);}
+
+  #lager-page .fab{
+    position:fixed;
+    max-width:480px;
+    margin:0 auto;
+    left:0;right:0;
+    bottom:78px;
+    display:flex;
+    justify-content:flex-end;
+    pointer-events:none;
+    padding:0 16px;
+  }
+  #lager-page .fab button{
+    pointer-events:all;
+    background:var(--accent);
+    color:var(--on-accent);
+    border:none;
+    width:52px;height:52px;
+    border-radius:50%;
+    font-size:26px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:0 4px 14px rgba(47,102,144,0.35);
+  }
+
+  #lager-page .btn{
+    font-family:var(--body);
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:6px;
+    padding:11px 16px;
+    cursor:pointer;
+  }
+  #lager-page .btn-primary{background:var(--accent);color:var(--on-accent);}
+  #lager-page .btn-secondary{background:var(--panel-alt);color:var(--text);border:1px solid var(--border);}
+  #lager-page .btn-success{background:var(--success);color:#ffffff;}
+  #lager-page .btn-danger{background:var(--danger);color:#ffffff;}
+  #lager-page .btn-block{width:100%;}
+  #lager-page .btn-row{display:flex;gap:8px;margin-top:14px;}
+  #lager-page .btn[disabled]{opacity:0.5;cursor:not-allowed;}
+
+  #lager-page label{
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--text-muted);
+    margin:12px 0 5px;
+  }
+  #lager-page input[type=text], #lager-page input[type=number], #lager-page select{
+    width:100%;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:6px;
+    font-family:var(--body);
+    font-size:14px;
+  }
+
+  #lager-page .overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.6);
+    display:flex;align-items:flex-end;
+    z-index:50;
+  }
+  #lager-page .sheet{
+    background:var(--panel);
+    width:100%;
+    max-width:480px;
+    margin:0 auto;
+    border-radius:16px 16px 0 0;
+    padding:18px 20px 26px;
+    max-height:88vh;
+    overflow-y:auto;
+    border-top:1px solid var(--border);
+  }
+  #lager-page .sheet-head{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:4px;
+  }
+  #lager-page .sheet-head h3{font-family:var(--disp);font-size:18px;margin:0;}
+  #lager-page .sheet-head .x{color:var(--text-muted);font-size:22px;cursor:pointer;background:none;border:none;}
+
+  #lager-page .stencil-id{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--accent);
+    letter-spacing:1px;
+    margin:2px 0 14px;
+  }
+  #lager-page .qr-box{
+    background:#fff;
+    padding:10px;
+    border-radius:8px;
+    display:inline-flex;
+    margin:6px 0 4px;
+  }
+  #lager-page .detail-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin:14px 0;
+  }
+  #lager-page .detail-grid div{
+    background:var(--panel-alt);
+    border-radius:6px;
+    padding:9px 11px;
+  }
+  #lager-page .detail-grid .dlabel{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;}
+  #lager-page .detail-grid .dval{font-family:var(--mono);font-size:15px;margin-top:2px;}
+
+  #lager-page .qty-stepper{
+    display:flex;align-items:center;gap:14px;
+    justify-content:center;
+    margin:16px 0 6px;
+  }
+  #lager-page .qty-stepper button{
+    width:40px;height:40px;border-radius:50%;
+    background:var(--panel-alt);border:1px solid var(--border);
+    color:var(--text);font-size:20px;cursor:pointer;
+  }
+  #lager-page .qty-stepper .qty-val{font-family:var(--mono);font-size:24px;min-width:44px;text-align:center;}
+
+  #lager-page .scan-zone{
+    display:flex;flex-direction:column;align-items:center;
+    padding:36px 10px 10px;
+  }
+  #lager-page .nfc-ring{
+    width:150px;height:150px;
+    border-radius:50%;
+    border:2px solid var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+    margin-bottom:22px;
+  }
+  #lager-page .nfc-ring::before, #lager-page .nfc-ring::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:50%;
+    border:2px solid var(--accent);
+    opacity:0;
+    animation:ping 2.2s ease-out infinite;
+  }
+  #lager-page .nfc-ring::after{animation-delay:1.1s;}
+  #lager-page @keyframes ping{
+    0%{transform:scale(0.85);opacity:0.7;}
+    100%{transform:scale(1.6);opacity:0;}
+  }
+  #lager-page .nfc-ring svg{width:56px;height:56px;color:var(--accent);}
+  #lager-page .scan-caption{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:1.5px;
+    color:var(--text-muted);
+    text-transform:uppercase;
+    margin-bottom:26px;
+  }
+  #lager-page .scan-caption.active{color:var(--accent);}
+  #lager-page .divider-or{
+    display:flex;align-items:center;gap:10px;
+    width:100%;color:var(--text-muted);font-size:11px;
+    margin:22px 0 16px;
+  }
+  #lager-page .divider-or::before, #lager-page .divider-or::after{
+    content:'';flex:1;height:1px;background:var(--border);
+  }
+  #lager-page .manual-entry{width:100%;display:flex;gap:8px;}
+  #lager-page .manual-entry input{flex:1;}
+
+  #lager-page .qr-scan-wrap{
+    position:relative;
+    width:100%;
+    margin-top:10px;
+    border-radius:14px;
+    overflow:hidden;
+    background:#000;
+    display:none;
+  }
+  #lager-page #qr-video{
+    width:100%;
+    height:320px;
+    object-fit:cover;
+    display:block;
+  }
+  #lager-page .qr-frame{
+    position:absolute;
+    top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:72%;
+    aspect-ratio:1/1;
+    max-width:230px;
+    pointer-events:none;
+  }
+  #lager-page .qr-frame::before{
+    content:'';
+    position:absolute;inset:0;
+    box-shadow:0 0 0 2000px rgba(0,0,0,0.45);
+    border-radius:14px;
+  }
+  #lager-page .qr-corner{
+    position:absolute;
+    width:32px;height:32px;
+    border:3px solid var(--accent);
+  }
+  #lager-page .qr-corner.tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:10px 0 0 0;}
+  #lager-page .qr-corner.tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 10px 0 0;}
+  #lager-page .qr-corner.bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 10px;}
+  #lager-page .qr-corner.br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 10px 0;}
+  #lager-page .qr-scan-line{
+    position:absolute;
+    left:6%;right:6%;
+    height:2px;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    animation:qrscan 2.2s ease-in-out infinite;
+  }
+  #lager-page @keyframes qrscan{
+    0%{top:8%;}
+    50%{top:88%;}
+    100%{top:8%;}
+  }
+  #lager-page .qr-scan-hint{
+    position:absolute;
+    bottom:14px;left:0;right:0;
+    text-align:center;
+    color:#fff;
+    font-size:12px;
+    font-family:var(--mono);
+    letter-spacing:0.5px;
+    text-shadow:0 1px 3px rgba(0,0,0,0.6);
+  }
+
+  #lager-page .movement-row{
+    display:flex;align-items:center;gap:12px;
+    padding:11px 0;
+    border-bottom:1px solid var(--border);
+  }
+  #lager-page .movement-row .m-icon{
+    width:34px;height:34px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:600;font-size:14px;
+    flex-shrink:0;
+  }
+  #lager-page .m-icon.in{background:rgba(95,167,119,0.15);color:var(--success);}
+  #lager-page .m-icon.out{background:rgba(214,69,69,0.15);color:var(--danger);}
+  #lager-page .movement-row .m-info{flex:1;min-width:0;}
+  #lager-page .movement-row .m-name{font-size:13.5px;font-weight:600;}
+  #lager-page .movement-row .m-meta{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);margin-top:1px;}
+  #lager-page .movement-row .m-qty{font-family:var(--mono);font-weight:600;font-size:14px;}
+  #lager-page .m-qty.in{color:var(--success);}
+  #lager-page .m-qty.out{color:var(--danger);}
+  #lager-page .movement-row .m-tags{display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;}
+  #lager-page .m-chip{
+    font-size:10px;
+    font-family:var(--mono);
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text-muted);
+    padding:1px 6px;
+    border-radius:3px;
+  }
+
+  #lager-page .empty-state{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--text-muted);
+  }
+  #lager-page .empty-state .disp{font-family:var(--disp);font-size:15px;color:var(--text);margin-bottom:6px;}
+  #lager-page .toast{
+    position:fixed;
+    bottom:90px;left:50%;transform:translateX(-50%);
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 18px;
+    border-radius:8px;
+    font-size:13px;
+    z-index:100;
+    box-shadow:0 4px 14px rgba(31,41,51,0.15);
+    max-width:90%;
+    text-align:center;
+  }
+  #lager-page ::-webkit-scrollbar{width:0;height:0;}
+
+  #lager-page .print-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:14px;
+  }
+  #lager-page .print-tile{
+    background:#fff;
+    border:1px dashed var(--border);
+    border-radius:6px;
+    padding:10px;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+  }
+  #lager-page .print-tile .ptid{
+    font-family:var(--mono);font-size:11px;color:#1b1d1f;letter-spacing:0.5px;
+  }
+  #lager-page .print-tile .qr-holder canvas, #lager-page .print-tile .qr-holder img{
+    width:84px;height:84px;
+  }
+  @media print{
+    #lager-page @page{ margin:12mm; }
+    #lager-page body *{visibility:hidden;}
+    #lager-page #printArea, #lager-page #printArea *{visibility:visible;}
+    #lager-page #printArea{
+      position:absolute;top:0;left:0;width:100%;
+      display:grid;grid-template-columns:1fr 1fr;gap:16mm;
+      padding:0;
+    }
+    #lager-page .print-tile{
+      border:1px solid #999;
+      background:#fff !important;
+      padding:8mm;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;
+      page-break-inside:avoid;
+    }
+    #lager-page .print-tile .ptid{color:#000;font-size:13px;}
+    #lager-page .print-tile canvas, #lager-page .print-tile img{
+      width:45mm !important;height:45mm !important;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;
+    }
+  }
+
+  #lager-page .login-screen{
+    min-height:100vh;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:24px;
+  }
+  #lager-page .login-screen .brand-lg{
+    font-family:var(--disp);font-size:28px;font-weight:700;margin-bottom:28px;
+  }
+  #lager-page .login-screen .brand-lg span{color:var(--accent);}
+  #lager-page .login-box{
+    width:100%;max-width:340px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:22px 20px;
+  }
+  #lager-page .login-box .err{
+    color:var(--danger);font-size:12.5px;margin-top:10px;min-height:16px;
+  }
+  #lager-page .logout-link{
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--text-muted);
+    background:none;border:none;cursor:pointer;
+    text-decoration:underline;
+    padding:0;margin-top:2px;
+  }
+  #lager-page .role-badge{
+    font-family:var(--mono);font-size:10px;
+    color:var(--accent);
+    border:1px solid var(--accent-dim);
+    padding:1px 6px;border-radius:3px;
+    margin-left:6px;
+  }
+
+  /* Eigener Header/Login-Bereich von mat-lager wird ausgeblendet — Branding, Nutzeranzeige und Abmelden laufen jetzt über die gemeinsame Kopfzeile. */
+  #lager-page header{display:none;}
+
 </style>
 </head>
 <body>
@@ -376,17 +932,9 @@
 
     <div class="seg" id="view-seg">
       <button data-view="table" class="active">Übersicht</button>
-      <button data-view="week">Woche</button>
-      <button data-view="month">Monat</button>
-      <button data-view="todos">To-Dos</button>
       <button data-view="staff">Personal</button>
-    </div>
-
-    <div class="nav-group" id="nav-group">
-      <button class="round" id="nav-prev" aria-label="Zurück">‹</button>
-      <div class="nav-label" id="nav-label"></div>
-      <button class="round" id="nav-next" aria-label="Weiter">›</button>
-      <button class="today-btn" id="nav-today">Heute</button>
+      <button data-view="todos">To-Dos</button>
+      <button data-view="lager">Lager</button>
     </div>
 
     <div class="filter-chips" id="filter-chips">
@@ -399,18 +947,6 @@
     <button class="add-btn" id="add-btn">+ Auftrag</button>
     <button class="logout-btn" id="logout-btn">Abmelden</button>
   </header>
-
-  <div class="layout">
-    <div class="cal-scroll"><div id="calendar"></div></div>
-    <aside class="sidebar">
-      <h2>Bereit zur Ausführung</h2>
-      <div class="count" id="ready-count"></div>
-      <div id="ready-list"></div>
-      <h2 class="sidebar-h2-second">Wartet auf Material</h2>
-      <div class="count" id="pending-count"></div>
-      <div id="pending-list"></div>
-    </aside>
-  </div>
 
   <div id="todos-page" style="display:none;">
     <form id="general-todo-form" class="gt-form">
@@ -448,6 +984,58 @@
         <tbody id="overview-tbody"></tbody>
       </table>
     </div>
+  </div>
+
+  <div id="lager-page" style="display:none;">
+
+<div id="lagerApp" style="display:none;">
+  <div class="hazard-strip"></div>
+  <header>
+    <div class="brand">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <img src="logo-mark.png" alt="FR Metallbau AG" style="height:36px;width:auto;">
+        <h1>MAT<span>.</span>LAGER</h1>
+      </div>
+      <div class="count" id="itemCount"><span class="conn-dot" id="lagerConnDot"></span>0 Artikel</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+      <div style="font-size:11px;color:var(--text-muted);" id="userLine"></div>
+      <button class="logout-link" id="logoutBtn">Abmelden</button>
+    </div>
+  </header>
+  <main id="main"></main>
+  <div class="fab" id="fab" style="display:none;">
+    <button id="fabAdd">+</button>
+  </div>
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Übersicht
+    </button>
+    <button data-tab="scan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5v1a5 5 0 0 1-2 4"/><path d="M12 22a5 5 0 0 1-5-5v-1a5 5 0 0 1 2-4"/><circle cx="12" cy="12" r="2"/></svg>
+      Scan
+    </button>
+    <button data-tab="articles">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7 12 3 4 7v10l8 4 8-4V7z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/></svg>
+      Artikel
+    </button>
+    <button data-tab="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+      Verlauf
+    </button>
+    <button data-tab="wishlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Bestellliste
+    </button>
+    <button data-tab="admin" id="navAdmin" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Verwaltung
+    </button>
+  </nav>
+</div>
+
+
   </div>
 
   <div id="staff-page" style="display:none;">
@@ -935,8 +1523,6 @@ function getMonthGrid(refISO){
   return { days: days, month: month };
 }
 function filteredOrders(){ return state.filter==="alle" ? state.orders : state.orders.filter(o=>o.workshop===state.filter); }
-function ordersStartingOn(iso){ return filteredOrders().filter(o=>o.productionStart===iso); }
-function ordersAssemblyOn(iso){ return filteredOrders().filter(o=>o.assemblyDate===iso && o.assemblyDate!==o.productionStart); }
 function orderMaterials(o){ return Array.isArray(o.materials) ? o.materials : []; }
 function orderTodos(o){ return Array.isArray(o.todos) ? o.todos : []; }
 function todoProgress(o){
@@ -945,13 +1531,10 @@ function todoProgress(o){
   return { done: done, total: todos.length };
 }
 function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
-function pendingMaterials(o){ return orderMaterials(o).filter(m=>m.status==="ausstehend"); }
 function materialBlocksPhase(m, phase){ return m.status==="ausstehend" && ((m.phase||"beide")===phase || (m.phase||"beide")==="beide"); }
 function hasPendingMaterialForPhase(o, phase){ return orderMaterials(o).some(m=>materialBlocksPhase(m, phase)); }
 function isWerkstattReady(o){ return !!o.productionStart && !hasPendingMaterialForPhase(o, "werkstatt"); }
 function isMontageReady(o){ return !!o.assemblyDate && !hasPendingMaterialForPhase(o, "montage"); }
-function isReadyNotDone(o){ return (isWerkstattReady(o) || isMontageReady(o)) && !o.completed; }
-function daysWaiting(o){ return Math.round((fromISO(todayISO()) - fromISO(o.productionStart)) / 86400000); }
 
 /* ---------- Rendering ---------- */
 
@@ -960,95 +1543,23 @@ function render(){
   var isTodos = state.view === "todos";
   var isTable = state.view === "table";
   var isStaff = state.view === "staff";
-  var isCalendar = !isTodos && !isTable && !isStaff;
-  $(".layout").style.display = isCalendar ? "grid" : "none";
+  var isLager = state.view === "lager";
   $("#todos-page").style.display = isTodos ? "block" : "none";
   $("#table-page").style.display = isTable ? "block" : "none";
   $("#staff-page").style.display = isStaff ? "block" : "none";
-  $("#nav-group").style.display = isCalendar ? "inline-flex" : "none";
-  $("#filter-chips").style.display = (isTodos || isStaff) ? "none" : "inline-flex";
-  $("#add-btn").style.display = (isTodos || isStaff) ? "none" : "inline-block";
+  $("#lager-page").style.display = isLager ? "block" : "none";
+  $("#filter-chips").style.display = (isTodos || isStaff || isLager) ? "none" : "inline-flex";
+  $("#add-btn").style.display = (isTodos || isStaff || isLager) ? "none" : "inline-block";
   if(isTodos){ renderGeneralTodos(); return; }
   if(isTable){ renderTable(); return; }
   if(isStaff){ renderStaffPage(); return; }
-  if(state.view==="week") renderWeek(); else renderMonth();
-  renderSidebar();
+  if(isLager){ return; }
 }
 function renderHeader(){
   document.querySelectorAll("#view-seg button").forEach(b=>b.classList.toggle("active", b.dataset.view===state.view));
   document.querySelectorAll("#filter-chips button").forEach(b=>b.classList.toggle("active", b.dataset.filter===state.filter));
-  var label;
-  if(state.view==="week"){ var days=getWeekDays(state.refDate); label = fmtDate(days[0]).slice(0,6) + " – " + fmtDate(days[4]) + " · KW " + isoWeek(toISO(days[0])); }
-  else{ var d=fromISO(state.refDate); label = d.toLocaleDateString("de-CH", { month: "long", year: "numeric" }); }
-  $("#nav-label").textContent = label;
 }
 function workshopLabel(w){ return w==="aluminium" ? "Aluminium" : (w==="reparaturen" ? "Reparaturen" : "Stahl"); }
-function orderCardHTML(o, isMontageOnly){
-  var wsClass = o.workshop==="aluminium" ? "wk-aluminium" : (o.workshop==="reparaturen" ? "wk-reparaturen" : "");
-  var pending = hasPendingMaterial(o);
-  var mats = orderMaterials(o);
-  var dotClass = mats.length===0 ? "neutral" : (pending ? "warn" : "ok");
-  var tagClass = o.workshop==="aluminium" ? "tag-aluminium" : (o.workshop==="reparaturen" ? "tag-reparaturen" : "");
-  var phase = isMontageOnly ? "montage" : "werkstatt";
-  var phaseReady = phase==="montage" ? isMontageReady(o) : isWerkstattReady(o);
-  var tags = '<span class="tag ' + (phase==="montage" ? "tag-montage" : "tag-werkstatt") + '">' + (phase==="montage" ? "Montage" : "Werkstatt") + '</span>';
-  tags += '<span class="tag ' + (phaseReady?"tag-ready":"tag-notready") + '">' + (phaseReady?"Bereit":"Nicht bereit") + '</span>';
-  tags += '<span class="tag ' + tagClass + '">' + workshopLabel(o.workshop) + "</span>";
-  if(!isMontageOnly && o.assemblyDate) tags += '<span class="tag tag-montage">Montage ' + fmtShort(o.assemblyDate) + "</span>";
-  var prog = todoProgress(o);
-  if(prog.total > 0) tags += '<span class="todo-progress' + (prog.done===prog.total?" done-all":"") + '">☑ ' + prog.done + '/' + prog.total + '</span>';
-  var matLines = "";
-  mats.forEach(m=>{
-    var isOk = m.status==="geliefert";
-    var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
-    var forTag = m.phase==="werkstatt" ? " (Werkstatt)" : (m.phase==="montage" ? " (Montage)" : "");
-    matLines += '<div class="material-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + forTag + " · " + line + "</div>";
-  });
-  var todoLines = "";
-  orderTodos(o).forEach((t,i)=>{
-    todoLines += '<div class="card-todo-line' + (t.done?" done":"") + ((!t.done && t.dueDate && t.dueDate < todayISO())?" overdue":"") + '" data-order-id="' + o.id + '" data-todo-idx="' + i + '">' + (t.done?"☑":"☐") + " " + escapeHtml(t.text) + (t.dueDate ? ' <span class="todo-due">· bis ' + fmtShort(t.dueDate) + '</span>' : "") + "</div>";
-  });
-  return '<div class="order-card ' + wsClass + " " + (pending?"mat-pending":"") + (isMontageOnly?" montage-only":"") + (phase==="montage"?" phase-montage":"") + (o.completed?" completed":"") + '" data-id="' + o.id + '">' +
-    '<div class="order-top"><span class="order-no">' + escapeHtml(o.orderNumber) + '</span>' + (isMontageOnly ? '<span class="dot ' + dotClass + '"></span>' : '<input type="checkbox" class="card-done-toggle" data-id="' + o.id + '"' + (o.completed?" checked":"") + '>') + '</div>' +
-    '<div class="order-customer">' + escapeHtml(o.customer) + '</div>' +
-    (o.description ? '<div class="order-desc">' + escapeHtml(o.description) + '</div>' : "") +
-    '<div class="order-tags">' + tags + '</div>' +
-    (matLines ? '<div class="material-lines">' + matLines + '</div>' : "") +
-    (todoLines ? '<div class="card-todo-lines">' + todoLines + '</div>' : "") +
-    '</div>';
-}
-function renderWeek(){
-  var days = getWeekDays(state.refDate);
-  var html = '<div class="week-grid">';
-  days.forEach(d=>{
-    var iso=toISO(d), starting=ordersStartingOn(iso), montage=ordersAssemblyOn(iso), isToday=iso===todayISO();
-    html += '<div class="day-col"><div class="day-head' + (isToday?" is-today":"") + '"><div class="day-name">' + fmtDay(d) + '</div><div class="day-date">' + fmtDate(d) + '</div></div><div class="day-body">';
-    if(starting.length===0 && montage.length===0) html += '<div class="day-empty">Keine Aufträge</div>';
-    else{ starting.forEach(o=>html+=orderCardHTML(o,false)); montage.forEach(o=>html+=orderCardHTML(o,true)); }
-    html += '<button class="day-add" data-date="' + iso + '">+ Auftrag hier</button></div></div>';
-  });
-  html += "</div>";
-  $("#calendar").innerHTML = html;
-}
-function renderMonth(){
-  var grid = getMonthGrid(state.refDate);
-  var weekdayNames = ["Mo","Di","Mi","Do","Fr","Sa","So"];
-  var html = '<div class="month-grid">';
-  weekdayNames.forEach(n=>html += '<div class="month-weekday">' + n + "</div>");
-  grid.days.forEach(d=>{
-    var iso=toISO(d), out=d.getMonth()!==grid.month, isToday=iso===todayISO();
-    var starting=ordersStartingOn(iso), montage=ordersAssemblyOn(iso);
-    html += '<div class="month-cell' + (out?" out":"") + (isToday?" is-today":"") + '"><div class="month-daynum" data-add-date="' + iso + '">' + d.getDate() + '</div><div class="month-chips">';
-    starting.forEach(o=>{
-      var cls = (o.workshop==="aluminium"?"aluminium":(o.workshop==="reparaturen"?"reparaturen":"")) + (hasPendingMaterial(o)?" pending":"");
-      html += '<div class="chip ' + cls + '" data-id="' + o.id + '">' + escapeHtml(o.orderNumber) + " · " + escapeHtml(o.customer) + "</div>";
-    });
-    montage.forEach(o=>html += '<div class="chip montage-chip" data-id="' + o.id + '">▲ ' + escapeHtml(o.orderNumber) + "</div>");
-    html += "</div></div>";
-  });
-  html += "</div>";
-  $("#calendar").innerHTML = html;
-}
 function renderGeneralTodos(){
   var list = $("#general-todos-list");
   var todos = state.generalTodos.slice().sort((a,b)=>{
@@ -1410,41 +1921,6 @@ $("#assign-delete-btn").addEventListener("click", async ()=>{
   catch(err){ console.error(err); toast("Entfernen fehlgeschlagen."); }
 });
 
-function renderSidebar(){
-  var ready = filteredOrders().filter(isReadyNotDone).sort((a,b)=> (a.productionStart||"") < (b.productionStart||"") ? -1 : 1);
-  $("#ready-count").textContent = ready.length + (ready.length===1 ? " Auftrag wartet" : " Aufträge warten");
-  var readyHtml = "";
-  if(ready.length===0) readyHtml = '<div class="empty-note">Nichts Offenes wartet.</div>';
-  else ready.forEach(o=>{
-    readyHtml += '<div class="ready-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
-    if(o.description) readyHtml += '<div class="ready-desc">' + escapeHtml(o.description) + '</div>';
-    if(o.productionStart){
-      var days = daysWaiting(o);
-      readyHtml += '<div class="ready-since">bereit seit ' + fmtShort(o.productionStart) + (days>0 ? " · " + days + (days===1?" Tag":" Tage") : " · heute") + '</div>';
-    } else {
-      readyHtml += '<div class="ready-since">Als bereit markiert</div>';
-    }
-    var readyTags = "";
-    if(isWerkstattReady(o)) readyTags += '<span class="tag tag-werkstatt">Werkstatt</span>';
-    if(isMontageReady(o)) readyTags += '<span class="tag tag-montage">Montage</span>';
-    if(readyTags) readyHtml += '<div class="order-tags" style="margin-top:5px;">' + readyTags + '</div>';
-    readyHtml += "</div>";
-  });
-  $("#ready-list").innerHTML = readyHtml;
-
-  var pending = filteredOrders().filter(hasPendingMaterial);
-  $("#pending-count").textContent = pending.length + (pending.length===1 ? " Auftrag blockiert" : " Aufträge blockiert");
-  var html = "";
-  if(pending.length===0) html = '<div class="empty-note">Alle Aufträge haben Material.</div>';
-  else pending.forEach(o=>{
-    html += '<div class="pending-item" data-id="' + o.id + '"><div class="order-no">' + escapeHtml(o.orderNumber) + '</div><div class="order-customer">' + escapeHtml(o.customer) + '</div>';
-    pendingMaterials(o).forEach(m=>{ html += '<div class="mat-detail">' + escapeHtml(m.name) + ": " + (m.expectedDate ? "erwartet ab " + fmtShort(m.expectedDate) : "kein Termin") + "</div>"; });
-    html += '<div class="plan-hint">' + (o.productionStart ? "Produktion geplant ab " + fmtShort(o.productionStart) : "Kein Starttermin geplant") + "</div>";
-    html += "</div>";
-  });
-  $("#pending-list").innerHTML = html;
-}
-
 /* ---------- Materials mini-form ---------- */
 
 function renderMaterialRows(){
@@ -1640,43 +2116,6 @@ $("#delete-btn").addEventListener("click", async ()=>{
 
 $("#view-seg").addEventListener("click", e=>{ var b=e.target.closest("button[data-view]"); if(!b) return; state.view=b.dataset.view; render(); });
 $("#filter-chips").addEventListener("click", e=>{ var b=e.target.closest("button[data-filter]"); if(!b) return; state.filter=b.dataset.filter; render(); });
-$("#nav-prev").addEventListener("click", ()=>navigate(-1));
-$("#nav-next").addEventListener("click", ()=>navigate(1));
-$("#nav-today").addEventListener("click", ()=>{ state.refDate = todayISO(); render(); });
-function navigate(dir){
-  var d = fromISO(state.refDate);
-  if(state.view==="week") d.setDate(d.getDate()+dir*7); else d.setMonth(d.getMonth()+dir);
-  state.refDate = toISO(d); render();
-}
-$("#calendar").addEventListener("click", e=>{
-  var todoLine = e.target.closest(".card-todo-line");
-  if(todoLine){ toggleCardTodo(todoLine.dataset.orderId, Number(todoLine.dataset.todoIdx)); return; }
-  var toggle = e.target.closest(".card-done-toggle");
-  if(toggle){ toggleCompleted(toggle.dataset.id, toggle.checked); return; }
-  var addBtn = e.target.closest("[data-date]"); if(addBtn){ openModal(null, addBtn.dataset.date); return; }
-  var dayNum = e.target.closest("[data-add-date]"); if(dayNum && !e.target.closest(".chip")){ openModal(null, dayNum.dataset.addDate); return; }
-  var card = e.target.closest("[data-id]");
-  if(card){ var o = state.orders.find(x=>x.id===card.dataset.id); if(o) openModal(o,null); }
-});
-async function toggleCardTodo(orderId, idx){
-  var o = state.orders.find(x=>x.id===orderId);
-  if(!o) return;
-  var todos = orderTodos(o).map((t,i)=> i===idx ? Object.assign({}, t, { done: !t.done }) : t);
-  try{ await updateDoc(doc(db, COLLECTION, orderId), { todos: todos }); }
-  catch(err){ console.error(err); toast("Aktualisieren fehlgeschlagen."); }
-}
-async function toggleCompleted(id, done){
-  try{ await updateDoc(doc(db, COLLECTION, id), { completed: done }); }
-  catch(err){ console.error(err); toast("Aktualisieren fehlgeschlagen."); }
-}
-$("#pending-list").addEventListener("click", e=>{
-  var item = e.target.closest("[data-id]"); if(!item) return;
-  var o = state.orders.find(x=>x.id===item.dataset.id); if(o) openModal(o,null);
-});
-$("#ready-list").addEventListener("click", e=>{
-  var item = e.target.closest("[data-id]"); if(!item) return;
-  var o = state.orders.find(x=>x.id===item.dataset.id); if(o) openModal(o,null);
-});
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && backdrop.classList.contains("open")) closeModal(); });
 
 function setStatus(msg){ $("#status-line").textContent = msg; }
@@ -1786,6 +2225,1534 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(err=>console.error('SW-Registrierung fehlgeschlagen:', err));
   });
 }
+</script>
+
+<!-- ================= mat-lager (Lager-Reiter, eingegliedert) ================= -->
+<script type="module">
+import { getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, increment
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// ---- Firebase-Konfiguration ----
+// Nutzt dieselbe, bereits vom Hauptmodul initialisierte Firebase-App (gemeinsames
+// Login/Projekt mit der Produktionsplanung) statt ein zweites Mal zu initialisieren.
+const firebaseConfig = {
+  apiKey: "AIzaSyD6zaLeNU1ZY-JHFYr-JrbpEUz096m9bfo",
+  authDomain: "mat-lager.firebaseapp.com",
+  projectId: "mat-lager",
+  storageBucket: "mat-lager.firebasestorage.app",
+  messagingSenderId: "838703283009",
+  appId: "1:838703283009:web:97f4a2e59a3ab44c67bfc0"
+};
+const fbApp = getApp();
+const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+// Zweite, unabhängige Firebase-Instanz: Damit lassen sich neue Nutzerkonten
+// anlegen, ohne dass die eigene (Admin-)Sitzung dabei überschrieben wird.
+const fbAppSecondary = initializeApp(firebaseConfig, 'Secondary');
+const authSecondary = getAuth(fbAppSecondary);
+
+let articles = [];
+let movements = [];
+let profiles = [];
+let rolesList = [];
+let wishlist = [];
+let imports = [];
+let notifSettings = null;
+let currentTab = 'dashboard';
+let qrScanStream = null;
+let connected = false;
+let unsubArticles = null;
+let unsubMovements = null;
+let unsubProfiles = null;
+let unsubRoles = null;
+let unsubWishlist = null;
+let unsubImports = null;
+let unsubSettings = null;
+let isAdmin = false;
+let currentUserEmail = '';
+let currentUid = '';
+
+const $ = sel => document.querySelector(sel);
+const main = $('#main');
+
+function setConn(ok){
+  connected = ok;
+  const dot = $('#lagerConnDot');
+  if(dot){ dot.className = 'conn-dot ' + (ok ? 'ok' : 'err'); }
+}
+
+// Interne Pseudo-Domain, damit Firebase Auth (das intern ein E-Mail-Format
+// erwartet) mit einfachen Benutzernamen statt echten E-Mail-Adressen läuft.
+const AUTH_DOMAIN_SUFFIX = '@matlager.local';
+function usernameToAuthEmail(username){
+  return username.trim().toLowerCase().replace(/\s+/g,'') + AUTH_DOMAIN_SUFFIX;
+}
+function authEmailToUsername(email){
+  return (email||'').replace(AUTH_DOMAIN_SUFFIX, '');
+}
+
+// ---- Login ----
+// Login läuft zentral über die Produktionsplanung (gemeinsamer Account/Login-Bildschirm).
+$('#logoutBtn').addEventListener('click', async ()=>{
+  if(unsubArticles) unsubArticles();
+  if(unsubMovements) unsubMovements();
+  await signOut(auth);
+});
+
+// ---- Auth-Status & Rolle laden ----
+// Reagiert auf dieselbe (zentrale) Anmeldung wie die Produktionsplanung.
+onAuthStateChanged(auth, async user => {
+  if(user){
+    currentUserEmail = user.email || '';
+    currentUid = user.uid;
+    const displayName = authEmailToUsername(currentUserEmail);
+
+    // Zuerst prüfen, ob dieses Konto gesperrt wurde – falls ja, sofort abmelden.
+    try{
+      const profSnap = await getDoc(doc(db, 'profiles', user.uid));
+      if(profSnap.exists() && profSnap.data().blocked){
+        await signOut(auth);
+        toast('Dieses Konto wurde gesperrt. Bitte an den Admin wenden.');
+        return;
+      }
+    }catch(e){ console.error('Sperr-Status konnte nicht geprüft werden', e); }
+
+    let role = 'user';
+    try{
+      const roleSnap = await getDoc(doc(db, 'roles', user.uid));
+      if(roleSnap.exists() && roleSnap.data().role === 'admin') role = 'admin';
+    }catch(e){ console.error('Rolle konnte nicht geladen werden', e); }
+    isAdmin = (role === 'admin');
+    $('#userLine').innerHTML = escapeHtml(displayName) + (isAdmin ? '<span class="role-badge">Admin</span>' : '<span class="role-badge">Mitarbeiter</span>');
+    $('#navAdmin').style.display = isAdmin ? 'flex' : 'none';
+    $('#lagerApp').style.display = 'flex';
+    // Eigenes Profil aktualisieren (Benutzername + letzter Login), damit
+    // Admins in der Verwaltung sehen, wer sich schon mal angemeldet hat.
+    // "blocked" wird hier bewusst nicht mitgeschrieben, damit ein bestehendes
+    // Sperr-Flag durch den Login-Vorgang nicht versehentlich überschrieben wird.
+    try{
+      await setDoc(doc(db, 'profiles', user.uid), { username: displayName, lastLogin: Date.now() }, { merge: true });
+    }catch(e){ console.error('Profil konnte nicht aktualisiert werden', e); }
+    startListeners();
+  } else {
+    isAdmin = false;
+    currentUid = '';
+    $('#navAdmin').style.display = 'none';
+    $('#lagerApp').style.display = 'none';
+    if(unsubArticles) unsubArticles();
+    if(unsubMovements) unsubMovements();
+    if(unsubProfiles) unsubProfiles();
+    if(unsubRoles) unsubRoles();
+    if(unsubSettings) unsubSettings();
+    if(unsubWishlist) unsubWishlist();
+    if(unsubImports) unsubImports();
+  }
+});
+
+// ---- Echtzeit-Listener (erst nach Login gestartet) ----
+function startListeners(){
+  unsubArticles = onSnapshot(collection(db, 'articles'), snap => {
+    articles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setConn(true);
+    render();
+  }, err => { setConn(false); toast('Verbindung zur Datenbank fehlgeschlagen'); console.error(err); });
+
+  unsubMovements = onSnapshot(query(collection(db, 'movements'), orderBy('timestamp', 'desc')), snap => {
+    movements = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  }, err => { console.error(err); });
+
+  unsubProfiles = onSnapshot(collection(db, 'profiles'), snap => {
+    profiles = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    if(currentTab==='admin') render();
+  }, err => { console.error(err); });
+
+  unsubRoles = onSnapshot(collection(db, 'roles'), snap => {
+    rolesList = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    if(currentTab==='admin') render();
+  }, err => { console.error(err); });
+
+  unsubSettings = onSnapshot(doc(db, 'settings', 'notifications'), snap => {
+    notifSettings = snap.exists() ? snap.data() : null;
+    if(currentTab==='admin') render();
+  }, err => { console.error(err); });
+
+  unsubWishlist = onSnapshot(query(collection(db, 'requests'), orderBy('createdAt', 'desc')), snap => {
+    wishlist = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if(currentTab==='wishlist') render();
+  }, err => { console.error(err); });
+
+  unsubImports = onSnapshot(query(collection(db, 'imports'), orderBy('importedAt', 'desc')), snap => {
+    imports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if(currentTab==='admin') render();
+  }, err => { console.error(err); });
+}
+
+function uid(prefix){
+  return prefix + '-' + Math.random().toString(36).slice(2,7).toUpperCase();
+}
+function genArticleId(category){
+  const pre = (category||'MAT').slice(0,3).toUpperCase();
+  const existing = articles.filter(a=>a.id.startsWith(pre+'-'));
+  const n = existing.length + 1;
+  return pre + '-' + String(n).padStart(3,'0');
+}
+function fmtDate(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
+}
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+function isLow(a){ return a.stock < a.minStock; }
+function escapeHtml(s){
+  const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML;
+}
+
+function render(){
+  $('#itemCount').innerHTML = `<span class="conn-dot ${connected?'ok':'err'}" id="lagerConnDot"></span>${articles.length} Artikel`;
+  $('#fab').style.display = ((currentTab === 'articles' && isAdmin) || currentTab === 'wishlist') ? 'flex' : 'none';
+  if(currentTab==='dashboard') renderDashboard();
+  if(currentTab==='articles') renderArticles();
+  if(currentTab==='scan') renderScan();
+  if(currentTab==='history') renderHistory();
+  if(currentTab==='wishlist') renderWishlist();
+  if(currentTab==='admin') renderAdmin();
+}
+
+function renderDashboard(){
+  const low = articles.filter(isLow);
+  const today = new Date().toDateString();
+  const todayMoves = movements.filter(m => new Date(m.timestamp).toDateString()===today).length;
+  let html = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">${articles.length}</div><div class="label">Artikel gesamt</div></div>
+      <div class="stat-card ${low.length? 'warn':''}"><div class="num">${low.length}</div><div class="label">Unter Mindestbestand</div></div>
+      <div class="stat-card"><div class="num">${todayMoves}</div><div class="label">Bewegungen heute</div></div>
+    </div>
+  `;
+  if(low.length){
+    html += `<h2 class="section-title">Nachbestellen</h2>`;
+    low.forEach(a => html += tagCardHtml(a));
+  } else {
+    html += `<div class="empty-state"><div class="disp">Alles im grünen Bereich</div>Kein Artikel unter Mindestbestand.</div>`;
+  }
+  main.innerHTML = html;
+  bindTagCards();
+}
+
+function tagCardHtml(a){
+  return `
+  <div class="tag-card ${isLow(a)?'low':''}" data-id="${a.id}">
+    ${a.imageUrl ? `<img src="${a.imageUrl}" style="width:42px;height:42px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ''}
+    <div class="info">
+      <div class="name">${escapeHtml(a.name)}</div>
+      <div class="meta">${a.id} · ${escapeHtml(a.location||'—')}</div>
+    </div>
+    <div class="stock">${a.stock}<small>Min. ${a.minStock}</small></div>
+  </div>`;
+}
+function bindTagCards(){
+  document.querySelectorAll('.tag-card').forEach(el=>{
+    el.addEventListener('click', ()=> openArticleDetail(el.dataset.id));
+  });
+}
+
+function renderArticles(){
+  const categories = [...new Set(articles.map(a => a.category || 'Sonstiges'))].sort();
+  let html = `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name, ID oder Art. Nr. …">`;
+  if(isAdmin){
+    html += `<button class="btn btn-secondary btn-block" id="importExcelBtn" style="margin-bottom:14px;">Artikel aus Excel importieren</button>`;
+  }
+  if(categories.length > 1){
+    html += `<div class="filter-row" id="catFilterRow">
+      <button class="chip-filter active" data-cat="__all">Alle</button>
+      ${categories.map(c => `<button class="chip-filter" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}
+    </div>`;
+  }
+  html += `<div id="articleList"></div>`;
+  main.innerHTML = html;
+  if(isAdmin){
+    $('#importExcelBtn').onclick = openImportExcelSheet;
+  }
+  let activeCat = '__all';
+  const list = () => {
+    const q = ($('#searchInput').value||'').toLowerCase();
+    const filtered = articles.filter(a => {
+      const matchesQuery = a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.vendorArticleNumber||'').toLowerCase().includes(q);
+      const matchesCat = activeCat === '__all' || (a.category || 'Sonstiges') === activeCat;
+      return matchesQuery && matchesCat;
+    });
+    $('#articleList').innerHTML = filtered.length
+      ? filtered.map(tagCardHtml).join('')
+      : `<div class="empty-state"><div class="disp">Keine Treffer</div>Versuch eine andere Suche oder Kategorie.</div>`;
+    bindTagCards();
+  };
+  $('#searchInput').addEventListener('input', list);
+  if(categories.length > 1){
+    $('#catFilterRow').querySelectorAll('.chip-filter').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        $('#catFilterRow').querySelectorAll('.chip-filter').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCat = btn.dataset.cat;
+        list();
+      });
+    });
+  }
+  list();
+  $('#fabAdd').onclick = openAddArticleSheet;
+}
+
+function renderHistory(){
+  if(!movements.length){
+    main.innerHTML = `<div class="empty-state"><div class="disp">Noch keine Bewegungen</div>Buchungen erscheinen hier chronologisch.</div>`;
+    return;
+  }
+  main.innerHTML = `<input class="search-bar" id="historySearch" type="text" placeholder="Suche nach Person, Kommission oder Artikel…"><div id="historyList"></div>`;
+  const list = () => {
+    const q = ($('#historySearch').value||'').toLowerCase();
+    const filtered = movements.filter(m=>{
+      if(!q) return true;
+      const a = articles.find(x=>x.id===m.articleId);
+      return (m.person||'').toLowerCase().includes(q)
+        || (m.komm||'').toLowerCase().includes(q)
+        || (a && a.name.toLowerCase().includes(q))
+        || m.articleId.toLowerCase().includes(q);
+    });
+    let html = '<div>';
+    if(!filtered.length){
+      html = `<div class="empty-state"><div class="disp">Keine Treffer</div>Versuch einen anderen Suchbegriff.</div>`;
+    } else {
+      filtered.forEach(m=>{
+        const a = articles.find(x=>x.id===m.articleId);
+        html += `
+        <div class="movement-row">
+          <div class="m-icon ${m.type}">${m.type==='in'?'↓':'↑'}</div>
+          <div class="m-info">
+            <div class="m-name">${escapeHtml(a?a.name:'Gelöschter Artikel')}</div>
+            <div class="m-meta">${fmtDate(m.timestamp)} · ${m.articleId}</div>
+            <div class="m-tags">
+              ${m.person ? `<span class="m-chip">${escapeHtml(m.person)}</span>` : ''}
+              ${m.komm ? `<span class="m-chip">Komm. ${escapeHtml(m.komm)}</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <div class="m-qty ${m.type}">${m.type==='in'?'+':'−'}${m.qty}</div>
+            ${isAdmin ? `<button class="btn btn-secondary" data-delmove="${m.id}" style="padding:2px 8px;font-size:10px;color:var(--danger);">Löschen</button>` : ''}
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    $('#historyList').innerHTML = html;
+    main.querySelectorAll('[data-delmove]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        try{
+          await deleteDoc(doc(db, 'movements', btn.dataset.delmove));
+          toast('Eintrag gelöscht');
+        }catch(e){
+          toast('Löschen fehlgeschlagen');
+          console.error(e);
+        }
+      };
+    });
+  };
+  $('#historySearch').addEventListener('input', list);
+  list();
+}
+
+let wishlistView = 'open';
+function renderWishlist(){
+  const open = wishlist.filter(w => !w.done);
+  const done = wishlist.filter(w => w.done);
+
+  const rowHtml = (w) => {
+    return `
+    <div class="movement-row">
+      <div class="m-icon ${w.done ? 'in' : 'out'}">${w.done ? '✓' : '!'}</div>
+      <div class="m-info">
+        <div class="m-name">${escapeHtml(w.text)}${w.qty ? ' <span class="role-badge" style="border-color:var(--border);color:var(--text-muted);">' + escapeHtml(String(w.qty)) + '</span>' : ''}</div>
+        <div class="m-meta">${escapeHtml(w.requestedBy || '—')} · ${fmtDate(w.createdAt)}${w.done && w.doneAt ? ' · erledigt ' + fmtDate(w.doneAt) : ''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        ${(isAdmin && !w.done) ? `<button class="btn btn-secondary" data-done="${w.id}" style="padding:4px 10px;font-size:10.5px;">Erledigt</button>` : ''}
+        ${isAdmin ? `<button class="btn btn-secondary" data-delwish="${w.id}" style="padding:4px 10px;font-size:10.5px;color:var(--danger);">Löschen</button>` : ''}
+      </div>
+    </div>`;
+  };
+
+  let html = `
+    <div class="filter-row">
+      <button class="chip-filter ${wishlistView==='open'?'active':''}" data-view="open">Offen (${open.length})</button>
+      <button class="chip-filter ${wishlistView==='done'?'active':''}" data-view="done">Erledigt (${done.length})</button>
+    </div>
+  `;
+
+  if(wishlistView === 'open'){
+    html += open.length ? open.map(rowHtml).join('') : `<div class="empty-state" style="padding:24px 10px;"><div class="disp">Keine offenen Einträge</div>Über den + Button kannst du etwas hinzufügen, das im Lager fehlt.</div>`;
+  } else {
+    html += done.length ? done.map(rowHtml).join('') : `<div class="empty-state" style="padding:24px 10px;"><div class="disp">Noch nichts erledigt</div>Abgeschlossene Bestellungen erscheinen hier.</div>`;
+  }
+
+  main.innerHTML = html;
+
+  main.querySelectorAll('[data-view]').forEach(btn=>{
+    btn.onclick = ()=>{
+      wishlistView = btn.dataset.view;
+      renderWishlist();
+    };
+  });
+
+  main.querySelectorAll('[data-done]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      try{
+        await updateDoc(doc(db, 'requests', btn.dataset.done), { done: true, doneAt: Date.now() });
+      }catch(e){ toast('Fehlgeschlagen'); console.error(e); }
+    };
+  });
+  main.querySelectorAll('[data-delwish]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      try{
+        await deleteDoc(doc(db, 'requests', btn.dataset.delwish));
+        toast('Eintrag gelöscht');
+      }catch(e){ toast('Löschen fehlgeschlagen'); console.error(e); }
+    };
+  });
+
+  $('#fabAdd').onclick = openAddWishSheet;
+}
+
+function openAddWishSheet(){
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Neue Bestellung</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px;">
+      Für Material oder Artikel, die im Lager fehlen oder neu beschafft werden sollen.
+    </div>
+    <label>Was wird benötigt?</label>
+    <input type="text" id="w-text" placeholder="z. B. Schrauben M10x60">
+    <label>Menge <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="text" id="w-qty" placeholder="z. B. 50 Stück">
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-primary btn-block" id="w-save">Hinzufügen</button>
+    </div>
+  `);
+  sheet.querySelector('#w-save').onclick = async ()=>{
+    const btn = sheet.querySelector('#w-save');
+    const text = sheet.querySelector('#w-text').value.trim();
+    if(!text){ toast('Bitte eintragen, was benötigt wird'); return; }
+    const qty = sheet.querySelector('#w-qty').value.trim();
+    btn.disabled = true; btn.textContent = 'Speichere…';
+    try{
+      await addDoc(collection(db, 'requests'), {
+        text, qty,
+        requestedBy: authEmailToUsername(currentUserEmail),
+        requestedByUid: currentUid,
+        createdAt: Date.now(),
+        done: false
+      });
+      closeSheet();
+      toast('Bestellung hinzugefügt');
+    }catch(e){
+      toast('Speichern fehlgeschlagen: ' + (e.code || e.message || 'unbekannter Fehler'));
+      console.error(e);
+      btn.disabled = false; btn.textContent = 'Hinzufügen';
+    }
+  };
+}
+
+function renderAdmin(){
+  if(!isAdmin){ main.innerHTML = `<div class="empty-state"><div class="disp">Kein Zugriff</div>Dieser Bereich ist nur für Admins.</div>`; return; }
+
+  const roleByUid = {};
+  rolesList.forEach(r => roleByUid[r.uid] = r.role);
+
+  const userRows = profiles.length ? profiles.map(p => {
+    const role = roleByUid[p.uid] || 'user';
+    const last = p.lastLogin ? fmtDate(p.lastLogin) : '—';
+    const isBlocked = !!p.blocked;
+    const isSelf = p.uid === currentUid;
+    let actionBtn = '';
+    if(!isSelf){
+      actionBtn = isBlocked
+        ? `<button class="btn btn-secondary" data-unblock="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;">Freischalten</button>`
+        : `<button class="btn btn-secondary" data-remove="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;color:var(--danger);">Entfernen</button>`;
+    }
+    return `
+    <div class="movement-row">
+      <div class="m-icon ${role==='admin'?'in':'out'}">${role==='admin'?'A':'M'}</div>
+      <div class="m-info">
+        <div class="m-name">${escapeHtml(p.username||p.uid)}${isBlocked ? ' <span class="role-badge" style="border-color:var(--danger);color:var(--danger);">Gesperrt</span>' : ''}</div>
+        <div class="m-meta">Letzter Login: ${last}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <span class="role-badge" style="margin-left:0;">${role==='admin'?'Admin':'Mitarbeiter'}</span>
+        ${actionBtn}
+      </div>
+    </div>`;
+  }).join('') : `<div style="font-size:12.5px;color:var(--text-muted);padding:10px 0;">Noch keine Nutzer haben sich angemeldet. Neu angelegte Nutzer erscheinen hier, sobald sie sich das erste Mal einloggen.</div>`;
+
+  const importRows = imports.length ? imports.map(imp => `
+    <div class="movement-row">
+      <div class="m-icon in">${imp.count}</div>
+      <div class="m-info">
+        <div class="m-name">${escapeHtml(imp.fileName || 'Import')}</div>
+        <div class="m-meta">${fmtDate(imp.importedAt)} · von ${escapeHtml(imp.importedBy || '—')} · ${imp.count} Artikel</div>
+      </div>
+      <div>
+        <button class="btn btn-secondary" data-delimport="${imp.id}" style="padding:4px 10px;font-size:10.5px;color:var(--danger);">Löschen</button>
+      </div>
+    </div>`).join('') : `<div style="font-size:12.5px;color:var(--text-muted);padding:10px 0;">Noch keine Excel-Importe durchgeführt.</div>`;
+
+  main.innerHTML = `
+    <h2 class="section-title">Nutzer (${profiles.length})</h2>
+    ${userRows}
+
+    <h2 class="section-title" style="margin-top:22px;">Neuen Nutzer anlegen</h2>
+    <label>Benutzername</label>
+    <input type="text" id="nu-username" placeholder="z. B. anna">
+    <label>Passwort</label>
+    <input type="text" id="nu-password" placeholder="Passwort (mind. 6 Zeichen)">
+    <label>Rolle</label>
+    <select id="nu-role">
+      <option value="user">Mitarbeiter</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-block" id="nu-create">Nutzer anlegen</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Der Nutzer taucht oben erst nach dem ersten Login auf, ist aber ab sofort anmeldefähig.</div>
+
+    <h2 class="section-title" style="margin-top:26px;">Excel-Importe (${imports.length})</h2>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+      "Löschen" entfernt den kompletten Import inklusive aller dabei angelegten Artikel. Bereits gebuchte Ein-/Auslagerungen im Verlauf bleiben davon unberührt.
+    </div>
+    ${importRows}
+
+    <h2 class="section-title" style="margin-top:26px;">Alle Artikel einer Kategorie löschen</h2>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+      Praktisch für Importe von vor der Import-Historie oben – z. B. um eine komplette Test-Kategorie wieder zu entfernen.
+    </div>
+    <label>Kategorie</label>
+    <select id="bulk-cat-select">
+      <option value="">Kategorie wählen…</option>
+      ${[...new Set(articles.map(a=>a.category||'Sonstiges'))].sort().map(c=>{
+        const count = articles.filter(a=>(a.category||'Sonstiges')===c).length;
+        return `<option value="${escapeHtml(c)}">${escapeHtml(c)} (${count} Artikel)</option>`;
+      }).join('')}
+    </select>
+    <div class="btn-row">
+      <button class="btn btn-danger btn-block" id="bulk-cat-delete">Kategorie löschen</button>
+    </div>
+
+    <h2 class="section-title" style="margin-top:26px;">Benachrichtigung bei Mindestbestand</h2>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+      Verschickt eine E-Mail an dich, sobald eine Entnahme den Bestand eines Artikels unter den Mindestbestand drückt. Benötigt ein kostenloses <a href="https://www.emailjs.com" target="_blank" style="color:var(--accent);">EmailJS</a>-Konto.
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--text);">
+      <input type="checkbox" id="ns-enabled" style="width:auto;"> Benachrichtigungen aktivieren
+    </label>
+    <label>Deine E-Mail-Adresse</label>
+    <input type="text" id="ns-email" placeholder="du@firma.ch">
+    <label>EmailJS Service ID</label>
+    <input type="text" id="ns-service" placeholder="z. B. service_abc123">
+    <label>EmailJS Template ID</label>
+    <input type="text" id="ns-template" placeholder="z. B. template_xyz789">
+    <label>EmailJS Public Key</label>
+    <input type="text" id="ns-key" placeholder="z. B. AbCdEfGh12345">
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" id="ns-save">Einstellungen speichern</button>
+    </div>
+  `;
+
+  // Formular mit aktuellen Einstellungen vorausfüllen
+  if(notifSettings){
+    $('#ns-enabled').checked = !!notifSettings.enabled;
+    $('#ns-email').value = notifSettings.adminEmail || '';
+    $('#ns-service').value = notifSettings.serviceId || '';
+    $('#ns-template').value = notifSettings.templateId || '';
+    $('#ns-key').value = notifSettings.publicKey || '';
+  }
+
+  main.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.onclick = ()=> openRemoveUserSheet(btn.dataset.remove);
+  });
+  main.querySelectorAll('[data-unblock]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      try{
+        await setDoc(doc(db, 'profiles', btn.dataset.unblock), { blocked: false }, { merge: true });
+        toast('Zugang wieder freigeschaltet');
+      }catch(e){
+        toast('Freischalten fehlgeschlagen');
+        console.error(e);
+      }
+    };
+  });
+  main.querySelectorAll('[data-delimport]').forEach(btn=>{
+    btn.onclick = ()=> openDeleteImportSheet(btn.dataset.delimport);
+  });
+  $('#bulk-cat-delete').onclick = ()=>{
+    const cat = $('#bulk-cat-select').value;
+    if(!cat){ toast('Bitte eine Kategorie wählen'); return; }
+    openDeleteCategorySheet(cat);
+  };
+
+  $('#nu-create').onclick = async ()=>{
+    const btn = $('#nu-create');
+    const username = $('#nu-username').value.trim();
+    const password = $('#nu-password').value;
+    const role = $('#nu-role').value;
+    if(!username || !/^[a-zA-Z0-9_-]+$/.test(username)){ toast('Benutzername: nur Buchstaben, Zahlen, - und _'); return; }
+    if(!password || password.length < 6){ toast('Passwort braucht mindestens 6 Zeichen'); return; }
+    btn.disabled = true; btn.textContent = 'Lege an…';
+    try{
+      const email = usernameToAuthEmail(username);
+      const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
+      const newUid = cred.user.uid;
+      await setDoc(doc(db, 'profiles', newUid), { username: username.toLowerCase(), createdAt: Date.now(), createdBy: currentUserEmail });
+      if(role === 'admin'){
+        await setDoc(doc(db, 'roles', newUid), { role: 'admin' });
+      }
+      await signOut(authSecondary);
+      toast('Nutzer "' + username + '" angelegt');
+      $('#nu-username').value = ''; $('#nu-password').value = ''; $('#nu-role').value = 'user';
+    }catch(e){
+      console.error(e);
+      const map = { 'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.', 'auth/weak-password': 'Passwort zu schwach (mind. 6 Zeichen).' };
+      toast(map[e.code] || ('Anlegen fehlgeschlagen: ' + (e.code || e.message)));
+    }finally{
+      btn.disabled = false; btn.textContent = 'Nutzer anlegen';
+    }
+  };
+
+  $('#ns-save').onclick = async ()=>{
+    const btn = $('#ns-save');
+    const settings = {
+      enabled: $('#ns-enabled').checked,
+      adminEmail: $('#ns-email').value.trim(),
+      serviceId: $('#ns-service').value.trim(),
+      templateId: $('#ns-template').value.trim(),
+      publicKey: $('#ns-key').value.trim()
+    };
+    btn.disabled = true; btn.textContent = 'Speichere…';
+    try{
+      await setDoc(doc(db, 'settings', 'notifications'), settings, { merge: true });
+      toast('Einstellungen gespeichert');
+    }catch(e){
+      toast('Speichern fehlgeschlagen');
+      console.error(e);
+    }finally{
+      btn.disabled = false; btn.textContent = 'Einstellungen speichern';
+    }
+  };
+}
+
+function openDeleteCategorySheet(category){
+  const matching = articles.filter(a => (a.category||'Sonstiges') === category);
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Kategorie löschen</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
+      Löscht alle <strong>${matching.length} Artikel</strong> der Kategorie "${escapeHtml(category)}" unwiderruflich. Bereits gebuchte Bewegungen im Verlauf bleiben erhalten, verweisen danach aber auf gelöschte Artikel.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-danger btn-block" id="confirmDeleteCategory">${matching.length} Artikel löschen</button>
+    </div>
+  `);
+  sheet.querySelector('#confirmDeleteCategory').onclick = async ()=>{
+    const btn = sheet.querySelector('#confirmDeleteCategory');
+    btn.disabled = true; btn.textContent = 'Lösche…';
+    try{
+      await Promise.all(matching.map(a => deleteDoc(doc(db, 'articles', a.id)).catch(()=>{})));
+      closeSheet();
+      toast(matching.length + ' Artikel gelöscht');
+    }catch(e){
+      toast('Löschen fehlgeschlagen');
+      console.error(e);
+      btn.disabled = false; btn.textContent = matching.length + ' Artikel löschen';
+    }
+  };
+}
+
+function openDeleteImportSheet(batchId){
+  const imp = imports.find(i => i.id === batchId);
+  if(!imp) return;
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Import löschen</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
+      Löscht alle <strong>${imp.count} Artikel</strong> aus dem Import "${escapeHtml(imp.fileName || 'Import')}" vom ${fmtDate(imp.importedAt)} unwiderruflich. Bereits gebuchte Bewegungen im Verlauf bleiben erhalten, verweisen danach aber auf einen gelöschten Artikel.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-danger btn-block" id="confirmDeleteImport">${imp.count} Artikel löschen</button>
+    </div>
+  `);
+  sheet.querySelector('#confirmDeleteImport').onclick = async ()=>{
+    const btn = sheet.querySelector('#confirmDeleteImport');
+    btn.disabled = true; btn.textContent = 'Lösche…';
+    try{
+      const ids = imp.articleIds || [];
+      await Promise.all(ids.map(id => deleteDoc(doc(db, 'articles', id)).catch(()=>{})));
+      await deleteDoc(doc(db, 'imports', batchId));
+      closeSheet();
+      toast(ids.length + ' Artikel gelöscht');
+    }catch(e){
+      toast('Löschen fehlgeschlagen');
+      console.error(e);
+      btn.disabled = false; btn.textContent = imp.count + ' Artikel löschen';
+    }
+  };
+}
+
+function openRemoveUserSheet(uid){
+  const profile = profiles.find(p => p.uid === uid);
+  const name = profile ? (profile.username || uid) : uid;
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Nutzer entfernen</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px;">
+      <strong>Sperren:</strong> "${escapeHtml(name)}" verliert sofort alle Rechte und wird beim nächsten Anmeldeversuch automatisch abgemeldet. Bleibt in der Liste sichtbar (mit "Gesperrt"-Abzeichen), lässt sich jederzeit wieder freischalten. Das Login-Konto selbst bleibt in Firebase Authentication bestehen.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-danger btn-block" id="confirmRemoveUser">Sperren</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+      <strong>Datensatz endgültig löschen:</strong> Entfernt den Eintrag komplett aus dieser Liste. Nur sinnvoll, wenn du das zugehörige Login-Konto bereits in Firebase Authentication gelöscht hast – sonst kann sich die Person weiterhin anmelden (nur eben ohne Eintrag hier).
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" id="confirmDeleteUser">Datensatz endgültig löschen</button>
+    </div>
+  `);
+  sheet.querySelector('#confirmRemoveUser').onclick = async ()=>{
+    const btn = sheet.querySelector('#confirmRemoveUser');
+    btn.disabled = true; btn.textContent = 'Sperre…';
+    try{
+      await deleteDoc(doc(db, 'roles', uid)).catch(()=>{});
+      await setDoc(doc(db, 'profiles', uid), { blocked: true }, { merge: true });
+      closeSheet();
+      toast('Nutzer "' + name + '" gesperrt');
+    }catch(e){
+      toast('Sperren fehlgeschlagen');
+      console.error(e);
+      btn.disabled = false; btn.textContent = 'Sperren';
+    }
+  };
+  sheet.querySelector('#confirmDeleteUser').onclick = async ()=>{
+    const btn = sheet.querySelector('#confirmDeleteUser');
+    btn.disabled = true; btn.textContent = 'Lösche…';
+    try{
+      await deleteDoc(doc(db, 'roles', uid)).catch(()=>{});
+      await deleteDoc(doc(db, 'profiles', uid));
+      closeSheet();
+      toast('Datensatz "' + name + '" gelöscht');
+    }catch(e){
+      toast('Löschen fehlgeschlagen');
+      console.error(e);
+      btn.disabled = false; btn.textContent = 'Datensatz endgültig löschen';
+    }
+  };
+}
+
+async function sendLowStockEmail(article, newStock){
+  if(!notifSettings || !notifSettings.enabled){
+    console.warn('Low-stock E-Mail übersprungen: Benachrichtigungen nicht aktiviert oder keine Einstellungen gespeichert.');
+    toast('Hinweis: Mindestbestand-Benachrichtigung ist nicht aktiviert');
+    return;
+  }
+  if(!notifSettings.adminEmail || !notifSettings.serviceId || !notifSettings.templateId || !notifSettings.publicKey){
+    toast('E-Mail-Benachrichtigung: Einstellungen unvollständig (Verwaltung prüfen)');
+    return;
+  }
+  if(typeof emailjs === 'undefined'){
+    toast('E-Mail-Bibliothek konnte nicht geladen werden');
+    return;
+  }
+  try{
+    await emailjs.send(notifSettings.serviceId, notifSettings.templateId, {
+      to_email: notifSettings.adminEmail,
+      article_name: article.name,
+      article_id: article.id,
+      stock: newStock,
+      min_stock: article.minStock,
+      location: article.location || '—',
+      vendor_number: article.vendorArticleNumber || '—'
+    }, { publicKey: notifSettings.publicKey });
+    toast('Benachrichtigung an ' + notifSettings.adminEmail + ' gesendet');
+  }catch(e){
+    console.error('E-Mail-Benachrichtigung fehlgeschlagen', e);
+    toast('E-Mail-Versand fehlgeschlagen: ' + (e.text || e.message || 'siehe Konsole'));
+  }
+}
+
+function renderScan(){
+  const nfcSupported = 'NDEFReader' in window;
+  main.innerHTML = `
+    <div class="scan-zone">
+      <div class="nfc-ring" id="nfcRing">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2a10 10 0 0 1 0 20"/><path d="M8 7a5 5 0 0 1 0 10"/><circle cx="8" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
+      </div>
+      <div class="scan-caption" id="scanCaption">${nfcSupported ? 'Bereit zum Scannen' : 'NFC hier nicht verfügbar'}</div>
+      <button class="btn btn-primary btn-block" id="nfcBtn">${nfcSupported ? 'NFC-Tag antippen' : 'Nur Android + Chrome'}</button>
+      ${!nfcSupported ? '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;text-align:center;">Web NFC funktioniert nicht auf iPhone/Safari. Nutze QR-Code oder manuelle Eingabe.</div>' : ''}
+
+      <div class="divider-or">oder</div>
+      <button class="btn btn-secondary btn-block" id="qrBtn">QR-Code scannen</button>
+      <div class="qr-scan-wrap" id="qr-scan-wrap">
+        <video id="qr-video" playsinline muted></video>
+        <div class="qr-frame">
+          <div class="qr-corner tl"></div>
+          <div class="qr-corner tr"></div>
+          <div class="qr-corner bl"></div>
+          <div class="qr-corner br"></div>
+          <div class="qr-scan-line"></div>
+        </div>
+        <div class="qr-scan-hint">Code im Rahmen positionieren</div>
+      </div>
+
+      <div class="divider-or">oder</div>
+      <div class="manual-entry">
+        <input type="text" id="manualId" placeholder="Artikel-ID eingeben, z. B. SCH-001">
+        <button class="btn btn-secondary" id="manualBtn">Suchen</button>
+      </div>
+
+      ${isAdmin ? `
+      <div class="divider-or">Admin</div>
+      <button class="btn btn-secondary btn-block" id="printBlankBtn">Leere QR-Codes drucken</button>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">Codes vorab ausdrucken, am Lagerplatz anbringen, später beim Scannen einem Artikel zuweisen.</div>
+      ` : ''}
+    </div>
+  `;
+  $('#nfcBtn').onclick = startNfcScan;
+  $('#qrBtn').onclick = startQrScan;
+  $('#manualBtn').onclick = ()=>{
+    const val = $('#manualId').value.trim();
+    if(val) lookupAndOpen(val);
+  };
+  if(isAdmin){
+    $('#printBlankBtn').onclick = openPrintBlankTagsSheet;
+  }
+}
+
+async function startNfcScan(){
+  if(!('NDEFReader' in window)){
+    toast('Web NFC wird auf diesem Gerät nicht unterstützt');
+    return;
+  }
+  try{
+    const reader = new NDEFReader();
+    await reader.scan();
+    $('#scanCaption').textContent = 'Scanne… Tag antippen';
+    $('#scanCaption').classList.add('active');
+    reader.onreading = event => {
+      let text = '';
+      for(const record of event.message.records){
+        if(record.recordType === 'text'){
+          const decoder = new TextDecoder(record.encoding || 'utf-8');
+          text = decoder.decode(record.data);
+        }
+      }
+      if(!text) text = event.serialNumber;
+      if(text) lookupAndOpen(text.trim());
+    };
+    reader.onreadingerror = () => toast('Tag konnte nicht gelesen werden');
+  }catch(e){
+    toast('NFC-Zugriff verweigert oder fehlgeschlagen');
+  }
+}
+
+async function startQrScan(){
+  if(typeof jsQR !== 'function'){
+    toast('QR-Scan-Bibliothek konnte nicht geladen werden. Internetverbindung prüfen und Seite neu laden.');
+    return;
+  }
+  const video = $('#qr-video');
+  const wrap = $('#qr-scan-wrap');
+  wrap.style.display = 'block';
+  try{
+    qrScanStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    });
+    video.srcObject = qrScanStream;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let errorShown = false;
+    const tick = () => {
+      if(!qrScanStream) return;
+      try{
+        if(video.readyState === video.HAVE_ENOUGH_DATA){
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+          const code = jsQR(imgData.data, imgData.width, imgData.height);
+          if(code && code.data){
+            stopQrScan();
+            lookupAndOpen(code.data.trim());
+            return;
+          }
+        }
+      }catch(e){
+        console.error('QR-Scan-Fehler', e);
+        if(!errorShown){ errorShown = true; toast('Scan-Fehler: ' + e.message); }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }catch(e){
+    toast('Kamerazugriff nicht möglich');
+    wrap.style.display = 'none';
+  }
+}
+function stopQrScan(){
+  if(qrScanStream){
+    qrScanStream.getTracks().forEach(t=>t.stop());
+    qrScanStream = null;
+  }
+  const wrap = $('#qr-scan-wrap');
+  if(wrap) wrap.style.display = 'none';
+}
+
+function lookupAndOpen(idOrText){
+  const cleanId = idOrText.trim();
+  const article = articles.find(a => a.id.toLowerCase() === cleanId.toLowerCase());
+  if(article){
+    openArticleDetail(article.id);
+  } else if(isAdmin){
+    openAssignBlankTagSheet(cleanId);
+  } else {
+    toast('Kein Artikel mit ID "' + cleanId + '" gefunden – ein Admin kann diesen Code einem neuen Artikel zuweisen.');
+  }
+}
+
+function openAssignBlankTagSheet(scannedId){
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Unbekannter Code</h3><button class="x" data-close>×</button></div>
+    <div class="stencil-id">TAG · ${escapeHtml(scannedId)}</div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px;">
+      Diese ID ist noch keinem Artikel zugewiesen. Jetzt einen neuen Artikel für diesen Code anlegen?
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-primary btn-block" id="assignBtn">Artikel anlegen</button>
+    </div>
+  `);
+  sheet.querySelector('#assignBtn').onclick = ()=>{
+    closeSheet();
+    openAddArticleSheet(scannedId);
+  };
+}
+
+// ---- Excel-Import ----
+const IMPORT_COLUMN_ALIASES = {
+  name: ['name', 'artikelname', 'bezeichnung', 'artikel'],
+  category: ['kategorie', 'category', 'gruppe'],
+  vendorArticleNumber: ['artnr', 'artnrhaendler', 'artikelnummer', 'haendlernummer', 'lieferantennummer', 'vendornumber', 'artnrhändler'],
+  price: ['preis', 'price', 'chf', 'verkaufspreis', 'einkaufspreis'],
+  location: ['standort', 'lagerort', 'ort', 'location', 'lager'],
+  stock: ['bestand', 'menge', 'anzahl', 'stock', 'startbestand'],
+  minStock: ['mindestbestand', 'minbestand', 'min', 'minstock']
+};
+function normalizeHeaderKey(key){
+  return String(key||'').toLowerCase().replace(/[.\s_-]/g, '');
+}
+function mapImportRow(rawRow){
+  const normalized = {};
+  Object.keys(rawRow).forEach(k => { normalized[normalizeHeaderKey(k)] = rawRow[k]; });
+  const out = {};
+  Object.entries(IMPORT_COLUMN_ALIASES).forEach(([field, aliases]) => {
+    for(const alias of aliases){
+      if(normalized[alias] !== undefined && normalized[alias] !== ''){
+        out[field] = normalized[alias];
+        break;
+      }
+    }
+  });
+  return out;
+}
+
+function openImportExcelSheet(){
+  if(!isAdmin){ toast('Nur Admins können Artikel importieren'); return; }
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Artikel aus Excel importieren</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
+      Erste Zeile muss Spaltenüberschriften enthalten. Erkannte Spalten (Gross-/Kleinschreibung egal): <strong>Name</strong> (Pflicht), Kategorie, Art. Nr. Händler, Standort, Bestand, Mindestbestand, Preis.
+    </div>
+    <input type="file" id="importFile" accept=".xlsx,.xls,.csv">
+    <div id="importPreview"></div>
+  `);
+  sheet.querySelector('#importFile').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const preview = sheet.querySelector('#importPreview');
+    preview.innerHTML = `<div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Datei wird gelesen…</div>`;
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const wsName = wb.SheetNames[0];
+      const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[wsName], { defval: '' });
+      const mapped = rawRows.map(mapImportRow).filter(r => r.name && String(r.name).trim());
+      if(!mapped.length){
+        preview.innerHTML = `<div style="font-size:12.5px;color:var(--danger);margin-top:10px;">Keine gültigen Zeilen gefunden. Ist eine Spalte "Name" vorhanden?</div>`;
+        return;
+      }
+      preview.innerHTML = `
+        <div style="font-size:12.5px;color:var(--text);margin:12px 0 6px;"><strong>${mapped.length} Artikel gefunden:</strong></div>
+        <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;">
+          ${mapped.map(r => `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">${escapeHtml(String(r.name))} ${r.category ? '· '+escapeHtml(String(r.category)) : ''}</div>`).join('')}
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-block" id="doImportBtn">${mapped.length} Artikel jetzt importieren</button>
+        </div>
+      `;
+      sheet.querySelector('#doImportBtn').onclick = async ()=>{
+        const btn = sheet.querySelector('#doImportBtn');
+        btn.disabled = true; btn.textContent = 'Importiere…';
+        try{
+          const usedIds = new Set();
+          const batchId = 'import_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+          const toCreate = mapped.map(r => {
+            const category = String(r.category || 'Sonstiges').trim() || 'Sonstiges';
+            const id = genArticleIdBulk(category, usedIds);
+            return {
+              id,
+              data: {
+                name: String(r.name).trim(),
+                category,
+                vendorArticleNumber: r.vendorArticleNumber ? String(r.vendorArticleNumber).trim() : '',
+                price: r.price ? parseFloat(String(r.price).replace(',', '.')) || 0 : 0,
+                location: r.location ? String(r.location).trim() : '',
+                stock: parseInt(r.stock) || 0,
+                minStock: parseInt(r.minStock) || 0,
+                createdAt: Date.now(),
+                importBatchId: batchId
+              }
+            };
+          });
+          await Promise.all(toCreate.map(item => setDoc(doc(db, 'articles', item.id), item.data)));
+          await setDoc(doc(db, 'imports', batchId), {
+            fileName: file.name,
+            importedAt: Date.now(),
+            importedBy: authEmailToUsername(currentUserEmail),
+            count: toCreate.length,
+            articleIds: toCreate.map(item => item.id)
+          });
+          closeSheet();
+          toast(toCreate.length + ' Artikel importiert');
+          openPrintImportedTagsSheet(toCreate);
+        }catch(e){
+          toast('Import fehlgeschlagen: ' + (e.code || e.message));
+          console.error(e);
+          btn.disabled = false; btn.textContent = mapped.length + ' Artikel jetzt importieren';
+        }
+      };
+    }catch(e){
+      preview.innerHTML = `<div style="font-size:12.5px;color:var(--danger);margin-top:10px;">Datei konnte nicht gelesen werden: ${escapeHtml(e.message)}</div>`;
+      console.error(e);
+    }
+  });
+}
+
+// Kollisionssichere ID-Vergabe innerhalb eines Imports: berücksichtigt sowohl
+// bereits vorhandene Artikel als auch bereits in diesem Import vergebene IDs.
+function genArticleIdBulk(category, usedIds){
+  const pre = (category || 'MAT').slice(0,3).toUpperCase();
+  const existingCount = articles.filter(a => a.id.startsWith(pre+'-')).length;
+  let n = 1, id;
+  do{
+    id = pre + '-' + String(existingCount + n).padStart(3, '0');
+    n++;
+  } while(usedIds.has(id));
+  usedIds.add(id);
+  return id;
+}
+
+function openPrintImportedTagsSheet(items){
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>QR-Codes drucken</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px;">
+      QR-Codes für die ${items.length} neu importierten Artikel. Ausdrucken und an den jeweiligen Lagerplätzen anbringen.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-block" id="doPrintImportedBtn">Jetzt drucken</button>
+    </div>
+    <div id="printArea" class="print-grid">
+      ${items.map(item => `
+        <div class="print-tile">
+          <div class="qr-holder" data-id="${item.id}"></div>
+          <div class="ptid">${item.id}</div>
+          <div class="ptid" style="font-weight:600;">${escapeHtml(item.data.name)}</div>
+        </div>`).join('')}
+    </div>
+  `);
+  sheet.querySelectorAll('.qr-holder').forEach(el=>{
+    try{
+      new QRCode(el, { text: el.dataset.id, width: 240, height: 240, colorDark:'#1b1d1f', colorLight:'#ffffff' });
+    }catch(e){}
+  });
+  sheet.querySelector('#doPrintImportedBtn').onclick = ()=>{
+    toast('Im Druckdialog: Skalierung "100%" und "Hintergrundgrafiken" aktivieren');
+    setTimeout(()=> window.print(), 400);
+  };
+}
+
+function genBlankTagId(){
+  // Kollisionsarme, kurze ID ohne Kategorie-Bezug – wird erst später einem Artikel zugewiesen.
+  return 'TAG-' + Math.random().toString(36).slice(2,7).toUpperCase();
+}
+
+function openPrintBlankTagsSheet(){
+  if(!isAdmin){ toast('Nur Admins können leere QR-Codes erstellen'); return; }
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Leere QR-Codes drucken</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:6px;">
+      Erstellt eindeutige IDs ohne zugehörigen Artikel. Ausdrucken, am Lagerplatz ankleben, später beim Scannen einem Artikel zuweisen.
+    </div>
+    <label>Anzahl Codes</label>
+    <input type="number" id="f-count" value="6" min="1" max="30">
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-primary btn-block" id="genBtn">Erstellen</button>
+    </div>
+    <div id="printPreview"></div>
+  `);
+  sheet.querySelector('#genBtn').onclick = ()=>{
+    const count = Math.max(1, Math.min(30, parseInt(sheet.querySelector('#f-count').value)||6));
+    const ids = [];
+    const existing = new Set(articles.map(a=>a.id));
+    while(ids.length < count){
+      const id = genBlankTagId();
+      if(!existing.has(id) && !ids.includes(id)) ids.push(id);
+    }
+    const preview = sheet.querySelector('#printPreview');
+    preview.innerHTML = `
+      <div id="printArea" class="print-grid">
+        ${ids.map(id => `<div class="print-tile"><div class="qr-holder" data-id="${id}"></div><div class="ptid">${id}</div></div>`).join('')}
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-block" id="doPrintBtn">Jetzt drucken</button>
+      </div>
+    `;
+    preview.querySelectorAll('.qr-holder').forEach(el=>{
+      try{
+        new QRCode(el, { text: el.dataset.id, width: 240, height: 240, colorDark:'#1b1d1f', colorLight:'#ffffff' });
+      }catch(e){}
+    });
+    preview.querySelector('#doPrintBtn').onclick = ()=>{
+      toast('Im Druckdialog: Skalierung "100%" und "Hintergrundgrafiken" aktivieren');
+      setTimeout(()=> window.print(), 400);
+    };
+  };
+}
+// Verkleinert und komprimiert ein Foto direkt im Browser und wandelt es in einen
+// Data-URL-String um, der zusammen mit dem Artikel in Firestore gespeichert wird.
+// So wird kein separater (kostenpflichtiger) Speicherdienst benötigt.
+async function resizeImageToDataUrl(file, maxDim, quality){
+  maxDim = maxDim || 480;
+  quality = quality || 0.6;
+  const bitmap = await createImageBitmap(file);
+  let width = bitmap.width, height = bitmap.height;
+  if(width > height && width > maxDim){ height = Math.round(height * maxDim / width); width = maxDim; }
+  else if(height >= width && height > maxDim){ width = Math.round(width * maxDim / height); height = maxDim; }
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+  let q = quality;
+  let dataUrl = canvas.toDataURL('image/jpeg', q);
+  // Falls das Bild trotz Verkleinerung noch gross ist, Qualität weiter reduzieren
+  // (Firestore-Dokumente dürfen max. ~1 MB gross sein).
+  while(dataUrl.length > 650000 && q > 0.25){
+    q -= 0.1;
+    dataUrl = canvas.toDataURL('image/jpeg', q);
+  }
+  if(dataUrl.length > 900000){
+    throw new Error('Bild ist auch komprimiert zu gross – bitte ein anderes Foto versuchen.');
+  }
+  return dataUrl;
+}
+async function uploadArticleImage(articleId, file){
+  return await resizeImageToDataUrl(file);
+}
+function bindImagePreview(sheet){
+  const preview = sheet.querySelector('#f-image-preview');
+  const inputs = [sheet.querySelector('#f-image'), sheet.querySelector('#f-image-camera')].filter(Boolean);
+  if(!inputs.length) return;
+  sheet._selectedImageFile = null;
+  inputs.forEach(input=>{
+    input.addEventListener('change', ()=>{
+      const file = input.files[0];
+      if(!file){ return; }
+      sheet._selectedImageFile = file;
+      // Auswahl im jeweils anderen Eingabefeld zuruecksetzen, damit nicht
+      // versehentlich zwei verschiedene Fotos "gleichzeitig" ausgewaehlt sind.
+      inputs.forEach(other => { if(other !== input) other.value = ''; });
+      const url = URL.createObjectURL(file);
+      preview.innerHTML = `<img src="${url}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:8px;">`;
+    });
+  });
+}
+function getSelectedImageFile(sheet){
+  return sheet._selectedImageFile || null;
+}
+
+function categorySelectHtml(selectedValue){
+  const categories = [...new Set(articles.map(a => a.category || 'Sonstiges'))].sort();
+  const isKnown = selectedValue && categories.includes(selectedValue);
+  return `
+    <select id="f-cat">
+      <option value="" ${!selectedValue ? 'selected' : ''} disabled>Kategorie wählen…</option>
+      ${categories.map(c => `<option value="${escapeHtml(c)}" ${selectedValue===c ? 'selected':''}>${escapeHtml(c)}</option>`).join('')}
+      <option value="__new__" ${selectedValue && !isKnown ? 'selected' : ''}>+ Neue Kategorie…</option>
+    </select>
+    <input type="text" id="f-cat-new" placeholder="Neue Kategorie eingeben" style="margin-top:8px;display:${selectedValue && !isKnown ? 'block' : 'none'};" value="${selectedValue && !isKnown ? escapeHtml(selectedValue) : ''}">
+  `;
+}
+function bindCategorySelect(sheet){
+  const sel = sheet.querySelector('#f-cat');
+  const newInput = sheet.querySelector('#f-cat-new');
+  sel.addEventListener('change', ()=>{
+    newInput.style.display = sel.value === '__new__' ? 'block' : 'none';
+    if(sel.value === '__new__') newInput.focus();
+  });
+}
+function getCategoryValue(sheet){
+  const sel = sheet.querySelector('#f-cat');
+  if(sel.value === '__new__'){
+    return sheet.querySelector('#f-cat-new').value.trim();
+  }
+  return sel.value;
+}
+
+function openAddArticleSheet(presetId){
+  if(!isAdmin){ toast('Nur Admins können Artikel anlegen'); return; }
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Neuer Artikel</h3><button class="x" data-close>×</button></div>
+    ${presetId ? `<div class="stencil-id">TAG · ${escapeHtml(presetId)} (bereits gedruckt/vorhanden)</div>` : ''}
+    <label>Name</label>
+    <input type="text" id="f-name" placeholder="z. B. Schrauben M6x30">
+    <label>Kategorie</label>
+    ${categorySelectHtml('')}
+    <label>Art. Nr. Händler <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="text" id="f-vendor" placeholder="z. B. 123456-A">
+    <label>Preis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="number" id="f-price" placeholder="z. B. 12.50" step="0.01" min="0">
+    <label>Standort</label>
+    <input type="text" id="f-loc" placeholder="z. B. Regal A2">
+    <label>Startbestand</label>
+    <input type="number" id="f-stock" value="0" min="0">
+    <label>Mindestbestand</label>
+    <input type="number" id="f-min" value="10" min="0">
+    <label>Bild <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <div class="btn-row" style="margin-top:0;">
+      <button type="button" class="btn btn-secondary btn-block" id="btnCamera">📷 Foto aufnehmen</button>
+      <button type="button" class="btn btn-secondary btn-block" id="btnGallery">Aus Galerie</button>
+    </div>
+    <input type="file" id="f-image-camera" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="f-image" accept="image/*" style="display:none;">
+    <div id="f-image-preview"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-primary btn-block" id="saveArticle">Anlegen</button>
+    </div>
+  `);
+  bindCategorySelect(sheet);
+  bindImagePreview(sheet);
+  sheet.querySelector('#btnCamera').onclick = ()=> sheet.querySelector('#f-image-camera').click();
+  sheet.querySelector('#btnGallery').onclick = ()=> sheet.querySelector('#f-image').click();
+  sheet.querySelector('#saveArticle').onclick = async ()=>{
+    const btn = sheet.querySelector('#saveArticle');
+    const name = sheet.querySelector('#f-name').value.trim();
+    if(!name){ toast('Bitte einen Namen eingeben'); return; }
+    const category = getCategoryValue(sheet) || 'Sonstiges';
+    const newId = presetId || genArticleId(category);
+    const article = {
+      name,
+      category,
+      vendorArticleNumber: sheet.querySelector('#f-vendor').value.trim(),
+      price: parseFloat(sheet.querySelector('#f-price').value) || 0,
+      location: sheet.querySelector('#f-loc').value.trim(),
+      stock: parseInt(sheet.querySelector('#f-stock').value)||0,
+      minStock: parseInt(sheet.querySelector('#f-min').value)||0,
+      createdAt: Date.now()
+    };
+    btn.disabled = true; btn.textContent = 'Speichere…';
+    try{
+      const imageFile = getSelectedImageFile(sheet);
+      if(imageFile){
+        btn.textContent = 'Lade Bild hoch…';
+        article.imageUrl = await uploadArticleImage(newId, imageFile);
+      }
+      await setDoc(doc(db, 'articles', newId), article);
+      closeSheet();
+      openArticleDetail(newId, true);
+    }catch(e){
+      toast('Speichern fehlgeschlagen – Verbindung prüfen');
+      btn.disabled = false; btn.textContent = 'Anlegen';
+      console.error(e);
+    }
+  };
+}
+
+function openArticleDetail(id, justCreated){
+  const a = articles.find(x=>x.id===id);
+  if(!a){ toast('Artikel nicht gefunden'); return; }
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>${escapeHtml(a.name)}</h3><button class="x" data-close>×</button></div>
+    <div class="stencil-id">TAG · ${a.id}</div>
+    ${a.imageUrl ? `<img src="${a.imageUrl}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:12px;">` : ''}
+    ${justCreated ? `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">Artikel angelegt. Jetzt einen leeren NFC-Tag beschreiben oder den QR-Code ausdrucken und am Lagerplatz anbringen.</div>` : ''}
+    <div style="display:flex;gap:16px;align-items:flex-start;">
+      <div>
+        <div class="qr-box" id="qrHolder"></div>
+      </div>
+      <div style="flex:1;">
+        <button class="btn btn-secondary btn-block" id="writeNfcBtn" style="margin-bottom:8px;">Tag beschreiben (NFC)</button>
+        <button class="btn btn-secondary btn-block" id="printQrBtn" style="margin-bottom:8px;">QR-Code drucken</button>
+        <div style="font-size:11px;color:var(--text-muted);">Leeren Tag ans Handy halten, ID wird geschrieben.</div>
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div><div class="dlabel">Bestand</div><div class="dval">${a.stock}</div></div>
+      <div><div class="dlabel">Mindestbestand</div><div class="dval">${a.minStock}</div></div>
+      <div><div class="dlabel">Standort</div><div class="dval">${escapeHtml(a.location||'—')}</div></div>
+      <div><div class="dlabel">Kategorie</div><div class="dval">${escapeHtml(a.category||'—')}</div></div>
+      <div><div class="dlabel">Art. Nr. Händler</div><div class="dval">${escapeHtml(a.vendorArticleNumber||'—')}</div></div>
+      <div><div class="dlabel">Preis</div><div class="dval">${a.price ? 'CHF ' + a.price.toFixed(2) : '—'}</div></div>
+    </div>
+    <label style="text-align:center;">Buchung</label>
+    <div class="qty-stepper">
+      <button data-step="-1">−</button>
+      <div class="qty-val" id="qtyVal">1</div>
+      <button data-step="1">+</button>
+    </div>
+    <label>Person</label>
+    <input type="text" id="f-person" placeholder="Wer bezieht/liefert das Material?">
+    <label>Kommissionsnr. <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="text" id="f-komm" placeholder="z. B. Auftrag/Projekt-Nr.">
+    <div class="btn-row">
+      <button class="btn btn-danger btn-block" id="bookOut">Entnahme</button>
+      <button class="btn btn-success btn-block" id="bookIn">Einlagerung</button>
+    </div>
+    ${isAdmin ? `
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" id="editArticle">Artikel bearbeiten</button>
+      <button class="btn btn-secondary btn-block" id="deleteArticle">Löschen</button>
+    </div>` : ''}
+  `);
+
+  // Buttons zuerst verknüpfen, damit ein Fehler bei QR/Storage sie nie blockiert.
+  let qty = 1;
+  const qtyVal = sheet.querySelector('#qtyVal');
+  sheet.querySelectorAll('[data-step]').forEach(btn=>{
+    btn.onclick = ()=>{
+      qty = Math.max(1, qty + parseInt(btn.dataset.step));
+      qtyVal.textContent = qty;
+    };
+  });
+
+  sheet.querySelector('#bookIn').onclick = async ()=>{
+    const person = sheet.querySelector('#f-person').value.trim();
+    const komm = sheet.querySelector('#f-komm').value.trim();
+    await book(a.id, 'in', qty, person, komm);
+  };
+  sheet.querySelector('#bookOut').onclick = async ()=>{
+    const person = sheet.querySelector('#f-person').value.trim();
+    const komm = sheet.querySelector('#f-komm').value.trim();
+    if(!person){ toast('Bitte Person angeben, wer das Material bezieht'); return; }
+    const fresh = articles.find(x=>x.id===a.id);
+    if(fresh && qty > fresh.stock){ toast('Nicht genug Bestand für diese Entnahme'); return; }
+    await book(a.id, 'out', qty, person, komm);
+  };
+  if(isAdmin){
+    sheet.querySelector('#editArticle').onclick = ()=>{
+      closeSheet();
+      openEditArticleSheet(a.id);
+    };
+    sheet.querySelector('#deleteArticle').onclick = async ()=>{
+      try{
+        await deleteDoc(doc(db, 'articles', a.id));
+        closeSheet();
+        toast('Artikel gelöscht');
+      }catch(e){
+        toast('Löschen fehlgeschlagen');
+        console.error(e);
+      }
+    };
+  }
+  sheet.querySelector('#writeNfcBtn').onclick = async ()=>{
+    if(!('NDEFReader' in window)){
+      toast('Web NFC wird auf diesem Gerät nicht unterstützt');
+      return;
+    }
+    try{
+      const writer = new NDEFReader();
+      await writer.write({ records: [{ recordType: 'text', data: a.id }] });
+      toast('Tag erfolgreich beschrieben: ' + a.id);
+    }catch(e){
+      toast('Schreiben fehlgeschlagen oder abgebrochen');
+    }
+  };
+  sheet.querySelector('#printQrBtn').onclick = ()=>{
+    closeSheet();
+    openPrintImportedTagsSheet([{ id: a.id, data: { name: a.name } }]);
+  };
+
+  try{
+    new QRCode(sheet.querySelector('#qrHolder'), { text: a.id, width: 96, height: 96, colorDark:'#1b1d1f', colorLight:'#ffffff' });
+  }catch(e){
+    sheet.querySelector('#qrHolder').innerHTML = `<div style="width:96px;height:96px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888;text-align:center;padding:4px;">QR nicht verfügbar</div>`;
+  }
+
+  const lastPerson = localStorage.getItem('mat-lager-last-person') || authEmailToUsername(currentUserEmail);
+  if(lastPerson) sheet.querySelector('#f-person').value = lastPerson;
+}
+
+function openEditArticleSheet(id){
+  if(!isAdmin){ toast('Nur Admins können Artikel bearbeiten'); return; }
+  const a = articles.find(x=>x.id===id);
+  if(!a) return;
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Artikel bearbeiten</h3><button class="x" data-close>×</button></div>
+    <div class="stencil-id">TAG · ${a.id} (ID bleibt unverändert)</div>
+    <label>Name</label>
+    <input type="text" id="f-name" value="${escapeHtml(a.name)}">
+    <label>Kategorie</label>
+    ${categorySelectHtml(a.category||'')}
+    <label>Art. Nr. Händler <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="text" id="f-vendor" value="${escapeHtml(a.vendorArticleNumber||'')}" placeholder="z. B. 123456-A">
+    <label>Preis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="number" id="f-price" value="${a.price || ''}" placeholder="z. B. 12.50" step="0.01" min="0">
+    <label>Standort</label>
+    <input type="text" id="f-loc" value="${escapeHtml(a.location||'')}">
+    <label>Bestand</label>
+    <input type="number" id="f-stock" value="${a.stock}" min="0">
+    <label>Mindestbestand</label>
+    <input type="number" id="f-min" value="${a.minStock}" min="0">
+    <label>Bild <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    ${a.imageUrl ? `<div id="f-image-preview"><img src="${a.imageUrl}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;"></div>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:12.5px;color:var(--text);margin-top:6px;">
+      <input type="checkbox" id="f-image-remove" style="width:auto;"> Bild entfernen
+    </label>` : '<div id="f-image-preview"></div>'}
+    <div class="btn-row" style="margin-top:8px;">
+      <button type="button" class="btn btn-secondary btn-block" id="btnCamera">📷 Foto aufnehmen</button>
+      <button type="button" class="btn btn-secondary btn-block" id="btnGallery">Aus Galerie</button>
+    </div>
+    <input type="file" id="f-image-camera" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="f-image" accept="image/*" style="display:none;">
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Neues Bild ersetzt automatisch das bestehende.</div>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">
+      Hinweis: Eine manuelle Bestandsänderung hier wird nicht als Ein-/Auslagerung im Verlauf protokolliert.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
+      <button class="btn btn-primary btn-block" id="saveEdit">Speichern</button>
+    </div>
+  `);
+  bindCategorySelect(sheet);
+  bindImagePreview(sheet);
+  sheet.querySelector('#btnCamera').onclick = ()=> sheet.querySelector('#f-image-camera').click();
+  sheet.querySelector('#btnGallery').onclick = ()=> sheet.querySelector('#f-image').click();
+  sheet.querySelector('#saveEdit').onclick = async ()=>{
+    const btn = sheet.querySelector('#saveEdit');
+    const name = sheet.querySelector('#f-name').value.trim();
+    if(!name){ toast('Bitte einen Namen eingeben'); return; }
+    btn.disabled = true; btn.textContent = 'Speichere…';
+    try{
+      const updates = {
+        name,
+        category: getCategoryValue(sheet) || 'Sonstiges',
+        vendorArticleNumber: sheet.querySelector('#f-vendor').value.trim(),
+        price: parseFloat(sheet.querySelector('#f-price').value) || 0,
+        location: sheet.querySelector('#f-loc').value.trim(),
+        stock: parseInt(sheet.querySelector('#f-stock').value)||0,
+        minStock: parseInt(sheet.querySelector('#f-min').value)||0
+      };
+      const imageFile = getSelectedImageFile(sheet);
+      const removeCheckbox = sheet.querySelector('#f-image-remove');
+      if(imageFile){
+        btn.textContent = 'Lade Bild hoch…';
+        updates.imageUrl = await uploadArticleImage(a.id, imageFile);
+      } else if(removeCheckbox && removeCheckbox.checked){
+        updates.imageUrl = '';
+      }
+      await updateDoc(doc(db, 'articles', a.id), updates);
+      closeSheet();
+      toast('Artikel aktualisiert');
+    }catch(e){
+      toast('Speichern fehlgeschlagen');
+      btn.disabled = false; btn.textContent = 'Speichern';
+      console.error(e);
+    }
+  };
+}
+
+async function book(articleId, type, qty, person, komm){
+  const a = articles.find(x=>x.id===articleId);
+  const oldStock = a ? a.stock : null;
+  try{
+    await updateDoc(doc(db, 'articles', articleId), {
+      stock: increment(type==='in' ? qty : -qty)
+    });
+    await addDoc(collection(db, 'movements'), {
+      articleId, type, qty, person: person||'', komm: komm||'', timestamp: Date.now()
+    });
+    if(person) localStorage.setItem('mat-lager-last-person', person);
+    closeSheet();
+    toast((type==='in' ? 'Eingelagert: ' : 'Entnommen: ') + qty + 'x' + (person ? ' · ' + person : ''));
+    // Bei Entnahme prüfen, ob der Bestand gerade neu unter den Mindestbestand fällt
+    // (nur beim Überschreiten der Schwelle, nicht bei jeder weiteren Entnahme darunter).
+    if(type==='out' && a && oldStock !== null){
+      const newStock = oldStock - qty;
+      if(oldStock >= a.minStock && newStock < a.minStock){
+        sendLowStockEmail(a, newStock);
+      }
+    }
+  }catch(e){
+    toast('Buchung fehlgeschlagen – Verbindung prüfen');
+    console.error(e);
+  }
+}
+
+function buildSheet(innerHtml){
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `<div class="sheet">${innerHtml}</div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) closeSheet(); });
+  overlay.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click', closeSheet));
+  return overlay;
+}
+function closeSheet(){
+  stopQrScan();
+  document.querySelectorAll('.overlay').forEach(o=>o.remove());
+}
+
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    stopQrScan();
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    render();
+  });
+});
+
+render();
 </script>
 </body>
 </html>
