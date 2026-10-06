@@ -1224,7 +1224,7 @@ function renderStaffGrid(){
         var o = state.orders.find(x=>x.id===a.orderId);
         var typ = a.type || "werkstatt";
         var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
-        html += '<div class="assign-chip type-' + typ + '" data-assign-id="' + a.id + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div></div>';
+        html += '<div class="assign-chip type-' + typ + '" draggable="true" data-assign-id="' + a.id + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div></div>';
       });
       html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
       html += '</div>';
@@ -1283,25 +1283,37 @@ $("#staff-grid").addEventListener("click", async e=>{
 /* Drag & Drop: Auftragskarte aus dem Pool auf eine Mitarbeiter-/Tageszelle ziehen */
 $("#staff-pool-list").addEventListener("dragstart", e=>{
   var card = e.target.closest(".pool-card"); if(!card) return;
-  e.dataTransfer.setData("text/plain", card.dataset.orderId);
+  e.dataTransfer.setData("text/plain", "order:" + card.dataset.orderId);
   e.dataTransfer.effectAllowed = "copy";
+});
+$("#staff-grid").addEventListener("dragstart", e=>{
+  var chip = e.target.closest(".assign-chip"); if(!chip) return;
+  e.dataTransfer.setData("text/plain", "assign:" + chip.dataset.assignId);
+  e.dataTransfer.effectAllowed = "move";
 });
 $("#staff-grid").addEventListener("dragover", e=>{
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+  e.preventDefault(); e.dataTransfer.dropEffect = "move";
   cell.classList.add("drag-over");
 });
 $("#staff-grid").addEventListener("dragleave", e=>{
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
   cell.classList.remove("drag-over");
 });
-$("#staff-grid").addEventListener("drop", e=>{
+$("#staff-grid").addEventListener("drop", async e=>{
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
   e.preventDefault();
   cell.classList.remove("drag-over");
-  var orderId = e.dataTransfer.getData("text/plain");
-  if(!orderId) return;
-  openAssignModal(orderId, { employeeId: cell.dataset.employeeId, date: cell.dataset.date }, null);
+  var payload = e.dataTransfer.getData("text/plain");
+  if(!payload) return;
+  var parts = payload.split(":"); var kind = parts[0], id = parts.slice(1).join(":");
+  if(kind === "order"){
+    openAssignModal(id, { employeeId: cell.dataset.employeeId, date: cell.dataset.date }, null);
+  }else if(kind === "assign"){
+    try{
+      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, id), { employeeId: cell.dataset.employeeId, date: cell.dataset.date });
+    }catch(err){ console.error(err); toast("Verschieben fehlgeschlagen."); }
+  }
 });
 
 /* Einsatz-Modal (Stunden eintragen / bearbeiten / löschen) */
