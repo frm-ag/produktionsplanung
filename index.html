@@ -155,6 +155,7 @@
   .ferien-badge.krank{background:var(--danger);}
   .ferien-badge.kompensation{background:#8a5cf6;}
   .ferien-badge.betriebsferien{background:#2a6f6f;}
+  .ferien-badge.feiertag{background:#b8860b;}
   .ferien-badge.sonstiges{background:var(--text-muted);}
   .zm-add-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;}
   .zm-add-form input#zm-name{flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);}
@@ -433,6 +434,7 @@
   .absence-krank{background:var(--warn-soft);color:var(--warn);}
   .absence-kompensation{background:#ede4fd;color:#8a5cf6;}
   .absence-betriebsferien{background:#deeeee;color:#2a6f6f;}
+  .absence-feiertag{background:#faf0d8;color:#b8860b;}
   .absence-sonstiges{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
   .staff-row-name:active{cursor:grabbing;}
   .staff-row-name.drag-over-row{outline:2px solid var(--accent);outline-offset:-2px;}
@@ -1322,6 +1324,25 @@
       <input type="number" id="bf-hours" placeholder="Std./Tag" step="0.1" value="8.4" style="max-width:110px;">
       <button type="submit" class="btn primary">+ Betriebsferien</button>
     </form>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Feiertage (für alle Mitarbeiter)</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Ein Feiertag gilt automatisch für alle Mitarbeiter — das Soll für diesen Tag wird auf 0h gesetzt (bezahlter Feiertag), ohne dass Ferien- oder Überstunden-Saldo belastet werden.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="feiertage-table">
+        <thead>
+          <tr><th>Name</th><th>Datum</th><th></th></tr>
+        </thead>
+        <tbody id="feiertage-tbody"></tbody>
+      </table>
+    </div>
+    <form id="feiertage-add-form" class="zm-add-form">
+      <input type="text" id="ft-name" placeholder="Name, z. B. Tag der Arbeit" required style="flex:1 1 220px;">
+      <span class="date-field">
+        <input type="text" id="ft-date-display" class="date-input" readonly placeholder="Datum (TT.MM.JJJJ)" autocomplete="off">
+        <input type="hidden" id="ft-date">
+      </span>
+      <button type="submit" class="btn primary">+ Feiertag</button>
+    </form>
   </div>
 
   <div id="verwaltung-page" style="display:none;">
@@ -1622,6 +1643,7 @@ const TIME_COLLECTION = "zeiterfassung";
 const ABSENCES_COLLECTION = "abwesenheiten";
 const ZEITMODELLE_COLLECTION = "zeitmodelle";
 const BETRIEBSFERIEN_COLLECTION = "betriebsferien";
+const FEIERTAGE_COLLECTION = "feiertage";
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -1666,6 +1688,7 @@ let unsubProfiles2 = null;
 let unsubAbsences = null;
 let unsubZeitmodelle = null;
 let unsubBetriebsferien = null;
+let unsubFeiertage = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -1687,6 +1710,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubAbsences) unsubAbsences();
     if(unsubZeitmodelle) unsubZeitmodelle();
     if(unsubBetriebsferien) unsubBetriebsferien();
+    if(unsubFeiertage) unsubFeiertage();
     subscribeOrders();
     subscribeStaff();
     subscribeAssignments();
@@ -1694,6 +1718,7 @@ onAuthStateChanged(auth, async user => {
     subscribeAbsences();
     subscribeZeitmodelle();
     subscribeBetriebsferien();
+    subscribeFeiertage();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
@@ -1706,6 +1731,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubAbsences) unsubAbsences();
     if(unsubZeitmodelle) unsubZeitmodelle();
     if(unsubBetriebsferien) unsubBetriebsferien();
+    if(unsubFeiertage) unsubFeiertage();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -1826,10 +1852,22 @@ function subscribeBetriebsferien(){
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
+function subscribeFeiertage(){
+  const q = query(collection(db, FEIERTAGE_COLLECTION), orderBy('date'));
+  unsubFeiertage = onSnapshot(q, snap => {
+    state.feiertage = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "einstellungen") renderFeiertagePanel();
+    if(state.view === "ferien") renderFerienPage();
+    if(state.view === "zeit") renderZeitPage();
+    if(state.view === "saldo") renderFerienSaldoPanel();
+    scheduleAutoBookUeberstunden();
+  }, err => { console.error(err); });
+}
+// (renderZeitPage aktualisiert bei Admin auch gleich die Übersichtstabelle mit.)
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2183,7 +2221,7 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); return; }
   if(isVerwaltung){ return; }
   if(isBuchhaltung){ return; }
 }
@@ -2281,9 +2319,13 @@ function absenceForDay(employeeId, iso){
   // (gilt automatisch für alle Mitarbeiter, ohne eigenen Abwesenheits-Eintrag je Person).
   var bf = betriebsferienForDay(iso);
   if(bf) return { id: "bf_"+bf.id, employeeId: employeeId, type: "betriebsferien", startDate: bf.startDate, endDate: bf.endDate, hours: bf.hoursPerDay, partial: false, isBetriebsferien: true, name: bf.name };
+  // Auch kein Betriebsferien-Zeitraum — prüfen, ob dieser Tag ein (bezahlter) Feiertag ist.
+  // Gilt automatisch für alle Mitarbeiter: Soll wird auf 0 gesetzt, aber kein Saldo belastet.
+  var ft = feiertagForDay(iso);
+  if(ft) return { id: "ft_"+ft.id, employeeId: employeeId, type: "feiertag", startDate: ft.date, endDate: ft.date, hours: null, partial: false, isFeiertag: true, name: ft.name };
   return null;
 }
-function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : type==="kompensation" ? "Kompensation" : type==="betriebsferien" ? "Betriebsferien" : "Abwesend"; }
+function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : type==="kompensation" ? "Kompensation" : type==="betriebsferien" ? "Betriebsferien" : type==="feiertag" ? "Feiertag" : "Abwesend"; }
 function absenceFullLabel(absence){
   var base = absenceLabel(absence.type);
   return (absence.partial && absence.hours) ? (base + " (" + absence.hours + "h)") : base;
@@ -2915,9 +2957,9 @@ function renderFerienGrid(){
       var cellClass = "ferien-day-cell" + (isWeekday(iso)?"":" ferien-day-weekend");
       var content = "";
       if(absence){
-        var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : absence.type==="kompensation" ? "KO" : absence.type==="betriebsferien" ? "BF" : "S";
-        var canDelete = state.isAdmin && !absence.isBetriebsferien;
-        var titleText = absence.isBetriebsferien ? (absenceFullLabel(absence) + " — " + escapeHtml(absence.name) + " (in Einstellungen verwalten)") : (absenceFullLabel(absence) + (canDelete?' — Klicken zum Bearbeiten':''));
+        var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : absence.type==="kompensation" ? "KO" : absence.type==="betriebsferien" ? "BF" : absence.type==="feiertag" ? "FT" : "S";
+        var canDelete = state.isAdmin && !absence.isBetriebsferien && !absence.isFeiertag;
+        var titleText = (absence.isBetriebsferien || absence.isFeiertag) ? (absenceFullLabel(absence) + " — " + escapeHtml(absence.name) + " (in Einstellungen verwalten)") : (absenceFullLabel(absence) + (canDelete?' — Klicken zum Bearbeiten':''));
         content = '<span class="ferien-badge ' + absence.type + '" data-absence-id="' + absence.id + '" data-deletable="' + (canDelete?'1':'0') + '" title="' + titleText + '">' + letter + (absence.partial?("·"+absence.hours+"h"):"") + '</span>';
       }
       row += '<td class="' + cellClass + '" data-employee-id="' + emp.id + '" data-date="' + iso + '">' + content + '</td>';
@@ -3068,6 +3110,50 @@ $("#betriebsferien-tbody").addEventListener("click", async e=>{
 // Mitarbeiter abdeckt — wird wie eine normale ganztägige Ferien-Abwesenheit behandelt.
 function betriebsferienForDay(iso){
   return state.betriebsferien.find(bf=> iso >= bf.startDate && iso <= bf.endDate) || null;
+}
+
+/* ---- Feiertage: gilt automatisch für alle Mitarbeiter, Soll=0, bezahlt (nur Admin) ---- */
+
+function renderFeiertagePanel(){
+  var tbody = $("#feiertage-tbody");
+  var sorted = state.feiertage.slice().sort((a,b)=> (a.date||"").localeCompare(b.date||""));
+  if(sorted.length===0){
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:12.5px;">Noch keine Feiertage erfasst.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(ft=>
+    '<tr data-ft-id="' + ft.id + '">' +
+    '<td>' + escapeHtml(ft.name) + '</td>' +
+    '<td>' + isoToDisplay(ft.date) + '</td>' +
+    '<td><button type="button" class="ft-delete" data-ft-id="' + ft.id + '" title="Feiertag löschen">✕</button></td>' +
+    '</tr>'
+  ).join("");
+}
+$("#feiertage-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var name = $("#ft-name").value.trim();
+  var date = $("#ft-date").value;
+  if(!name || !date){ toast("Bitte Name und Datum angeben."); return; }
+  try{
+    await addDoc(collection(db, FEIERTAGE_COLLECTION), { name: name, date: date, createdAt: Date.now() });
+    $("#ft-name").value = ""; $("#ft-date").value = ""; $("#ft-date-display").value = "";
+    toast("Feiertag gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+});
+$("#feiertage-tbody").addEventListener("click", async e=>{
+  var delBtn = e.target.closest(".ft-delete");
+  if(!delBtn) return;
+  var ft = state.feiertage.find(f=>f.id===delBtn.dataset.ftId);
+  if(!ft) return;
+  if(!confirm('Feiertag "' + ft.name + '" wirklich löschen?')) return;
+  try{
+    await deleteDoc(doc(db, FEIERTAGE_COLLECTION, ft.id));
+    toast("Feiertag gelöscht.");
+  }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+});
+// Liefert den Feiertag (falls vorhanden) für ein bestimmtes Datum — gilt für alle Mitarbeiter.
+function feiertagForDay(iso){
+  return state.feiertage.find(ft=> ft.date === iso) || null;
 }
 
 /* ---- Feriensaldo & Zeitmodell je Mitarbeiter (nur Admin) ---- */
