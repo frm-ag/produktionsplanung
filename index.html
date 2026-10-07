@@ -2603,11 +2603,13 @@ async function punchFromAssignment(assignId){
   var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
   try{
     if(status === "off"){
+      if(!confirm("Auf Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " einstempeln?")) return;
       var data = { uid: state.currentUid, name: state.currentName, type: "kommen", timestamp: Date.now(), date: todayISO() };
       if(order){ data.orderId = order.id; data.orderNumber = order.orderNumber; }
       await addDoc(collection(db, TIME_COLLECTION), data);
       toast("Eingestempelt auf Auftrag " + (order?order.orderNumber:"?") + ".");
     } else if(lastKommen && lastKommen.orderId === a.orderId){
+      if(!confirm("Von Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " ausstempeln?")) return;
       await addDoc(collection(db, TIME_COLLECTION), { uid: state.currentUid, name: state.currentName, type: "gehen", timestamp: Date.now(), date: todayISO() });
       toast("Ausgestempelt.");
     } else {
