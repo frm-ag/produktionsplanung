@@ -1074,7 +1074,7 @@
       <div class="table-scroll">
         <table class="overview-table" id="zeit-admin-table">
           <thead>
-            <tr><th>Mitarbeiter</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th></tr>
+            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th></tr>
           </thead>
           <tbody id="zeit-admin-tbody"></tbody>
         </table>
@@ -1776,6 +1776,9 @@ function render(){
   $("#lager-page").style.display = isLager ? "block" : "none";
   $("#zeit-page").style.display = isZeit ? "block" : "none";
   $("#verwaltung-page").style.display = isVerwaltung ? "block" : "none";
+  // Beim Verlassen des Lager-Reiters offene Detailkarten (z.B. Artikel-Ansicht) schliessen,
+  // damit sie sich nicht ansammeln und irgendwo im Dokument sichtbar bleiben.
+  if(!isLager) document.querySelectorAll(".overlay").forEach(o=>o.remove());
   $("#filter-chips").style.display = (isTodos || isStaff || isLager || isZeit || isVerwaltung) ? "none" : "inline-flex";
   $("#add-btn").style.display = (isTodos || isStaff || isLager || isZeit || isVerwaltung) ? "none" : "inline-block";
   if(isTodos){ renderGeneralTodos(); return; }
@@ -1994,7 +1997,7 @@ $("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 function renderZeitOverview(){
   var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
   var tbody = $("#zeit-admin-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="6">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
   var rows = state.staff.map(emp=>{
     var absence = absenceForDay(emp.id, dateIso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
@@ -2008,10 +2011,13 @@ function renderZeitOverview(){
     var totalMs = (kommen && gehen) ? (gehen - kommen - pauseMs) : null;
     var status = absence ? absenceLabel(absence.type) : (pauseStart ? "In Pause" : (kommen && !gehen) ? "Anwesend" : (kommen && gehen) ? "Fertig" : "Nicht eingestempelt");
     var statusClass = absence ? "abwesend" : (pauseStart ? "pause" : (kommen && !gehen) ? "da" : "nicht-da");
-    return { uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid };
+    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid };
   });
   tbody.innerHTML = rows.map(r=>
-    '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + (r.linked?"":' <span class="zeit-nolink">kein Konto</span>') + '</td>' +
+    '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
+    '<td data-label="Konto"><select class="staff-link-select" data-staff-id="' + r.empId + '"><option value="">— kein Konto —</option>' +
+      state.profiles.map(p=>'<option value="'+p.uid+'"'+(r.uid===p.uid?' selected':'')+'>'+escapeHtml(p.username||p.uid)+'</option>').join('') +
+      '</select></td>' +
     '<td data-label="Status"><span class="zeit-status-pill ' + r.statusClass + '">' + r.status + '</span></td>' +
     '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + '</td>' +
     '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
@@ -2020,8 +2026,9 @@ function renderZeitOverview(){
   ).join("");
 }
 $("#zeit-admin-tbody").addEventListener("click", e=>{
+  if(e.target.closest(".staff-link-select")) return;
   var tr = e.target.closest("tr.zeit-row"); if(!tr) return;
-  if(!tr.dataset.uid){ toast("Für " + tr.dataset.name + " ist noch kein Konto verknüpft (unter \"Personal\")."); return; }
+  if(!tr.dataset.uid){ toast("Für " + tr.dataset.name + " zuerst links ein Konto verknüpfen."); return; }
   openZeitEditModal(tr.dataset.uid, tr.dataset.name);
 });
 
@@ -2130,11 +2137,6 @@ function renderStaffGrid(){
     html += '<div class="staff-row">';
     html += '<div class="staff-row-name" draggable="true" data-staff-id="' + emp.id + '">';
     html += '<div class="staff-name-line"><span class="staff-name-group"><span class="staff-drag-handle">⠿</span><span>' + escapeHtml(emp.name) + '</span></span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
-    if(state.isAdmin){
-      html += '<select class="staff-link-select" data-staff-id="' + emp.id + '"><option value="">— kein Konto —</option>' +
-        state.profiles.map(p=>'<option value="'+p.uid+'"'+(emp.uid===p.uid?' selected':'')+'>'+escapeHtml(p.username||p.uid)+'</option>').join('') +
-        '</select>';
-    }
     html += '</div>';
     days.forEach(d=>{
       var iso = toISO(d);
@@ -2212,7 +2214,7 @@ $("#staff-grid").addEventListener("click", async e=>{
     return;
   }
 });
-$("#staff-grid").addEventListener("change", async e=>{
+$("#zeit-admin-tbody").addEventListener("change", async e=>{
   if(!e.target.classList.contains("staff-link-select")) return;
   var staffId = e.target.dataset.staffId;
   var uid = e.target.value;
@@ -3273,6 +3275,9 @@ function renderUserAdmin(){
     ${userRows}
 
     <h2 class="section-title" style="margin-top:22px;">Neuen Nutzer anlegen</h2>
+    <label>Name</label>
+    <input type="text" id="nu-name" placeholder="z. B. Anna Muster">
+    <div style="font-size:11px;color:var(--text-muted);margin-top:-2px;margin-bottom:10px;">Erscheint so in "Personal" und in der Stempeluhr.</div>
     <label>Benutzername</label>
     <input type="text" id="nu-username" placeholder="z. B. anna">
     <label>Passwort</label>
@@ -3305,9 +3310,11 @@ function renderUserAdmin(){
 
   container.querySelector('#nu-create').onclick = async ()=>{
     const btn = container.querySelector('#nu-create');
+    const fullName = container.querySelector('#nu-name').value.trim();
     const username = container.querySelector('#nu-username').value.trim();
     const password = container.querySelector('#nu-password').value;
     const role = container.querySelector('#nu-role').value;
+    if(!fullName){ toast('Bitte einen Namen eingeben.'); return; }
     if(!username || !/^[a-zA-Z0-9_-]+$/.test(username)){ toast('Benutzername: nur Buchstaben, Zahlen, - und _'); return; }
     if(!password || password.length < 6){ toast('Passwort braucht mindestens 6 Zeichen'); return; }
     btn.disabled = true; btn.textContent = 'Lege an…';
@@ -3319,9 +3326,10 @@ function renderUserAdmin(){
       if(role === 'admin'){
         await setDoc(doc(db, 'roles', newUid), { role: 'admin' });
       }
+      await addDoc(collection(db, 'mitarbeiter'), { name: fullName, uid: newUid, createdAt: Date.now() });
       await signOut(authSecondary);
-      toast('Nutzer "' + username + '" angelegt');
-      container.querySelector('#nu-username').value = ''; container.querySelector('#nu-password').value = ''; container.querySelector('#nu-role').value = 'user';
+      toast('Nutzer "' + username + '" angelegt und mit "' + fullName + '" in Personal verknüpft.');
+      container.querySelector('#nu-name').value = ''; container.querySelector('#nu-username').value = ''; container.querySelector('#nu-password').value = ''; container.querySelector('#nu-role').value = 'user';
     }catch(e){
       console.error(e);
       const map = { 'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.', 'auth/weak-password': 'Passwort zu schwach (mind. 6 Zeichen).' };
@@ -4206,7 +4214,9 @@ function buildSheet(innerHtml){
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `<div class="sheet">${innerHtml}</div>`;
-  document.body.appendChild(overlay);
+  // In #lager-page einhängen (nicht direkt in body) — so wird das Fenster korrekt
+  // mitversteckt, sobald man zu einem anderen Reiter wechselt, und behält sein Styling.
+  (document.getElementById('lager-page') || document.body).appendChild(overlay);
   overlay.addEventListener('click', e=>{ if(e.target===overlay) closeSheet(); });
   overlay.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click', closeSheet));
   return overlay;
