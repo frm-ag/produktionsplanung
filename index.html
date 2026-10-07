@@ -1156,7 +1156,8 @@
     <div id="verwaltung-main"></div>
   </div>
 
-  <div id="lager-page" style="display:none;">
+  <div id="lager-page">
+  <div id="lager-tab-body" style="display:none;">
 
 <div id="lagerApp" style="display:none;">
   <div class="hazard-strip"></div>
@@ -1205,6 +1206,15 @@
   </nav>
 </div>
 
+  </div>
+
+<!-- Eigenständiger Anker für Sheet-Overlays (Nutzer entfernen, Artikel-Details, etc.):
+     liegt als Geschwister von #lager-tab-body noch innerhalb von #lager-page (damit das
+     mat-lager-CSS-Scoping greift), wird aber NICHT mit dem Lager-Tab ein-/ausgeblendet —
+     so verschwindet ein Sheet nicht sofort wieder, wenn es von einem anderen Reiter aus
+     geöffnet wird (z.B. "Nutzer entfernen" in der Verwaltung), und bleibt auch beim
+     Wechseln vom Lager-Reiter nicht unsichtbar hängen. -->
+<div id="lager-overlay-host"></div>
 
   </div>
 
@@ -1827,6 +1837,7 @@ var HEADER_INFO = {
   verwaltung: ["Verwaltung", "Nutzerkonten verwalten"],
   buchhaltung: ["Buchhaltung", "Dieser Bereich kommt noch"]
 };
+var lastRenderedView = null;
 function render(){
   renderHeader();
   var isTable = state.view === "table";
@@ -1837,13 +1848,18 @@ function render(){
   var isBuchhaltung = state.view === "buchhaltung";
   $("#table-page").style.display = isTable ? "block" : "none";
   $("#staff-page").style.display = isStaff ? "block" : "none";
-  $("#lager-page").style.display = isLager ? "block" : "none";
+  $("#lager-tab-body").style.display = isLager ? "block" : "none";
   $("#zeit-page").style.display = isZeit ? "block" : "none";
   $("#verwaltung-page").style.display = isVerwaltung ? "block" : "none";
   $("#buchhaltung-page").style.display = isBuchhaltung ? "block" : "none";
-  // Beim Verlassen des Lager-Reiters offene Detailkarten (z.B. Artikel-Ansicht) schliessen,
-  // damit sie sich nicht ansammeln und irgendwo im Dokument sichtbar bleiben.
-  if(!isLager) document.querySelectorAll(".overlay").forEach(o=>o.remove());
+  // Offene Sheets (z.B. Artikel-Detail im Lager, "Nutzer entfernen" in der Verwaltung) nur
+  // beim tatsächlichen Reiter-Wechsel schliessen — nicht bei jedem render(), das z.B. durch
+  // einen Firestore-Snapshot ausgelöst wird, sonst verschwindet ein gerade geöffnetes Sheet
+  // sofort wieder, bevor man damit interagieren kann.
+  if(lastRenderedView !== null && lastRenderedView !== state.view){
+    document.querySelectorAll(".overlay").forEach(o=>o.remove());
+  }
+  lastRenderedView = state.view;
   var hideToolbar = (isStaff || isLager || isZeit || isVerwaltung || isBuchhaltung);
   $("#filter-chips").style.display = hideToolbar ? "none" : "inline-flex";
   $("#add-btn").style.display = hideToolbar ? "none" : "inline-block";
@@ -4254,9 +4270,12 @@ function buildSheet(innerHtml){
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `<div class="sheet">${innerHtml}</div>`;
-  // In #lager-page einhängen (nicht direkt in body) — so wird das Fenster korrekt
-  // mitversteckt, sobald man zu einem anderen Reiter wechselt, und behält sein Styling.
-  (document.getElementById('lager-page') || document.body).appendChild(overlay);
+  // In #lager-overlay-host einhängen: dieser Anker liegt zwar innerhalb von #lager-page
+  // (damit das mat-lager-Styling via CSS-Scoping greift), bleibt aber selbst immer im DOM
+  // sichtbar — unabhängig davon, ob gerade der Lager-Reiter oder z.B. Verwaltung aktiv ist.
+  // So verschwindet ein Sheet nicht mehr sofort wieder, wenn es von einem anderen Reiter
+  // aus geöffnet wird (z.B. "Nutzer entfernen" in der Verwaltung).
+  (document.getElementById('lager-overlay-host') || document.getElementById('lager-page') || document.body).appendChild(overlay);
   overlay.addEventListener('click', e=>{ if(e.target===overlay) closeSheet(); });
   overlay.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click', closeSheet));
   return overlay;
