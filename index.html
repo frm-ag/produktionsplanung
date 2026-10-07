@@ -484,10 +484,10 @@
      Breite — damit die Tabelle immer in die verfügbare Breite passt, ohne seitlich zu scrollen. */
   #zeit-admin-table{min-width:0;table-layout:fixed;}
   #zeit-admin-table th, #zeit-admin-table td{padding:8px 6px;overflow:hidden;text-overflow:ellipsis;}
-  #zeit-admin-table th:nth-child(1), #zeit-admin-table td:nth-child(1){width:17%;white-space:normal;}
-  #zeit-admin-table th:nth-child(2), #zeit-admin-table td:nth-child(2){width:13%;}
-  #zeit-admin-table th:nth-child(3), #zeit-admin-table td:nth-child(3){width:14%;}
-  #zeit-admin-table th:nth-child(4), #zeit-admin-table td:nth-child(4){width:12%;white-space:normal;}
+  #zeit-admin-table th:nth-child(1), #zeit-admin-table td:nth-child(1){width:19%;white-space:normal;}
+  #zeit-admin-table th:nth-child(2), #zeit-admin-table td:nth-child(2){width:14%;}
+  #zeit-admin-table th:nth-child(3), #zeit-admin-table td:nth-child(3){width:10%;}
+  #zeit-admin-table th:nth-child(4), #zeit-admin-table td:nth-child(4){width:13%;white-space:normal;}
   #zeit-admin-table th:nth-child(5), #zeit-admin-table td:nth-child(5){width:11%;}
   #zeit-admin-table th:nth-child(6), #zeit-admin-table td:nth-child(6){width:11%;}
   #zeit-admin-table th:nth-child(7), #zeit-admin-table td:nth-child(7){width:11%;}
@@ -2492,7 +2492,9 @@ function renderZeitOverview(){
     var day = analyzeDayEntries(entries);
     var kommen = day.firstKommen, gehen = day.lastGehen;
     var totalMs = (day.firstKommen!=null && !day.isOpen) ? day.totalMs : null;
-    var status = absence ? absenceLabel(absence.type) : (day.isOpen ? "Anwesend" : (kommen && gehen) ? "Fertig" : "Nicht eingestempelt");
+    // Einfach gehalten: nur "Da" (aktuell eingestempelt) oder "Nicht da" — bei einer Abwesenheit
+    // (Ferien/Krank/Kompensation/Betriebsferien) wird stattdessen deren Bezeichnung angezeigt.
+    var status = absence ? absenceLabel(absence.type) : (day.isOpen ? "Da" : "Nicht da");
     var statusClass = absence ? "abwesend" : (day.isOpen ? "da" : "nicht-da");
     var soll = sollHoursForDate(emp, dateIso);
     if(soll != null && absence){ soll = absence.partial ? Math.max(0, soll - (absence.hours||0)) : 0; }
