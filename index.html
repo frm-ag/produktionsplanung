@@ -1364,31 +1364,25 @@
       <button type="submit" class="btn primary">+ Feiertag</button>
     </form>
 
-    <h2 class="zeit-h2" style="margin-top:22px;">Feriensaldo pro Mitarbeiter</h2>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel). Der Überstunden-Saldo wird automatisch über die Zeiterfassung geführt und muss hier nicht manuell angepasst werden. Die laufende Übersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
-    <div class="table-scroll">
-      <table class="overview-table" id="saldo-settings-table">
-        <thead>
-          <tr><th>Mitarbeiter</th><th>Feriensaldo</th><th>Anpassen</th></tr>
-        </thead>
-        <tbody id="saldo-settings-tbody"></tbody>
-      </table>
-    </div>
-
-    <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter-Namen &amp; Zugänge</h2>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Name ändern wirkt sich überall aus (Zeiterfassung, Personalplanung, PDFs). "Zugang zurücksetzen" legt ein neues Login für diesen Mitarbeiter an und verknüpft es — praktisch bei vergessenem Passwort, da ein bestehendes Passwort aus technischen Gründen nicht direkt überschrieben werden kann. Das alte Login wird dabei automatisch gesperrt.</div>
+    <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Name ändern wirkt sich überall aus (Zeiterfassung, Personalplanung, PDFs). "Zugang zurücksetzen" legt ein neues Login für diesen Mitarbeiter an und verknüpft es — praktisch bei vergessenem Passwort, da ein bestehendes Passwort aus technischen Gründen nicht direkt überschrieben werden kann (altes Login wird dabei automatisch gesperrt). Der Feriensaldo dient zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel) — der Überstunden-Saldo läuft automatisch über die Zeiterfassung. Die laufende Gesamtübersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
     <div class="table-scroll">
       <table class="overview-table" id="mitarbeiter-edit-table">
         <thead>
-          <tr><th>Name</th><th></th><th>Login</th><th></th></tr>
+          <tr><th>Name</th><th></th><th>Login</th><th></th><th>Feriensaldo</th><th>Anpassen</th></tr>
         </thead>
         <tbody id="mitarbeiter-edit-tbody"></tbody>
       </table>
     </div>
 
-    <h2 class="zeit-h2" style="margin-top:22px;">Mein Passwort ändern</h2>
+    <h2 class="zeit-h2" style="margin-top:22px;">Mein Zugang</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Gilt nur für dein eigenes, aktuell angemeldetes Konto.</div>
-    <form id="own-password-form" class="zm-add-form">
+    <form id="own-username-form" class="zm-add-form">
+      <input type="password" id="ou-current-pw" placeholder="Aktuelles Passwort" autocomplete="current-password" required style="flex:1 1 200px;">
+      <input type="text" id="ou-new-username" placeholder="Neuer Login-Name" autocomplete="username" required style="flex:1 1 200px;">
+      <button type="submit" class="btn primary">Login-Name ändern</button>
+    </form>
+    <form id="own-password-form" class="zm-add-form" style="margin-top:8px;">
       <input type="password" id="op-current" placeholder="Aktuelles Passwort" autocomplete="current-password" required style="flex:1 1 200px;">
       <input type="password" id="op-new" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password" required style="flex:1 1 200px;">
       <button type="submit" class="btn primary">Passwort ändern</button>
@@ -1672,7 +1666,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
-  reauthenticateWithCredential, EmailAuthProvider, updatePassword
+  reauthenticateWithCredential, EmailAuthProvider, updatePassword, updateEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ---- Gleiche Firebase-Konfiguration wie Mat.Lager ----
@@ -1843,7 +1837,7 @@ function subscribeStaff(){
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "ferien") renderFerienPage();
     if(state.view === "saldo") renderFerienSaldoPanel();
-    if(state.view === "einstellungen"){ renderSaldoSettingsPanel(); renderMitarbeiterEditPanel(); }
+    if(state.view === "einstellungen"){ renderMitarbeiterEditPanel(); }
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
@@ -2280,7 +2274,7 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderSaldoSettingsPanel(); renderMitarbeiterEditPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderMitarbeiterEditPanel(); return; }
   if(isVerwaltung){ return; }
   if(isBuchhaltung){ return; }
 }
@@ -3317,53 +3311,23 @@ function feiertagForDay(iso){
 
 /* ---- Feriensaldo/Überstunden-Saldo auch in den Einstellungen setzbar (eigene IDs, damit sie
    sich nicht mit der gleichen Tabelle auf der "Stunden- & Feriensaldo"-Seite überschneiden) ---- */
-function renderSaldoSettingsPanel(){
-  var tbody = $("#saldo-settings-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
-  tbody.innerHTML = state.staff.map(emp=>{
-    var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
-    return '<tr data-staff-id="' + emp.id + '">' +
-      '<td style="display:flex;align-items:center;gap:7px;">' + staffAvatarHtml(emp, "staff-avatar-sm") + escapeHtml(emp.name) + '</td>' +
-      '<td>' + saldo.toFixed(1) + 'h</td>' +
-      '<td><div class="saldo-adjust-stack">' +
-        '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="Neuer Wert" id="set-saldo-set-' + emp.id + '"><button type="button" class="btn set-fs-saldo-set" data-staff-id="' + emp.id + '" title="Feriensaldo direkt auf diesen Wert setzen — z.B. am Jahresanfang">Setzen</button></div>' +
-        '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="± Std." id="set-saldo-adjust-' + emp.id + '"><button type="button" class="btn set-fs-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Feriensaldo dazuzählen (negative Zahl zum Abziehen)">± Buchen</button></div>' +
-      '</div></td>' +
-      '</tr>';
-  }).join("");
-}
-$("#saldo-settings-tbody").addEventListener("click", async e=>{
-  var setBtn = e.target.closest(".set-fs-saldo-set");
-  if(setBtn){
-    var staffId = setBtn.dataset.staffId;
-    var val = parseFloat($("#set-saldo-set-" + staffId).value);
-    if(isNaN(val)){ toast("Bitte die gewünschte Saldo-Stundenzahl eingeben."); return; }
-    try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId), { ferienSaldo: val }); toast("Feriensaldo auf " + val.toFixed(1) + "h gesetzt."); }
-    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
-  var applyBtn = e.target.closest(".set-fs-saldo-apply");
-  if(applyBtn){
-    var staffId2 = applyBtn.dataset.staffId;
-    var delta = parseFloat($("#set-saldo-adjust-" + staffId2).value);
-    if(!delta){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
-    try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId2), { ferienSaldo: increment(delta) }); toast("Feriensaldo angepasst."); }
-    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
-});
-
-/* ---- Mitarbeiter-Namen bearbeiten & Zugang zurücksetzen (nur Admin) ---- */
+/* ---- Mitarbeiter: Name, Login/Zugang & Feriensaldo in einer Liste (nur Admin) ---- */
 function renderMitarbeiterEditPanel(){
   var tbody = $("#mitarbeiter-edit-tbody");
   if(!tbody) return;
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
+    var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
     return '<tr data-staff-id="' + emp.id + '">' +
       '<td><input type="text" class="me-name-input" id="me-name-' + emp.id + '" value="' + escapeHtml(emp.name) + '" style="width:100%;min-width:140px;font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></td>' +
       '<td><button type="button" class="btn me-name-save" data-staff-id="' + emp.id + '">Speichern</button></td>' +
       '<td>' + (emp.uid ? '<span style="color:var(--success);font-weight:600;">verknüpft</span>' : '<span style="color:var(--text-muted);">kein Login</span>') + '</td>' +
       '<td>' + (emp.uid ? ('<button type="button" class="btn me-reset-btn" data-staff-id="' + emp.id + '">Zugang zurücksetzen</button>') : '<span style="color:var(--text-muted);font-size:11px;">— Konto in Zeiterfassung &gt; Alle Mitarbeiter verknüpfen —</span>') + '</td>' +
+      '<td>' + saldo.toFixed(1) + 'h</td>' +
+      '<td><div class="saldo-adjust-stack">' +
+        '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="Neuer Wert" id="set-saldo-set-' + emp.id + '"><button type="button" class="btn set-fs-saldo-set" data-staff-id="' + emp.id + '" title="Feriensaldo direkt auf diesen Wert setzen — z.B. am Jahresanfang">Setzen</button></div>' +
+        '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="± Std." id="set-saldo-adjust-' + emp.id + '"><button type="button" class="btn set-fs-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Feriensaldo dazuzählen (negative Zahl zum Abziehen)">± Buchen</button></div>' +
+      '</div></td>' +
       '</tr>';
   }).join("");
 }
@@ -3379,6 +3343,24 @@ $("#mitarbeiter-edit-tbody").addEventListener("click", async e=>{
   }
   var resetBtn = e.target.closest(".me-reset-btn");
   if(resetBtn){ await resetMitarbeiterZugang(resetBtn.dataset.staffId); return; }
+  var setBtn = e.target.closest(".set-fs-saldo-set");
+  if(setBtn){
+    var sId = setBtn.dataset.staffId;
+    var val2 = parseFloat($("#set-saldo-set-" + sId).value);
+    if(isNaN(val2)){ toast("Bitte die gewünschte Saldo-Stundenzahl eingeben."); return; }
+    try{ await updateDoc(doc(db, STAFF_COLLECTION, sId), { ferienSaldo: val2 }); toast("Feriensaldo auf " + val2.toFixed(1) + "h gesetzt."); }
+    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var applyBtn = e.target.closest(".set-fs-saldo-apply");
+  if(applyBtn){
+    var sId2 = applyBtn.dataset.staffId;
+    var delta = parseFloat($("#set-saldo-adjust-" + sId2).value);
+    if(!delta){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
+    try{ await updateDoc(doc(db, STAFF_COLLECTION, sId2), { ferienSaldo: increment(delta) }); toast("Feriensaldo angepasst."); }
+    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
 });
 // Legt für einen Mitarbeiter ein neues Login-Konto an und verknüpft es (uid) — das bisherige
 // Konto wird gesperrt. Nötig, weil ein bestehendes Passwort aus einer reinen Client-App heraus
@@ -3418,6 +3400,31 @@ async function resetMitarbeiterZugang(empId){
     toast(map[err.code] || ('Fehlgeschlagen: ' + (err.code || err.message)));
   }
 }
+
+/* ---- Eigenen Login-Namen ändern (jeder angemeldete Nutzer) ---- */
+$("#own-username-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var currentPw2 = $("#ou-current-pw").value;
+  var newUsername2 = $("#ou-new-username").value.trim();
+  if(!currentPw2 || !newUsername2){ toast("Bitte beide Felder ausfüllen."); return; }
+  if(!/^[a-zA-Z0-9_-]+$/.test(newUsername2)){ toast("Nur Buchstaben, Zahlen, - und _ erlaubt."); return; }
+  var user2 = auth.currentUser;
+  if(!user2 || !user2.email){ toast("Nicht angemeldet."); return; }
+  try{
+    var cred3 = EmailAuthProvider.credential(user2.email, currentPw2);
+    await reauthenticateWithCredential(user2, cred3);
+    var newEmail = usernameToAuthEmail(newUsername2);
+    await updateEmail(user2, newEmail);
+    await setDoc(doc(db, 'profiles', user2.uid), { username: newUsername2.toLowerCase() }, { merge: true });
+    state.currentName = newUsername2.toLowerCase();
+    $("#ou-current-pw").value = ""; $("#ou-new-username").value = "";
+    toast("Login-Name geändert auf \"" + newUsername2 + "\".");
+  }catch(err){
+    console.error(err);
+    var map3 = { 'auth/wrong-password': 'Aktuelles Passwort ist falsch.', 'auth/invalid-credential': 'Aktuelles Passwort ist falsch.', 'auth/email-already-in-use': 'Dieser Login-Name ist bereits vergeben.', 'auth/too-many-requests': 'Zu viele Versuche — bitte kurz warten.' };
+    toast(map3[err.code] || ('Fehlgeschlagen: ' + (err.code || err.message)));
+  }
+});
 
 /* ---- Eigenes Passwort ändern (jeder angemeldete Nutzer) ---- */
 $("#own-password-form").addEventListener("submit", async e=>{
