@@ -1274,7 +1274,7 @@
     <div class="table-scroll">
       <table class="overview-table" id="ferien-saldo-table">
         <thead>
-          <tr><th><input type="checkbox" id="ferien-saldo-select-all" title="Alle auswählen"></th><th>Mitarbeiter</th><th>Zeitmodell</th><th>Stundensaldo (Überstunden)</th><th>Anpassen</th><th>Feriensaldo</th><th>Anpassen</th><th>Saldo Total</th><th>Export</th></tr>
+          <tr><th><input type="checkbox" id="ferien-saldo-select-all" title="Alle auswählen"></th><th>Mitarbeiter</th><th>Zeitmodell</th><th>Stundensaldo (Überstunden)</th><th>Feriensaldo</th><th>Saldo Total</th><th>Export</th></tr>
         </thead>
         <tbody id="ferien-saldo-tbody"></tbody>
       </table>
@@ -1347,12 +1347,12 @@
       <button type="submit" class="btn primary">+ Feiertag</button>
     </form>
 
-    <h2 class="zeit-h2" style="margin-top:22px;">Feriensaldo &amp; Überstunden-Saldo pro Mitarbeiter</h2>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel). Die laufende Übersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
+    <h2 class="zeit-h2" style="margin-top:22px;">Feriensaldo pro Mitarbeiter</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel). Der Überstunden-Saldo wird automatisch über die Zeiterfassung geführt und muss hier nicht manuell angepasst werden. Die laufende Übersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
     <div class="table-scroll">
       <table class="overview-table" id="saldo-settings-table">
         <thead>
-          <tr><th>Mitarbeiter</th><th>Überstunden-Saldo</th><th>Anpassen</th><th>Feriensaldo</th><th>Anpassen</th></tr>
+          <tr><th>Mitarbeiter</th><th>Feriensaldo</th><th>Anpassen</th></tr>
         </thead>
         <tbody id="saldo-settings-tbody"></tbody>
       </table>
@@ -3175,17 +3175,11 @@ function feiertagForDay(iso){
    sich nicht mit der gleichen Tabelle auf der "Stunden- & Feriensaldo"-Seite überschneiden) ---- */
 function renderSaldoSettingsPanel(){
   var tbody = $("#saldo-settings-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
     var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
-    var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
     return '<tr data-staff-id="' + emp.id + '">' +
       '<td style="display:flex;align-items:center;gap:7px;">' + staffAvatarHtml(emp, "staff-avatar-sm") + escapeHtml(emp.name) + '</td>' +
-      '<td><span style="font-weight:600;color:' + (ueberstd<-0.05?"var(--danger)":ueberstd>0.05?"var(--success)":"inherit") + ';">' + (ueberstd>0?"+":"") + ueberstd.toFixed(1) + 'h</span></td>' +
-      '<td><div class="saldo-adjust-stack">' +
-        '<div class="saldo-adjust-row"><input type="number" class="ueberstd-input" step="0.5" placeholder="Neuer Wert" id="set-ueberstd-set-' + emp.id + '"><button type="button" class="btn set-us-saldo-set" data-staff-id="' + emp.id + '" title="Überstunden-Saldo direkt auf diesen Wert setzen — ersetzt den bisherigen Saldo">Setzen</button></div>' +
-        '<div class="saldo-adjust-row"><input type="number" class="ueberstd-input" step="0.5" placeholder="± Std." id="set-ueberstd-adjust-' + emp.id + '"><button type="button" class="btn set-us-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Überstunden-Saldo dazuzählen (negative Zahl zum Abziehen)">± Buchen</button></div>' +
-      '</div></td>' +
       '<td>' + saldo.toFixed(1) + 'h</td>' +
       '<td><div class="saldo-adjust-stack">' +
         '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="Neuer Wert" id="set-saldo-set-' + emp.id + '"><button type="button" class="btn set-fs-saldo-set" data-staff-id="' + emp.id + '" title="Feriensaldo direkt auf diesen Wert setzen — z.B. am Jahresanfang">Setzen</button></div>' +
@@ -3213,24 +3207,6 @@ $("#saldo-settings-tbody").addEventListener("click", async e=>{
     catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
     return;
   }
-  var usSetBtn = e.target.closest(".set-us-saldo-set");
-  if(usSetBtn){
-    var staffId3 = usSetBtn.dataset.staffId;
-    var val3 = parseFloat($("#set-ueberstd-set-" + staffId3).value);
-    if(isNaN(val3)){ toast("Bitte die gewünschte Überstunden-Stundenzahl eingeben."); return; }
-    try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId3), { ueberstundenSaldo: val3 }); toast("Überstunden-Saldo auf " + val3.toFixed(1) + "h gesetzt."); }
-    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
-  var usApplyBtn = e.target.closest(".set-us-saldo-apply");
-  if(usApplyBtn){
-    var staffId4 = usApplyBtn.dataset.staffId;
-    var delta2 = parseFloat($("#set-ueberstd-adjust-" + staffId4).value);
-    if(!delta2){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
-    try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId4), { ueberstundenSaldo: increment(delta2) }); toast("Überstunden-Saldo angepasst."); }
-    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
 });
 
 /* ---- Feriensaldo & Zeitmodell je Mitarbeiter (nur Admin) ---- */
@@ -3238,7 +3214,7 @@ $("#saldo-settings-tbody").addEventListener("click", async e=>{
 var ferienSaldoSelected = new Set();
 function renderFerienSaldoPanel(){
   var tbody = $("#ferien-saldo-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
     var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
     var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
@@ -3250,15 +3226,7 @@ function renderFerienSaldoPanel(){
         state.zeitmodelle.map(m=>'<option value="'+m.id+'"'+(emp.zeitmodellId===m.id?' selected':'')+'>'+escapeHtml(m.name)+'</option>').join('') +
       '</select></td>' +
       '<td><span style="font-weight:600;color:' + (ueberstd<-0.05?"var(--danger)":ueberstd>0.05?"var(--success)":"inherit") + ';">' + (ueberstd>0?"+":"") + ueberstd.toFixed(1) + 'h</span></td>' +
-      '<td><div class="saldo-adjust-stack">' +
-        '<div class="saldo-adjust-row"><input type="number" class="ueberstd-input" step="0.5" placeholder="Neuer Wert" id="ueberstd-set-' + emp.id + '"><button type="button" class="btn us-saldo-set" data-staff-id="' + emp.id + '" title="Überstunden-Saldo direkt auf diesen Wert setzen — ersetzt den bisherigen Saldo">Setzen</button></div>' +
-        '<div class="saldo-adjust-row"><input type="number" class="ueberstd-input" step="0.5" placeholder="± Std." id="ueberstd-adjust-' + emp.id + '"><button type="button" class="btn us-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Überstunden-Saldo dazuzählen (negative Zahl zum Abziehen) — ändert nur um diesen Betrag">± Buchen</button></div>' +
-      '</div></td>' +
       '<td>' + saldo.toFixed(1) + 'h</td>' +
-      '<td><div class="saldo-adjust-stack">' +
-        '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="Neuer Wert" id="saldo-set-' + emp.id + '"><button type="button" class="btn fs-saldo-set" data-staff-id="' + emp.id + '" title="Feriensaldo direkt auf diesen Wert setzen — z.B. am Jahresanfang, ersetzt den bisherigen Saldo">Setzen</button></div>' +
-        '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="± Std." id="saldo-adjust-' + emp.id + '"><button type="button" class="btn fs-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Feriensaldo dazuzählen (negative Zahl zum Abziehen) — ändert nur um diesen Betrag">± Buchen</button></div>' +
-      '</div></td>' +
       '<td><span style="font-weight:700;color:' + (total<-0.05?"var(--danger)":total>0.05?"var(--success)":"inherit") + ';">' + (total>0?"+":"") + total.toFixed(1) + 'h</span></td>' +
       '<td><div class="export-btn-row"><button type="button" class="fs-export" data-staff-id="' + emp.id + '" data-mode="week">Woche PDF</button><button type="button" class="fs-export" data-staff-id="' + emp.id + '" data-mode="month">Monat PDF</button></div></td>' +
       '</tr>';
@@ -3277,58 +3245,6 @@ $("#ferien-saldo-tbody").addEventListener("change", async e=>{
   catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#ferien-saldo-tbody").addEventListener("click", async e=>{
-  var setBtn = e.target.closest(".fs-saldo-set");
-  if(setBtn){
-    var staffId = setBtn.dataset.staffId;
-    var input = $("#saldo-set-" + staffId);
-    var val = parseFloat(input.value);
-    if(isNaN(val)){ toast("Bitte die gewünschte Saldo-Stundenzahl eingeben."); return; }
-    try{
-      await updateDoc(doc(db, STAFF_COLLECTION, staffId), { ferienSaldo: val });
-      input.value = "";
-      toast("Feriensaldo auf " + val.toFixed(1) + "h gesetzt.");
-    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
-  var applyBtn = e.target.closest(".fs-saldo-apply");
-  if(applyBtn){
-    var staffId2 = applyBtn.dataset.staffId;
-    var input2 = $("#saldo-adjust-" + staffId2);
-    var delta = parseFloat(input2.value);
-    if(!delta){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
-    try{
-      await updateDoc(doc(db, STAFF_COLLECTION, staffId2), { ferienSaldo: increment(delta) });
-      input2.value = "";
-      toast("Feriensaldo angepasst.");
-    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
-  var usSetBtn = e.target.closest(".us-saldo-set");
-  if(usSetBtn){
-    var staffId3 = usSetBtn.dataset.staffId;
-    var input3 = $("#ueberstd-set-" + staffId3);
-    var val3 = parseFloat(input3.value);
-    if(isNaN(val3)){ toast("Bitte die gewünschte Überstunden-Stundenzahl eingeben."); return; }
-    try{
-      await updateDoc(doc(db, STAFF_COLLECTION, staffId3), { ueberstundenSaldo: val3 });
-      input3.value = "";
-      toast("Überstunden-Saldo auf " + val3.toFixed(1) + "h gesetzt.");
-    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
-  var usApplyBtn = e.target.closest(".us-saldo-apply");
-  if(usApplyBtn){
-    var staffId4 = usApplyBtn.dataset.staffId;
-    var input4 = $("#ueberstd-adjust-" + staffId4);
-    var delta2 = parseFloat(input4.value);
-    if(!delta2){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
-    try{
-      await updateDoc(doc(db, STAFF_COLLECTION, staffId4), { ueberstundenSaldo: increment(delta2) });
-      input4.value = "";
-      toast("Überstunden-Saldo angepasst.");
-    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
-    return;
-  }
   var exportBtn = e.target.closest(".fs-export");
   if(exportBtn){ exportTimesheet(exportBtn.dataset.staffId, exportBtn.dataset.mode); return; }
 });
