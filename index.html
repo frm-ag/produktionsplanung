@@ -1216,7 +1216,7 @@
       <div class="table-scroll">
         <table class="overview-table" id="zeit-admin-table">
           <thead>
-            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Haben</th><th>Soll</th><th>Saldo</th></tr>
+            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Haben</th><th>Soll</th><th>Saldo</th></tr>
           </thead>
           <tbody id="zeit-admin-tbody"></tbody>
         </table>
@@ -2285,6 +2285,32 @@ function zeitTodayEntries(list){
   var today = todayISO();
   return list.filter(t=>t.date===today).slice().sort((a,b)=>a.timestamp-b.timestamp);
 }
+// Wertet die (chronologisch sortierten) Zeiteinträge EINES Tages aus. Wichtig: ein Tag kann
+// mehrere Kommen/Gehen-Paare enthalten (z.B. Mittagspause separat gestempelt, oder Wechsel
+// zwischen Aufträgen) — daher wird hier über alle Paare summiert statt nur "erstes Kommen bis
+// letztes Gehen" zu nehmen (das würde Lücken zwischen den Paaren fälschlich als Arbeitszeit
+// zählen). Alte "pause_start"/"pause_ende"-Einträge werden weiterhin abgezogen (Altdaten).
+function analyzeDayEntries(entriesSorted){
+  var totalMs = 0, pauseMs = 0;
+  var openKommen = null, openPauseStart = null;
+  var firstKommen = null, lastGehen = null;
+  entriesSorted.forEach(e=>{
+    if(e.type==="kommen"){
+      if(firstKommen==null) firstKommen = e.timestamp;
+      if(openKommen==null) openKommen = e.timestamp;
+    } else if(e.type==="pause_start"){
+      openPauseStart = e.timestamp;
+    } else if(e.type==="pause_ende"){
+      if(openPauseStart!=null){ pauseMs += e.timestamp - openPauseStart; openPauseStart=null; }
+    } else if(e.type==="gehen"){
+      lastGehen = e.timestamp;
+      if(openKommen!=null){ totalMs += (e.timestamp - openKommen); openKommen=null; }
+    }
+  });
+  totalMs -= pauseMs;
+  if(totalMs<0) totalMs = 0;
+  return { totalMs: totalMs, pauseMs: pauseMs, isOpen: openKommen!=null, firstKommen: firstKommen, lastGehen: lastGehen };
+}
 function zeitCurrentStatus(entriesToday){
   if(entriesToday.length===0) return "off";
   var last = entriesToday[entriesToday.length-1];
@@ -2443,30 +2469,23 @@ $("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 function renderZeitOverview(){
   var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
   var tbody = $("#zeit-admin-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="9">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="8">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
   var rows = state.staff.map(emp=>{
     var absence = absenceForDay(emp.id, dateIso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
-    var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
     var orderNumbers = [];
-    entries.forEach(e=>{
-      if(e.type==="kommen"){
-        if(!kommen) kommen = e.timestamp;
-        if(e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber);
-      }
-      else if(e.type==="pause_start") pauseStart = e.timestamp;
-      else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
-      else if(e.type==="gehen") gehen = e.timestamp;
-    });
-    var totalMs = (kommen && gehen) ? (gehen - kommen - pauseMs) : null;
-    var status = absence ? absenceLabel(absence.type) : (pauseStart ? "In Pause" : (kommen && !gehen) ? "Anwesend" : (kommen && gehen) ? "Fertig" : "Nicht eingestempelt");
-    var statusClass = absence ? "abwesend" : (pauseStart ? "pause" : (kommen && !gehen) ? "da" : "nicht-da");
+    entries.forEach(e=>{ if(e.type==="kommen" && e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber); });
+    var day = analyzeDayEntries(entries);
+    var kommen = day.firstKommen, gehen = day.lastGehen;
+    var totalMs = (day.firstKommen!=null && !day.isOpen) ? day.totalMs : null;
+    var status = absence ? absenceLabel(absence.type) : (day.isOpen ? "Anwesend" : (kommen && gehen) ? "Fertig" : "Nicht eingestempelt");
+    var statusClass = absence ? "abwesend" : (day.isOpen ? "da" : "nicht-da");
     var soll = sollHoursForDate(emp, dateIso);
     if(soll != null && absence){ soll = absence.partial ? Math.max(0, soll - (absence.hours||0)) : 0; }
     var habenH = totalMs != null ? totalMs/3600000 : 0;
     var saldo = soll != null ? (habenH - soll) : null;
     var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
-    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid, soll: soll, saldo: saldo, ueberstd: ueberstd, orderNumbers: orderNumbers };
+    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid, soll: soll, saldo: saldo, ueberstd: ueberstd, orderNumbers: orderNumbers };
   });
   tbody.innerHTML = rows.map(r=>
     '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
@@ -2476,7 +2495,6 @@ function renderZeitOverview(){
     '<td data-label="Status"><span class="zeit-status-pill ' + r.statusClass + '">' + r.status + '</span></td>' +
     '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + (r.orderNumbers.length?('<br><span style="font-size:9.5px;color:var(--accent);">Auftr. ' + r.orderNumbers.map(escapeHtml).join(", ") + '</span>'):"") + '</td>' +
     '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
-    '<td data-label="Pause">' + (r.pauseMs?fmtDuration(r.pauseMs):"–") + '</td>' +
     '<td data-label="Haben">' + fmtDuration(r.totalMs) + '</td>' +
     '<td data-label="Soll">' + (r.soll!=null ? r.soll.toFixed(1)+"h" : "–") + '</td>' +
     '<td data-label="Saldo">' + (r.saldo!=null ? ('<span style="color:'+(r.saldo<-0.05?"var(--danger)":r.saldo>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.saldo>0?"+":"")+r.saldo.toFixed(1)+"h</span>") : "–") + '</td></tr>'
@@ -2651,18 +2669,13 @@ function computeDayUeberstundenDelta(emp, iso){
   var absence = absenceForDay(emp.id, iso);
   if(absence && !absence.partial) return null;
   var entries = state.allTime.filter(t=>t.uid===emp.uid && t.date===iso).sort((a,b)=>a.timestamp-b.timestamp);
-  var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
-  entries.forEach(e=>{
-    if(e.type==="kommen" && !kommen) kommen = e.timestamp;
-    else if(e.type==="pause_start") pauseStart = e.timestamp;
-    else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
-    else if(e.type==="gehen") gehen = e.timestamp;
-  });
-  if(!kommen || !gehen) return null;
+  var day = analyzeDayEntries(entries);
+  // Noch nicht ausgestempelt (letztes Segment offen) → Tag ist noch nicht abgeschlossen, keine Buchung.
+  if(day.firstKommen==null || day.lastGehen==null || day.isOpen) return null;
   var soll = sollHoursForDate(emp, iso);
   if(soll == null) return null;
   if(absence && absence.partial) soll = Math.max(0, soll - (absence.hours||0));
-  var habenH = (gehen - kommen - pauseMs) / 3600000;
+  var habenH = day.totalMs / 3600000;
   return habenH - soll;
 }
 var ueberstundenAutoBookBusy = false, ueberstundenAutoBookQueued = false;
@@ -3173,18 +3186,11 @@ function buildTimesheetSectionHtml(emp, mode){
     var iso = toISO(d);
     var absence = absenceForDay(emp.id, iso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===iso).sort((a,b)=>a.timestamp-b.timestamp) : [];
-    var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
     var orderNumbers = [];
-    entries.forEach(e=>{
-      if(e.type==="kommen"){
-        if(!kommen) kommen = e.timestamp;
-        if(e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber);
-      }
-      else if(e.type==="pause_start") pauseStart = e.timestamp;
-      else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
-      else if(e.type==="gehen") gehen = e.timestamp;
-    });
-    var totalMs = (kommen && gehen) ? (gehen - kommen - pauseMs) : null;
+    entries.forEach(e=>{ if(e.type==="kommen" && e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber); });
+    var day = analyzeDayEntries(entries);
+    var kommen = day.firstKommen, gehen = day.lastGehen, pauseMs = day.pauseMs;
+    var totalMs = (day.firstKommen!=null && !day.isOpen) ? day.totalMs : null;
     var habenH = totalMs!=null ? totalMs/3600000 : 0;
     var soll = sollHoursForDate(emp, iso);
     var sollVorAbwesenheit = soll;
