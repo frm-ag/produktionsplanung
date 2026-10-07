@@ -388,9 +388,10 @@
   .zeit-status-pill.pause{background:var(--warn-soft);color:var(--warn);}
   .zeit-status-pill.nicht-da{background:var(--panel-alt);color:var(--text-muted);}
   .zeit-status-pill.abwesend{background:#e3ebf3;color:var(--accent);}
-  .zeit-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;}
+  .zeit-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--border);}
   .zeit-edit-row select{flex:1 1 130px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row input[type="time"]{flex:1 1 90px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .zeit-edit-row input.ze-order{flex:1 1 100%;font:inherit;font-size:12px;padding:6px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row .zeit-edit-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
   .zeit-edit-row .zeit-edit-remove:hover{color:var(--danger);}
 
@@ -1154,6 +1155,11 @@
     <div class="zeit-punch-card">
       <div class="zeit-status" id="zeit-status">–</div>
       <div id="zeit-ueberstunden-info" style="display:none;font-size:12.5px;color:var(--text-muted);margin-top:-4px;margin-bottom:10px;text-align:center;"></div>
+      <div class="field" style="margin-bottom:10px;">
+        <label for="zeit-punch-order" style="font-size:11.5px;">Auftrag (optional) — gilt bis zum nächsten Stempeln</label>
+        <input type="text" id="zeit-punch-order" list="zeit-punch-order-list" placeholder="Auftragsnummer eingeben…" autocomplete="off">
+        <datalist id="zeit-punch-order-list"></datalist>
+      </div>
       <div class="zeit-buttons">
         <button type="button" class="zeit-btn zeit-btn-go" id="zeit-kommen">Kommen</button>
         <button type="button" class="zeit-btn zeit-btn-pause" id="zeit-pause-start">Pause Start</button>
@@ -1163,6 +1169,15 @@
     </div>
     <h2 class="zeit-h2">Heute</h2>
     <div id="zeit-today-list"></div>
+
+    <div class="zeit-toolbar" style="margin-top:10px;">
+      <span style="font-size:12.5px;color:var(--text-muted);">Eigene Einträge nachtragen / bearbeiten:</span>
+      <span class="date-field">
+        <input type="text" id="zeit-own-edit-date-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
+        <input type="hidden" id="zeit-own-edit-date-hidden">
+      </span>
+      <button type="button" class="btn" id="zeit-own-edit-btn">Bearbeiten</button>
+    </div>
 
     <div id="zeit-admin-section" style="display:none;">
       <div class="zeit-toolbar">
@@ -1426,8 +1441,9 @@
 </div>
 
 <div class="modal-backdrop" id="zeit-edit-backdrop">
-  <div class="modal" style="max-width:420px;">
+  <div class="modal" style="max-width:480px;">
     <h3 id="zeit-edit-title">Zeiten bearbeiten</h3>
+    <datalist id="zeit-edit-order-list"></datalist>
     <div id="zeit-edit-rows"></div>
     <button type="button" class="btn" id="zeit-edit-add-btn" style="width:100%;margin-bottom:14px;">+ Eintrag hinzufügen</button>
     <div class="modal-actions">
@@ -2122,12 +2138,50 @@ function zeitDotClass(type){
   return (type==="kommen" || type==="pause_ende") ? "go" : type==="gehen" ? "stop" : "pause";
 }
 
+// Wandelt eine Eingabe wie "26246 – Müller AG" (oder nur "26246") in den passenden offenen
+// Auftrag um. Genutzt sowohl beim Stempeln als auch beim manuellen Nacherfassen.
+function resolveOrderFromText(typed){
+  if(!typed) return null;
+  var numPart = String(typed).split(" – ")[0].trim().toLowerCase();
+  if(!numPart) return null;
+  return state.orders.find(o=> (o.orderNumber||"").toLowerCase() === numPart) || null;
+}
+function populateOrderDatalist(selector){
+  var open = state.orders.filter(o=>!o.completed).slice().sort((a,b)=> (a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
+  var el = $(selector);
+  if(el) el.innerHTML = open.map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(o.customer) + '">').join("");
+}
+// Liefert für einen Mitarbeiter-Uid die Zeiteinträge, die lokal verfügbar sind: Admins sehen
+// alle (state.allTime), normale Mitarbeiter nur ihre eigenen (state.myTime).
+function timeEntriesForUid(uid){
+  var source = state.isAdmin ? state.allTime : state.myTime;
+  return source.filter(t=>t.uid===uid);
+}
+
 function renderZeitPage(){
   var todayEntries = zeitTodayEntries(state.myTime);
   var status = zeitCurrentStatus(todayEntries);
   var statusEl = $("#zeit-status");
   statusEl.className = "zeit-status " + (status==="on"?"on":status==="pause"?"pause":"off");
   statusEl.textContent = status==="on" ? "Eingestempelt" : status==="pause" ? "In Pause" : "Nicht eingestempelt";
+
+  populateOrderDatalist("#zeit-punch-order-list");
+  // Solange eingestempelt (oder in Pause), zeigt das Feld den beim letzten "Kommen" gewählten
+  // Auftrag an und ist gesperrt — der Auftrag gilt bis zum nächsten Stempeln.
+  var punchOrderInput = $("#zeit-punch-order");
+  if(status === "off"){
+    punchOrderInput.disabled = false;
+  } else {
+    var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
+    punchOrderInput.value = lastKommen && lastKommen.orderNumber ? lastKommen.orderNumber : "";
+    punchOrderInput.disabled = true;
+  }
+
+  if(!$("#zeit-own-edit-date-hidden").value){
+    var ownIso = todayISO();
+    $("#zeit-own-edit-date-hidden").value = ownIso;
+    $("#zeit-own-edit-date-display").value = isoToDisplay(ownIso);
+  }
 
   var meInfo = $("#zeit-ueberstunden-info");
   var meEmp = state.staff.find(s=>s.uid === state.currentUid);
@@ -2149,7 +2203,7 @@ function renderZeitPage(){
   if(todayEntries.length===0){ listEl.innerHTML = '<div class="empty-note">Heute noch keine Einträge.</div>'; }
   else{
     listEl.innerHTML = todayEntries.map(e=>
-      '<div class="zeit-log-item"><span class="zt-time">' + fmtTime(e.timestamp) + '</span><span class="zt-dot ' + zeitDotClass(e.type) + '"></span><span class="zt-label">' + zeitLabel(e.type) + '</span></div>'
+      '<div class="zeit-log-item"><span class="zt-time">' + fmtTime(e.timestamp) + '</span><span class="zt-dot ' + zeitDotClass(e.type) + '"></span><span class="zt-label">' + zeitLabel(e.type) + (e.orderNumber?(' <span style="color:var(--accent);font-weight:600;">· Auftrag ' + escapeHtml(e.orderNumber) + '</span>'):"") + '</span></div>'
     ).join("");
   }
 
@@ -2162,14 +2216,23 @@ function renderZeitPage(){
     }
     renderZeitOverview();
   }
+  if(zeitEditBackdrop && zeitEditBackdrop.classList.contains("open")) renderZeitEditRows();
 }
 
 async function zeitPunch(type){
   if(!state.currentUid) return;
+  var data = { uid: state.currentUid, name: state.currentName, type: type, timestamp: Date.now(), date: todayISO() };
+  if(type === "kommen"){
+    var typed = $("#zeit-punch-order").value.trim();
+    if(typed){
+      var match = resolveOrderFromText(typed);
+      if(match){ data.orderId = match.id; data.orderNumber = match.orderNumber; }
+      else toast('Kein offener Auftrag mit der Nummer "' + typed + '" gefunden — ohne Auftrag gestempelt.');
+    }
+  }
   try{
-    await addDoc(collection(db, TIME_COLLECTION), {
-      uid: state.currentUid, name: state.currentName, type: type, timestamp: Date.now(), date: todayISO()
-    });
+    await addDoc(collection(db, TIME_COLLECTION), data);
+    if(type === "kommen") $("#zeit-punch-order").value = "";
   }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
 }
 $("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
@@ -2186,8 +2249,12 @@ function renderZeitOverview(){
     var absence = absenceForDay(emp.id, dateIso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
     var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
+    var orderNumbers = [];
     entries.forEach(e=>{
-      if(e.type==="kommen" && !kommen) kommen = e.timestamp;
+      if(e.type==="kommen"){
+        if(!kommen) kommen = e.timestamp;
+        if(e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber);
+      }
       else if(e.type==="pause_start") pauseStart = e.timestamp;
       else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
       else if(e.type==="gehen") gehen = e.timestamp;
@@ -2200,7 +2267,7 @@ function renderZeitOverview(){
     var habenH = totalMs != null ? totalMs/3600000 : 0;
     var saldo = soll != null ? (habenH - soll) : null;
     var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
-    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid, soll: soll, saldo: saldo, ueberstd: ueberstd };
+    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid, soll: soll, saldo: saldo, ueberstd: ueberstd, orderNumbers: orderNumbers };
   });
   tbody.innerHTML = rows.map(r=>
     '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
@@ -2208,7 +2275,7 @@ function renderZeitOverview(){
       state.profiles.map(p=>'<option value="'+p.uid+'"'+(r.uid===p.uid?' selected':'')+'>'+escapeHtml(p.username||p.uid)+'</option>').join('') +
       '</select></td>' +
     '<td data-label="Status"><span class="zeit-status-pill ' + r.statusClass + '">' + r.status + '</span></td>' +
-    '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + '</td>' +
+    '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + (r.orderNumbers.length?('<br><span style="font-size:9.5px;color:var(--accent);">Auftr. ' + r.orderNumbers.map(escapeHtml).join(", ") + '</span>'):"") + '</td>' +
     '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
     '<td data-label="Pause">' + (r.pauseMs?fmtDuration(r.pauseMs):"–") + '</td>' +
     '<td data-label="Total">' + fmtDuration(r.totalMs) + '</td>' +
@@ -2221,17 +2288,24 @@ $("#zeit-admin-tbody").addEventListener("click", e=>{
   if(e.target.closest(".staff-link-select")) return;
   var tr = e.target.closest("tr.zeit-row"); if(!tr) return;
   if(!tr.dataset.uid){ toast("Für " + tr.dataset.name + " zuerst links ein Konto verknüpfen."); return; }
-  openZeitEditModal(tr.dataset.uid, tr.dataset.name);
+  openZeitEditModal(tr.dataset.uid, tr.dataset.name, $("#zeit-admin-date-hidden").value || todayISO());
+});
+$("#zeit-own-edit-btn").addEventListener("click", ()=>{
+  if(!state.currentUid){ toast("Dein Konto ist noch nicht verknüpft — bitte den Admin fragen."); return; }
+  var dIso = $("#zeit-own-edit-date-hidden").value || todayISO();
+  openZeitEditModal(state.currentUid, state.currentName, dIso);
 });
 
-/* ---------- Zeiten korrigieren (nur Admin) ---------- */
+/* ---------- Zeiten korrigieren (Admin: alle: Mitarbeiter: nur die eigenen) ---------- */
 
 var zeitEditBackdrop = $("#zeit-edit-backdrop");
-var zeitEditUid = null, zeitEditDate = null;
-function openZeitEditModal(uid, name){
+var zeitEditUid = null, zeitEditDate = null, zeitEditName = "";
+function openZeitEditModal(uid, name, dateIso){
   zeitEditUid = uid;
-  zeitEditDate = $("#zeit-admin-date-hidden").value || todayISO();
+  zeitEditName = name;
+  zeitEditDate = dateIso || todayISO();
   $("#zeit-edit-title").textContent = "Zeiten bearbeiten — " + name + " · " + fmtShort(zeitEditDate);
+  populateOrderDatalist("#zeit-edit-order-list");
   renderZeitEditRows();
   zeitEditBackdrop.classList.add("open");
 }
@@ -2246,7 +2320,8 @@ function timeInputToTs(dateIso, hhmm){
   return d.getTime();
 }
 function renderZeitEditRows(){
-  var entries = state.allTime.filter(t=>t.uid===zeitEditUid && t.date===zeitEditDate).sort((a,b)=>a.timestamp-b.timestamp);
+  if(!zeitEditUid) return;
+  var entries = timeEntriesForUid(zeitEditUid).filter(t=>t.date===zeitEditDate).sort((a,b)=>a.timestamp-b.timestamp);
   var list = $("#zeit-edit-rows");
   if(entries.length===0){ list.innerHTML = '<div class="empty-note">Keine Einträge an diesem Tag.</div>'; return; }
   list.innerHTML = entries.map(e=>
@@ -2254,29 +2329,35 @@ function renderZeitEditRows(){
     '<select class="ze-type"><option value="kommen"' + (e.type==="kommen"?" selected":"") + '>Kommen</option><option value="pause_start"' + (e.type==="pause_start"?" selected":"") + '>Pause Start</option><option value="pause_ende"' + (e.type==="pause_ende"?" selected":"") + '>Pause Ende</option><option value="gehen"' + (e.type==="gehen"?" selected":"") + '>Gehen</option></select>' +
     '<input type="time" class="ze-time" value="' + tsToTimeInput(e.timestamp) + '">' +
     '<button type="button" class="zeit-edit-remove" aria-label="Eintrag löschen">✕</button>' +
+    '<input type="text" class="ze-order" list="zeit-edit-order-list" placeholder="Auftrag (optional)" value="' + escapeHtml(e.orderNumber||"") + '">' +
     '</div>'
   ).join("");
 }
 $("#zeit-edit-add-btn").addEventListener("click", async ()=>{
   if(!zeitEditUid) return;
-  var name = (state.allTime.find(t=>t.uid===zeitEditUid) || {}).name || "";
   try{
-    await addDoc(collection(db, TIME_COLLECTION), { uid: zeitEditUid, name: name, type: "kommen", timestamp: timeInputToTs(zeitEditDate, "08:00"), date: zeitEditDate });
-  }catch(err){ console.error(err); toast("Hinzufügen fehlgeschlagen."); }
+    await addDoc(collection(db, TIME_COLLECTION), { uid: zeitEditUid, name: zeitEditName, type: "kommen", timestamp: timeInputToTs(zeitEditDate, "08:00"), date: zeitEditDate });
+  }catch(err){ console.error(err); toast("Hinzufügen fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#zeit-edit-rows").addEventListener("click", async e=>{
   var rmBtn = e.target.closest(".zeit-edit-remove"); if(!rmBtn) return;
   var id = rmBtn.closest(".zeit-edit-row").dataset.id;
-  try{ await deleteDoc(doc(db, TIME_COLLECTION, id)); } catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+  try{ await deleteDoc(doc(db, TIME_COLLECTION, id)); } catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#zeit-edit-rows").addEventListener("change", async e=>{
   var row = e.target.closest(".zeit-edit-row"); if(!row) return;
   var id = row.dataset.id;
   var type = row.querySelector(".ze-type").value;
   var time = row.querySelector(".ze-time").value;
+  var orderTyped = row.querySelector(".ze-order").value.trim();
+  var match = orderTyped ? resolveOrderFromText(orderTyped) : null;
+  var data = { type: type, timestamp: timeInputToTs(zeitEditDate, time) };
+  data.orderId = match ? match.id : null;
+  data.orderNumber = match ? match.orderNumber : null;
+  if(orderTyped && !match) toast('Kein offener Auftrag mit der Nummer "' + orderTyped + '" gefunden — Auftrag nicht gespeichert.');
   try{
-    await updateDoc(doc(db, TIME_COLLECTION, id), { type: type, timestamp: timeInputToTs(zeitEditDate, time) });
-  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+    await updateDoc(doc(db, TIME_COLLECTION, id), data);
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 // Während das Bearbeiten-Fenster offen ist, Liste bei neuen Daten aktuell halten.
 var _origRenderZeitOverview = renderZeitOverview;
@@ -2630,8 +2711,12 @@ function exportTimesheet(employeeId, mode){
     var absence = absenceForDay(emp.id, iso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===iso).sort((a,b)=>a.timestamp-b.timestamp) : [];
     var kommen=null, gehen=null, pauseMs=0, pauseStart=null;
+    var orderNumbers = [];
     entries.forEach(e=>{
-      if(e.type==="kommen" && !kommen) kommen = e.timestamp;
+      if(e.type==="kommen"){
+        if(!kommen) kommen = e.timestamp;
+        if(e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber);
+      }
       else if(e.type==="pause_start") pauseStart = e.timestamp;
       else if(e.type==="pause_ende" && pauseStart){ pauseMs += e.timestamp - pauseStart; pauseStart=null; }
       else if(e.type==="gehen") gehen = e.timestamp;
@@ -2650,6 +2735,7 @@ function exportTimesheet(employeeId, mode){
       '<td>' + fmtDuration(totalMs) + '</td>' +
       '<td>' + (soll!=null?soll.toFixed(1)+"h":"–") + '</td>' +
       '<td>' + (absence?absenceFullLabel(absence):"") + '</td>' +
+      '<td>' + escapeHtml(orderNumbers.join(", ")) + '</td>' +
       '</tr>';
   }).join("");
   var saldoTotal = habenTotal - sollTotal;
@@ -2658,9 +2744,9 @@ function exportTimesheet(employeeId, mode){
     '</head><body>' +
     '<h1>Zeitnachweis — ' + escapeHtml(emp.name) + '</h1>' +
     '<div class="sub">' + rangeLabel + ' · FR Metallbau AG</div>' +
-    '<table><thead><tr><th>Tag</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th><th>Soll</th><th>Abwesenheit</th></tr></thead>' +
+    '<table><thead><tr><th>Tag</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th><th>Soll</th><th>Abwesenheit</th><th>Aufträge</th></tr></thead>' +
     '<tbody>' + rowsHtml + '</tbody>' +
-    '<tfoot><tr><td colspan="4">Summe</td><td>' + habenTotal.toFixed(1) + 'h</td><td>' + sollTotal.toFixed(1) + 'h</td><td>Saldo: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + 'h</td></tr></tfoot>' +
+    '<tfoot><tr><td colspan="4">Summe</td><td>' + habenTotal.toFixed(1) + 'h</td><td>' + sollTotal.toFixed(1) + 'h</td><td>Saldo: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + 'h</td><td></td></tr></tfoot>' +
     '</table>' +
     '<p style="font-size:11px;color:#69737d;margin-top:18px;">Feriensaldo aktuell: ' + (typeof emp.ferienSaldo==="number"?emp.ferienSaldo.toFixed(1):"0.0") + ' Std. · Überstunden-Saldo aktuell: ' + (typeof emp.ueberstundenSaldo==="number"?(emp.ueberstundenSaldo>0?"+":"")+emp.ueberstundenSaldo.toFixed(1):"0.0") + ' Std.</p>' +
     '</body></html>';
