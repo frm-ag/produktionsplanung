@@ -1275,6 +1275,23 @@
         <tbody id="ferien-saldo-tbody"></tbody>
       </table>
     </div>
+
+    <div class="zeit-toolbar" style="margin-top:26px;">
+      <h2 class="zeit-h2" style="margin:0;">Monatsrapport</h2>
+      <button class="round" id="monatsrapport-prev" aria-label="Vormonat">‹</button>
+      <div class="nav-label" id="monatsrapport-label" style="min-width:140px;text-align:center;"></div>
+      <button class="round" id="monatsrapport-next" aria-label="Folgemonat">›</button>
+      <button class="today-btn" id="monatsrapport-today">Heute</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Monats-Soll = Wochenstunden des Zeitmodells ÷ 5 × Arbeitstage im Monat (Feiertage und Betriebsferien bereits abgezogen). Persönliche Abwesenheiten (Ferien/Krank/Kompensation) verändern das Soll nicht — sie werden über die jeweiligen Salden verrechnet.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="monatsrapport-table">
+        <thead>
+          <tr><th>Mitarbeiter</th><th>Zeitmodell</th><th>Monats-Soll</th><th>Effektiv geleistet</th><th>Differenz</th></tr>
+        </thead>
+        <tbody id="monatsrapport-tbody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div id="einstellungen-page" style="display:none;">
@@ -1812,6 +1829,7 @@ function subscribeAssignments(){
   unsubAssignments = onSnapshot(q, snap => {
     state.assignments = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     if(state.view === "staff") renderStaffPage();
+    if(state.view === "zeit") renderZeitPage();
   }, err => { console.error(err); });
 }
 
@@ -1878,7 +1896,7 @@ function subscribeFeiertage(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2762,6 +2780,44 @@ function weekTotalForModel(model){
   WEEKDAY_KEYS.forEach(k=> total += parseTimeRangeHours(model[k]));
   return total;
 }
+// Zählt die Arbeitstage (Mo–Fr) eines Monats, abzüglich Feiertagen und Betriebsferien
+// (beides gilt unternehmensweit — persönliche Abwesenheiten wie Ferien/Krank/Kompensation
+// verändern das vertragliche Monats-Soll dagegen nicht, sondern werden über die jeweiligen
+// Salden verrechnet).
+function arbeitstageImMonat(monthIso){
+  var days = daysInMonthIso(monthIso);
+  var count = 0;
+  days.forEach(iso=>{
+    if(!isWeekday(iso)) return;
+    if(feiertagForDay(iso)) return;
+    if(betriebsferienForDay(iso)) return;
+    count++;
+  });
+  return count;
+}
+// Fixes Monats-Soll eines Mitarbeiters: Wochenstunden seines Zeitmodells geteilt durch 5,
+// multipliziert mit den effektiven Arbeitstagen des Monats (siehe arbeitstageImMonat).
+function monatsSollForEmployee(emp, monthIso){
+  if(!emp || !emp.zeitmodellId) return null;
+  var model = state.zeitmodelle.find(m=>m.id===emp.zeitmodellId);
+  if(!model) return null;
+  var wochenstunden = weekTotalForModel(model);
+  if(!wochenstunden) return 0;
+  return (wochenstunden/5) * arbeitstageImMonat(monthIso);
+}
+// Effektiv geleistete Stunden eines Mitarbeiters im gesamten Monat (Summe aller abgeschlossenen
+// Arbeitstage, mehrere Kommen/Gehen-Paare pro Tag korrekt berücksichtigt).
+function monatsHabenForEmployee(emp, monthIso){
+  if(!emp || !emp.uid) return 0;
+  var total = 0;
+  daysInMonthIso(monthIso).forEach(iso=>{
+    var entries = state.allTime.filter(t=>t.uid===emp.uid && t.date===iso).sort((a,b)=>a.timestamp-b.timestamp);
+    if(entries.length===0) return;
+    var day = analyzeDayEntries(entries);
+    if(day.firstKommen!=null && !day.isOpen) total += day.totalMs/3600000;
+  });
+  return total;
+}
 
 /* ---- Überstunden: automatische Tagessaldo-Buchung ---- */
 // Berechnet für einen abgeschlossenen Arbeitstag (Kommen + Gehen vorhanden, kein ganztägiger
@@ -3242,6 +3298,7 @@ $("#saldo-settings-tbody").addEventListener("click", async e=>{
 
 var ferienSaldoSelected = new Set();
 function renderFerienSaldoPanel(){
+  renderMonatsrapport();
   var tbody = $("#ferien-saldo-tbody");
   if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
@@ -3282,6 +3339,30 @@ $("#ferien-saldo-select-all").addEventListener("change", e=>{
   if(e.target.checked) state.staff.forEach(s=>ferienSaldoSelected.add(s.id));
   renderFerienSaldoPanel();
 });
+
+/* ---- Monatsrapport: Soll (aus Zeitmodell/Arbeitstagen berechnet) vs. effektiv geleistet ---- */
+function renderMonatsrapport(){
+  $("#monatsrapport-label").textContent = ferienMonthLabel(state.monatsrapportDate);
+  var tbody = $("#monatsrapport-tbody");
+  if(!tbody) return;
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  tbody.innerHTML = state.staff.map(emp=>{
+    var model = state.zeitmodelle.find(m=>m.id===emp.zeitmodellId);
+    var soll = monatsSollForEmployee(emp, state.monatsrapportDate);
+    var haben = monatsHabenForEmployee(emp, state.monatsrapportDate);
+    var diff = soll!=null ? (haben - soll) : null;
+    return '<tr>' +
+      '<td style="display:flex;align-items:center;gap:7px;">' + staffAvatarHtml(emp, "staff-avatar-sm") + escapeHtml(emp.name) + '</td>' +
+      '<td>' + (model?escapeHtml(model.name):'<span style="color:var(--text-muted);">— keines —</span>') + '</td>' +
+      '<td>' + (soll!=null?soll.toFixed(1)+'h':'–') + '</td>' +
+      '<td>' + haben.toFixed(1) + 'h</td>' +
+      '<td>' + (diff!=null?('<span style="font-weight:600;color:' + (diff<-0.05?"var(--danger)":diff>0.05?"var(--success)":"inherit") + ';">' + (diff>0?"+":"") + diff.toFixed(1) + 'h</span>'):'–') + '</td>' +
+      '</tr>';
+  }).join("");
+}
+$("#monatsrapport-prev").addEventListener("click", ()=>{ var d=fromISO(state.monatsrapportDate); d.setMonth(d.getMonth()-1,1); state.monatsrapportDate=toISO(d); renderMonatsrapport(); });
+$("#monatsrapport-next").addEventListener("click", ()=>{ var d=fromISO(state.monatsrapportDate); d.setMonth(d.getMonth()+1,1); state.monatsrapportDate=toISO(d); renderMonatsrapport(); });
+$("#monatsrapport-today").addEventListener("click", ()=>{ var d=new Date(); d.setDate(1); state.monatsrapportDate=toISO(d); renderMonatsrapport(); });
 function bulkExportFromSelection(mode){
   var ids = ferienSaldoSelected.size>0 ? Array.from(ferienSaldoSelected) : state.staff.map(s=>s.id);
   exportTimesheetBulk(ids, mode);
