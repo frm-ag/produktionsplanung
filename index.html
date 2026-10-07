@@ -1212,6 +1212,9 @@
         <label for="zeit-punch-order" style="font-size:11.5px;">Auftrag (optional) — gilt bis zum nächsten Stempeln</label>
         <input type="text" id="zeit-punch-order" list="zeit-punch-order-list" placeholder="Auftragsnummer eingeben…" autocomplete="off">
         <datalist id="zeit-punch-order-list"></datalist>
+        <select id="zeit-punch-order-select" style="display:none;">
+          <option value="">— kein Auftrag —</option>
+        </select>
       </div>
       <div class="zeit-icon-buttons">
         <button type="button" class="zeit-icon-btn zeit-icon-go" id="zeit-kommen" title="Kommen" aria-label="Kommen">▶</button>
@@ -2431,22 +2434,47 @@ function renderZeitPage(){
   statusEl.className = "zeit-status " + (status==="on"?"on":status==="pause"?"pause":"off");
   statusEl.textContent = status==="on" ? "Eingestempelt" : status==="pause" ? "In Pause" : "Nicht eingestempelt";
 
-  populateOrderDatalist("#zeit-punch-order-list");
+  var meEmp = state.staff.find(s=>s.uid === state.currentUid);
+
   // Solange eingestempelt (oder in Pause), zeigt das Feld den beim letzten "Kommen" gewählten
   // Auftrag an und ist gesperrt — der Auftrag gilt bis zum nächsten Stempeln.
   var punchOrderInput = $("#zeit-punch-order");
-  if(status === "off"){
-    punchOrderInput.disabled = false;
+  var punchOrderSelect = $("#zeit-punch-order-select");
+  var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
+  if(state.isAdmin){
+    // Admin: freie Eingabe der Auftragsnummer (wie bisher).
+    punchOrderInput.style.display = "";
+    punchOrderSelect.style.display = "none";
+    populateOrderDatalist("#zeit-punch-order-list");
+    if(status === "off"){
+      punchOrderInput.disabled = false;
+    } else {
+      punchOrderInput.value = lastKommen && lastKommen.orderNumber ? lastKommen.orderNumber : "";
+      punchOrderInput.disabled = true;
+    }
   } else {
-    var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
-    punchOrderInput.value = lastKommen && lastKommen.orderNumber ? lastKommen.orderNumber : "";
-    punchOrderInput.disabled = true;
+    // Mitarbeiter: nur Aufträge wählbar, die ihm für heute in der Personalplanung zugeteilt wurden.
+    punchOrderInput.style.display = "none";
+    punchOrderSelect.style.display = "";
+    var todayIso = todayISO();
+    var myAssignsToday = meEmp ? state.assignments.filter(a=>a.employeeId===meEmp.id && a.date===todayIso) : [];
+    var optsHtml = '<option value="">— kein Auftrag —</option>' + myAssignsToday.map(a=>{
+      var o = state.orders.find(x=>x.id===a.orderId);
+      return '<option value="' + a.orderId + '">' + escapeHtml(o?o.orderNumber:"?") + ' – ' + escapeHtml(o?o.customer:"") + '</option>';
+    }).join("");
+    punchOrderSelect.innerHTML = optsHtml;
+    if(status === "off"){
+      punchOrderSelect.disabled = false;
+    } else {
+      var lastOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
+      punchOrderSelect.value = lastOrder ? lastOrder.id : "";
+      punchOrderSelect.disabled = true;
+    }
   }
 
   if(!$("#zeit-own-edit-date-hidden").value) $("#zeit-own-edit-date-hidden").value = todayISO();
 
   var meInfo = $("#zeit-ueberstunden-info");
-  var meEmp = state.staff.find(s=>s.uid === state.currentUid);
   $("#zeit-my-avatar").innerHTML = staffAvatarHtml(meEmp, "staff-avatar-lg");
   $("#zeit-my-name").textContent = meEmp ? meEmp.name : (state.currentName || "–");
   if(meEmp){
@@ -2522,16 +2550,24 @@ async function zeitPunch(type){
   if(!state.currentUid) return;
   var data = { uid: state.currentUid, name: state.currentName, type: type, timestamp: Date.now(), date: todayISO() };
   if(type === "kommen"){
-    var typed = $("#zeit-punch-order").value.trim();
-    if(typed){
-      var match = resolveOrderFromText(typed);
-      if(match){ data.orderId = match.id; data.orderNumber = match.orderNumber; }
-      else toast('Kein offener Auftrag mit der Nummer "' + typed + '" gefunden — ohne Auftrag gestempelt.');
+    if(state.isAdmin){
+      var typed = $("#zeit-punch-order").value.trim();
+      if(typed){
+        var match = resolveOrderFromText(typed);
+        if(match){ data.orderId = match.id; data.orderNumber = match.orderNumber; }
+        else toast('Kein offener Auftrag mit der Nummer "' + typed + '" gefunden — ohne Auftrag gestempelt.');
+      }
+    } else {
+      var selectedOrderId = $("#zeit-punch-order-select").value;
+      if(selectedOrderId){
+        var match2 = state.orders.find(x=>x.id===selectedOrderId);
+        if(match2){ data.orderId = match2.id; data.orderNumber = match2.orderNumber; }
+      }
     }
   }
   try{
     await addDoc(collection(db, TIME_COLLECTION), data);
-    if(type === "kommen") $("#zeit-punch-order").value = "";
+    if(type === "kommen"){ $("#zeit-punch-order").value = ""; $("#zeit-punch-order-select").value = ""; }
   }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
 }
 $("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
@@ -3338,7 +3374,7 @@ function buildTimesheetSectionHtml(emp, mode){
     var orderNumbers = [];
     entries.forEach(e=>{ if(e.type==="kommen" && e.orderNumber && orderNumbers.indexOf(e.orderNumber)===-1) orderNumbers.push(e.orderNumber); });
     var day = analyzeDayEntries(entries);
-    var kommen = day.firstKommen, gehen = day.lastGehen, pauseMs = day.pauseMs;
+    var kommen = day.firstKommen, gehen = day.lastGehen;
     var totalMs = (day.firstKommen!=null && !day.isOpen) ? day.totalMs : null;
     var habenH = totalMs!=null ? totalMs/3600000 : 0;
     var soll = sollHoursForDate(emp, iso);
@@ -3356,7 +3392,6 @@ function buildTimesheetSectionHtml(emp, mode){
       '<td>' + d.toLocaleDateString("de-CH",{weekday:"short"}) + ' ' + fmtDate(d) + '</td>' +
       '<td>' + (kommen?fmtTime(kommen):"–") + '</td>' +
       '<td>' + (gehen?fmtTime(gehen):"–") + '</td>' +
-      '<td>' + (pauseMs?fmtDuration(pauseMs):"–") + '</td>' +
       '<td>' + fmtDuration(totalMs) + '</td>' +
       '<td>' + (soll!=null?soll.toFixed(1)+"h":"–") + '</td>' +
       '<td>' + (absence?absenceFullLabel(absence):"") + '</td>' +
@@ -3367,9 +3402,9 @@ function buildTimesheetSectionHtml(emp, mode){
   return { rangeLabel: rangeLabel, html:
     '<h1>Zeitnachweis — ' + escapeHtml(emp.name) + '</h1>' +
     '<div class="sub">' + rangeLabel + ' · FR Metallbau AG</div>' +
-    '<table><thead><tr><th>Tag</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th><th>Soll</th><th>Abwesenheit</th><th>Aufträge</th></tr></thead>' +
+    '<table><thead><tr><th>Tag</th><th>Kommen</th><th>Gehen</th><th>Total</th><th>Soll</th><th>Abwesenheit</th><th>Aufträge</th></tr></thead>' +
     '<tbody>' + rowsHtml + '</tbody>' +
-    '<tfoot><tr><td colspan="4">Summe</td><td>' + habenTotal.toFixed(1) + 'h</td><td>' + sollTotal.toFixed(1) + 'h</td><td>Saldo: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + 'h</td><td></td></tr></tfoot>' +
+    '<tfoot><tr><td colspan="3">Summe</td><td>' + habenTotal.toFixed(1) + 'h</td><td>' + sollTotal.toFixed(1) + 'h</td><td>Saldo: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + 'h</td><td></td></tr></tfoot>' +
     '</table>' +
     '<p style="font-size:11px;color:#69737d;margin-top:18px;line-height:1.6;">' +
       '<strong>Aktueller Stand:</strong> Überstunden-Saldo: ' + (typeof emp.ueberstundenSaldo==="number"?(emp.ueberstundenSaldo>0?"+":"")+emp.ueberstundenSaldo.toFixed(1):"0.0") + ' Std. · Feriensaldo: ' + (typeof emp.ferienSaldo==="number"?emp.ferienSaldo.toFixed(1):"0.0") + ' Std.' +
@@ -3405,6 +3440,8 @@ function exportTimesheetBulk(employeeIds, mode){
 function renderStaffPage(){
   renderStaffHeaderLabel();
   renderStaffGrid();
+  $("#staff-seed-btn").style.display = state.isAdmin ? "" : "none";
+  $("#staff-add-btn").style.display = state.isAdmin ? "" : "none";
 }
 
 function renderStaffGrid(){
@@ -3414,10 +3451,11 @@ function renderStaffGrid(){
   var html = '<div class="staff-grid-header"><div>Mitarbeiter</div>';
   days.forEach(d=> html += '<div>' + fmtDay(d) + ' ' + fmtShort(toISO(d)) + '</div>');
   html += '</div>';
+  var canEdit = !!state.isAdmin;
   state.staff.forEach(emp=>{
     html += '<div class="staff-row">';
-    html += '<div class="staff-row-name" draggable="true" data-staff-id="' + emp.id + '">';
-    html += '<div class="staff-name-line"><span class="staff-name-group"><span class="staff-drag-handle">⠿</span>' + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span><button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button></div>';
+    html += '<div class="staff-row-name"' + (canEdit?' draggable="true"':'') + ' data-staff-id="' + emp.id + '">';
+    html += '<div class="staff-name-line"><span class="staff-name-group">' + (canEdit?'<span class="staff-drag-handle">⠿</span>':'') + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span>' + (canEdit?('<button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button>'):'') + '</div>';
     html += '</div>';
     days.forEach(d=>{
       var iso = toISO(d);
@@ -3431,9 +3469,9 @@ function renderStaffGrid(){
         var o = state.orders.find(x=>x.id===a.orderId);
         var typ = a.type || "werkstatt";
         var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
-        html += '<div class="assign-chip type-' + typ + '" draggable="true" data-assign-id="' + a.id + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div></div>';
+        html += '<div class="assign-chip type-' + typ + '"' + (canEdit?' draggable="true"':'') + ' data-assign-id="' + a.id + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div></div>';
       });
-      html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
+      if(canEdit) html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
       html += '</div>';
     });
     html += '</div>';
@@ -3472,6 +3510,7 @@ $("#staff-seed-btn").addEventListener("click", async ()=>{
 });
 
 $("#staff-grid").addEventListener("click", async e=>{
+  if(!state.isAdmin) return;
   var rmBtn = e.target.closest(".staff-remove");
   if(rmBtn){
     if(!confirm("Diesen Mitarbeiter wirklich entfernen? Zugewiesene Einsätze bleiben als verwaiste Einträge bestehen.")) return;
@@ -3504,12 +3543,14 @@ $("#zeit-admin-tbody").addEventListener("change", async e=>{
 
 /* Drag & Drop: Auftragskarte aus dem Pool auf eine Mitarbeiter-/Tageszelle ziehen */
 $("#staff-grid").addEventListener("dragstart", e=>{
+  if(!state.isAdmin) return;
   var chip = e.target.closest(".assign-chip");
   if(chip){ e.dataTransfer.setData("text/plain", "assign:" + chip.dataset.assignId); e.dataTransfer.effectAllowed = "move"; return; }
   var rowName = e.target.closest(".staff-row-name");
   if(rowName){ e.dataTransfer.setData("text/plain", "staffmove:" + rowName.dataset.staffId); e.dataTransfer.effectAllowed = "move"; return; }
 });
 $("#staff-grid").addEventListener("dragover", e=>{
+  if(!state.isAdmin) return;
   var rowName = e.target.closest(".staff-row-name");
   if(rowName){ e.preventDefault(); e.dataTransfer.dropEffect = "move"; rowName.classList.add("drag-over-row"); return; }
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
@@ -3517,12 +3558,14 @@ $("#staff-grid").addEventListener("dragover", e=>{
   cell.classList.add("drag-over");
 });
 $("#staff-grid").addEventListener("dragleave", e=>{
+  if(!state.isAdmin) return;
   var rowName = e.target.closest(".staff-row-name");
   if(rowName){ rowName.classList.remove("drag-over-row"); return; }
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
   cell.classList.remove("drag-over");
 });
 $("#staff-grid").addEventListener("drop", async e=>{
+  if(!state.isAdmin) return;
   var rowName = e.target.closest(".staff-row-name");
   if(rowName){
     e.preventDefault();
