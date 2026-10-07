@@ -153,6 +153,7 @@
   .ferien-badge{display:inline-block;border-radius:4px;font-size:10.5px;font-weight:700;padding:2px 5px;color:#fff;}
   .ferien-badge.ferien{background:var(--accent);}
   .ferien-badge.krank{background:var(--danger);}
+  .ferien-badge.kompensation{background:#8a5cf6;}
   .ferien-badge.sonstiges{background:var(--text-muted);}
   .zm-add-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;}
   .zm-add-form input#zm-name{flex:1;min-width:200px;font:inherit;font-size:13px;padding:7px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);}
@@ -409,6 +410,7 @@
   .absence-banner{font-size:10.5px;font-weight:700;text-align:center;padding:5px 4px;border-radius:5px;margin-bottom:4px;}
   .absence-ferien{background:#e3ebf3;color:var(--accent);}
   .absence-krank{background:var(--warn-soft);color:var(--warn);}
+  .absence-kompensation{background:#ede4fd;color:#8a5cf6;}
   .absence-sonstiges{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
   .staff-row-name:active{cursor:grabbing;}
   .staff-row-name.drag-over-row{outline:2px solid var(--accent);outline-offset:-2px;}
@@ -1074,6 +1076,7 @@
         <div class="side-section-body">
           <button class="side-item sub" data-view="zeit">Zeiterfassung</button>
           <button class="side-item sub" data-view="ferien">Ferienplaner</button>
+          <button class="side-item sub" data-view="einstellungen">Einstellungen</button>
         </div>
       </div>
 
@@ -1150,6 +1153,7 @@
   <div id="zeit-page" style="display:none;">
     <div class="zeit-punch-card">
       <div class="zeit-status" id="zeit-status">–</div>
+      <div id="zeit-ueberstunden-info" style="display:none;font-size:12.5px;color:var(--text-muted);margin-top:-4px;margin-bottom:10px;text-align:center;"></div>
       <div class="zeit-buttons">
         <button type="button" class="zeit-btn zeit-btn-go" id="zeit-kommen">Kommen</button>
         <button type="button" class="zeit-btn zeit-btn-pause" id="zeit-pause-start">Pause Start</button>
@@ -1171,7 +1175,7 @@
       <div class="table-scroll">
         <table class="overview-table" id="zeit-admin-table">
           <thead>
-            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th><th>Soll</th><th>Saldo</th></tr>
+            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th><th>Soll</th><th>Saldo</th><th>Überstd.</th></tr>
           </thead>
           <tbody id="zeit-admin-tbody"></tbody>
         </table>
@@ -1195,38 +1199,39 @@
       </table>
     </div>
 
-    <div id="ferien-admin-section" style="display:none;">
-      <h2 class="zeit-h2">Zeitmodelle</h2>
-      <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Pro Tag die Arbeitsblöcke eintragen, z. B. <code>07:00-11:00 13:00-16:00</code> (mehrere Blöcke mit Leerzeichen trennen). Leer lassen = kein Soll an diesem Tag.</div>
-      <div class="table-scroll">
-        <table class="overview-table" id="zeitmodelle-table">
-          <thead>
-            <tr><th>Name</th><th>Mo</th><th>Di</th><th>Mi</th><th>Do</th><th>Fr</th><th>Sa</th><th>So</th><th>Woche</th><th></th></tr>
-          </thead>
-          <tbody id="zeitmodelle-tbody"></tbody>
-        </table>
-      </div>
-      <form id="zeitmodell-add-form" class="zm-add-form">
-        <input type="text" id="zm-name" placeholder="Name, z. B. 100% – 42h/Woche" required>
-        <input type="text" id="zm-mo" placeholder="Mo z.B. 07:00-11:00 13:00-16:00" class="zm-time-input" value="07:00-12:00 13:00-17:00">
-        <input type="text" id="zm-di" placeholder="Di" class="zm-time-input" value="07:00-12:00 13:00-17:00">
-        <input type="text" id="zm-mi" placeholder="Mi" class="zm-time-input" value="07:00-12:00 13:00-17:00">
-        <input type="text" id="zm-do" placeholder="Do" class="zm-time-input" value="07:00-12:00 13:00-17:00">
-        <input type="text" id="zm-fr" placeholder="Fr" class="zm-time-input" value="07:00-12:00 13:00-16:00">
-        <input type="text" id="zm-sa" placeholder="Sa" class="zm-time-input" value="">
-        <input type="text" id="zm-so" placeholder="So" class="zm-time-input" value="">
-        <button type="submit" class="btn primary">+ Zeitmodell</button>
-      </form>
+  </div>
 
-      <h2 class="zeit-h2" style="margin-top:22px;">Feriensaldo &amp; Zeitmodell je Mitarbeiter</h2>
-      <div class="table-scroll">
-        <table class="overview-table" id="ferien-saldo-table">
-          <thead>
-            <tr><th>Mitarbeiter</th><th>Zeitmodell</th><th>Feriensaldo (Std.)</th><th>Anpassen</th><th>Export</th></tr>
-          </thead>
-          <tbody id="ferien-saldo-tbody"></tbody>
-        </table>
-      </div>
+  <div id="einstellungen-page" style="display:none;">
+    <h2 class="zeit-h2" style="margin-top:0;">Zeitmodelle</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Pro Tag die Arbeitsblöcke eintragen, z. B. <code>07:00-11:00 13:00-16:00</code> (mehrere Blöcke mit Leerzeichen trennen). Leer lassen = kein Soll an diesem Tag.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="zeitmodelle-table">
+        <thead>
+          <tr><th>Name</th><th>Mo</th><th>Di</th><th>Mi</th><th>Do</th><th>Fr</th><th>Sa</th><th>So</th><th>Woche</th><th></th></tr>
+        </thead>
+        <tbody id="zeitmodelle-tbody"></tbody>
+      </table>
+    </div>
+    <form id="zeitmodell-add-form" class="zm-add-form">
+      <input type="text" id="zm-name" placeholder="Name, z. B. 100% – 42h/Woche" required>
+      <input type="text" id="zm-mo" placeholder="Mo z.B. 07:00-11:00 13:00-16:00" class="zm-time-input" value="07:00-12:00 13:00-17:00">
+      <input type="text" id="zm-di" placeholder="Di" class="zm-time-input" value="07:00-12:00 13:00-17:00">
+      <input type="text" id="zm-mi" placeholder="Mi" class="zm-time-input" value="07:00-12:00 13:00-17:00">
+      <input type="text" id="zm-do" placeholder="Do" class="zm-time-input" value="07:00-12:00 13:00-17:00">
+      <input type="text" id="zm-fr" placeholder="Fr" class="zm-time-input" value="07:00-12:00 13:00-16:00">
+      <input type="text" id="zm-sa" placeholder="Sa" class="zm-time-input" value="">
+      <input type="text" id="zm-so" placeholder="So" class="zm-time-input" value="">
+      <button type="submit" class="btn primary">+ Zeitmodell</button>
+    </form>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Feriensaldo, Überstunden &amp; Zeitmodell je Mitarbeiter</h2>
+    <div class="table-scroll">
+      <table class="overview-table" id="ferien-saldo-table">
+        <thead>
+          <tr><th>Mitarbeiter</th><th>Zeitmodell</th><th>Feriensaldo (Std.)</th><th>Anpassen</th><th>Überstunden (Std.)</th><th>Anpassen</th><th>Export</th></tr>
+        </thead>
+        <tbody id="ferien-saldo-tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -1378,6 +1383,7 @@
         <select id="absence-type">
           <option value="ferien">Ferien</option>
           <option value="krank">Krank</option>
+          <option value="kompensation">Kompensation (Überstunden)</option>
           <option value="sonstiges">Sonstiges</option>
         </select>
       </div>
@@ -1609,7 +1615,7 @@ onAuthStateChanged(auth, async user => {
 // Blendet Reiter je nach Rolle ein/aus: Mitarbeiter sehen nur Stempeluhr, Lager, Personal;
 // Admin/Produktionsleitung sieht weiterhin alles.
 function applyRoleVisibility(){
-  var adminOnlyTabs = ["table","verwaltung"];
+  var adminOnlyTabs = ["table","verwaltung","einstellungen"];
   document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
     var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
     b.style.display = (isAdminOnly && !state.isAdmin) ? "none" : "flex";
@@ -1654,6 +1660,7 @@ function subscribeStaff(){
     if(state.view === "staff") renderStaffPage();
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "ferien") renderFerienPage();
+    if(state.view === "einstellungen") renderFerienSaldoPanel();
   }, err => { console.error(err); });
 }
 function subscribeProfiles(){
@@ -1700,6 +1707,7 @@ function subscribeZeitmodelle(){
     state.zeitmodelle = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     if(state.view === "ferien") renderFerienPage();
     if(state.view === "zeit") renderZeitOverview();
+    if(state.view === "einstellungen"){ renderZeitmodellePanel(); renderFerienSaldoPanel(); }
   }, err => { console.error(err); });
 }
 
@@ -1939,7 +1947,8 @@ function isMontageReady(o){ return !!o.assemblyDate && !hasPendingMaterialForPha
 
 var HEADER_INFO = {
   zeit: ["Zeiterfassung", "Kommen, Pausen und Gehen erfassen"],
-  ferien: ["Ferienplaner", "Abwesenheiten, Zeitmodelle und Feriensaldo"],
+  ferien: ["Ferienplaner", "Abwesenheiten und Feriensaldo"],
+  einstellungen: ["Einstellungen", "Zeitmodelle verwalten"],
   table: ["Übersicht", "Übersicht für die Produktionsleitung"],
   staff: ["Personalplanung", "Mitarbeiter den Aufträgen zuteilen"],
   lager: ["Artikelsammlung", "Lagerbestand und Artikel"],
@@ -1954,6 +1963,7 @@ function render(){
   var isLager = state.view === "lager";
   var isZeit = state.view === "zeit";
   var isFerien = state.view === "ferien";
+  var isEinstellungen = state.view === "einstellungen";
   var isVerwaltung = state.view === "verwaltung";
   var isBuchhaltung = state.view === "buchhaltung";
   $("#table-page").style.display = isTable ? "block" : "none";
@@ -1961,6 +1971,7 @@ function render(){
   $("#lager-tab-body").style.display = isLager ? "block" : "none";
   $("#zeit-page").style.display = isZeit ? "block" : "none";
   $("#ferien-page").style.display = isFerien ? "block" : "none";
+  $("#einstellungen-page").style.display = isEinstellungen ? "block" : "none";
   $("#verwaltung-page").style.display = isVerwaltung ? "block" : "none";
   $("#buchhaltung-page").style.display = isBuchhaltung ? "block" : "none";
   // Offene Sheets (z.B. Artikel-Detail im Lager, "Nutzer entfernen" in der Verwaltung) nur
@@ -1971,7 +1982,7 @@ function render(){
     document.querySelectorAll(".overlay").forEach(o=>o.remove());
   }
   lastRenderedView = state.view;
-  var hideToolbar = (isStaff || isLager || isZeit || isFerien || isVerwaltung || isBuchhaltung);
+  var hideToolbar = (isStaff || isLager || isZeit || isFerien || isEinstellungen || isVerwaltung || isBuchhaltung);
   $("#filter-chips").style.display = hideToolbar ? "none" : "inline-flex";
   $("#add-btn").style.display = hideToolbar ? "none" : "inline-block";
   if(isTable){ renderTable(); return; }
@@ -1979,6 +1990,7 @@ function render(){
   if(isLager){ return; }
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderFerienSaldoPanel(); return; }
   if(isVerwaltung){ return; }
   if(isBuchhaltung){ return; }
 }
@@ -2072,7 +2084,7 @@ var STAFF_SEED_NAMES = [
 function absenceForDay(employeeId, iso){
   return state.absences.find(a=> a.employeeId===employeeId && iso >= a.startDate && iso <= a.endDate) || null;
 }
-function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : "Abwesend"; }
+function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : type==="kompensation" ? "Kompensation" : "Abwesend"; }
 function absenceFullLabel(absence){
   var base = absenceLabel(absence.type);
   return (absence.partial && absence.hours) ? (base + " (" + absence.hours + "h)") : base;
@@ -2117,6 +2129,17 @@ function renderZeitPage(){
   statusEl.className = "zeit-status " + (status==="on"?"on":status==="pause"?"pause":"off");
   statusEl.textContent = status==="on" ? "Eingestempelt" : status==="pause" ? "In Pause" : "Nicht eingestempelt";
 
+  var meInfo = $("#zeit-ueberstunden-info");
+  var meEmp = state.staff.find(s=>s.uid === state.currentUid);
+  if(meEmp){
+    var meUeberstd = typeof meEmp.ueberstundenSaldo === "number" ? meEmp.ueberstundenSaldo : 0;
+    var meFerien = typeof meEmp.ferienSaldo === "number" ? meEmp.ferienSaldo : 0;
+    meInfo.style.display = "block";
+    meInfo.innerHTML = 'Überstunden: <strong style="color:' + (meUeberstd<-0.05?"var(--danger)":meUeberstd>0.05?"var(--success)":"inherit") + ';">' + (meUeberstd>0?"+":"") + meUeberstd.toFixed(1) + 'h</strong> · Feriensaldo: <strong>' + meFerien.toFixed(1) + 'h</strong>';
+  } else {
+    meInfo.style.display = "none";
+  }
+
   $("#zeit-kommen").disabled = status !== "off";
   $("#zeit-pause-start").disabled = status !== "on";
   $("#zeit-pause-ende").disabled = status !== "pause";
@@ -2158,7 +2181,7 @@ $("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 function renderZeitOverview(){
   var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
   var tbody = $("#zeit-admin-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="9">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="10">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
   var rows = state.staff.map(emp=>{
     var absence = absenceForDay(emp.id, dateIso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
@@ -2176,7 +2199,8 @@ function renderZeitOverview(){
     if(soll != null && absence){ soll = absence.partial ? Math.max(0, soll - (absence.hours||0)) : 0; }
     var habenH = totalMs != null ? totalMs/3600000 : 0;
     var saldo = soll != null ? (habenH - soll) : null;
-    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid, soll: soll, saldo: saldo };
+    var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
+    return { empId: emp.id, uid: emp.uid||"", name: emp.name, kommen: kommen, gehen: gehen, pauseMs: pauseMs, totalMs: totalMs, status: status, statusClass: statusClass, linked: !!emp.uid, soll: soll, saldo: saldo, ueberstd: ueberstd };
   });
   tbody.innerHTML = rows.map(r=>
     '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
@@ -2189,7 +2213,8 @@ function renderZeitOverview(){
     '<td data-label="Pause">' + (r.pauseMs?fmtDuration(r.pauseMs):"–") + '</td>' +
     '<td data-label="Total">' + fmtDuration(r.totalMs) + '</td>' +
     '<td data-label="Soll">' + (r.soll!=null ? r.soll.toFixed(1)+"h" : "–") + '</td>' +
-    '<td data-label="Saldo">' + (r.saldo!=null ? ('<span style="color:'+(r.saldo<-0.05?"var(--danger)":r.saldo>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.saldo>0?"+":"")+r.saldo.toFixed(1)+"h</span>") : "–") + '</td></tr>'
+    '<td data-label="Saldo">' + (r.saldo!=null ? ('<span style="color:'+(r.saldo<-0.05?"var(--danger)":r.saldo>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.saldo>0?"+":"")+r.saldo.toFixed(1)+"h</span>") : "–") + '</td>' +
+    '<td data-label="Überstd.">' + '<span style="color:'+(r.ueberstd<-0.05?"var(--danger)":r.ueberstd>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.ueberstd>0?"+":"")+r.ueberstd.toFixed(1)+"h</span>" + '</td></tr>'
   ).join("");
 }
 $("#zeit-admin-tbody").addEventListener("click", e=>{
@@ -2363,6 +2388,9 @@ $("#absence-form").addEventListener("submit", async e=>{
     if(type === "ferien" && emp){
       await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
     }
+    if(type === "kompensation" && emp){
+      await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ueberstundenSaldo: increment(-hours) });
+    }
     absenceBackdrop.classList.remove("open");
     toast("Abwesenheit eingetragen.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
@@ -2377,6 +2405,9 @@ async function deleteAbsence(absenceId){
     await deleteDoc(doc(db, ABSENCES_COLLECTION, absenceId));
     if(abs.type === "ferien" && typeof abs.hours === "number"){
       await updateDoc(doc(db, STAFF_COLLECTION, abs.employeeId), { ferienSaldo: increment(abs.hours) });
+    }
+    if(abs.type === "kompensation" && typeof abs.hours === "number"){
+      await updateDoc(doc(db, STAFF_COLLECTION, abs.employeeId), { ueberstundenSaldo: increment(abs.hours) });
     }
   }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
 }
@@ -2396,12 +2427,7 @@ function daysInMonthIso(iso){
 }
 function renderFerienPage(){
   $("#ferien-nav-label").textContent = ferienMonthLabel(state.ferienRefDate);
-  $("#ferien-admin-section").style.display = state.isAdmin ? "block" : "none";
   renderFerienGrid();
-  if(state.isAdmin){
-    renderZeitmodellePanel();
-    renderFerienSaldoPanel();
-  }
 }
 function renderFerienGrid(){
   var days = daysInMonthIso(state.ferienRefDate);
@@ -2420,7 +2446,7 @@ function renderFerienGrid(){
       var cellClass = "ferien-day-cell" + (isWeekday(iso)?"":" ferien-day-weekend");
       var content = "";
       if(absence){
-        var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : "S";
+        var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : absence.type==="kompensation" ? "KO" : "S";
         content = '<span class="ferien-badge ' + absence.type + '" data-absence-id="' + absence.id + '" title="' + absenceFullLabel(absence) + (state.isAdmin?' — Klicken zum Löschen':'') + '">' + letter + (absence.partial?("·"+absence.hours+"h"):"") + '</span>';
       }
       row += '<td class="' + cellClass + '" data-employee-id="' + emp.id + '" data-date="' + iso + '">' + content + '</td>';
@@ -2499,16 +2525,23 @@ $("#zeitmodell-add-form").addEventListener("submit", async e=>{
 
 function renderFerienSaldoPanel(){
   var tbody = $("#ferien-saldo-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
     var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
+    var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
     return '<tr data-staff-id="' + emp.id + '">' +
       '<td>' + escapeHtml(emp.name) + '</td>' +
       '<td><select class="fs-model-select" data-staff-id="' + emp.id + '"><option value="">— keines —</option>' +
         state.zeitmodelle.map(m=>'<option value="'+m.id+'"'+(emp.zeitmodellId===m.id?' selected':'')+'>'+escapeHtml(m.name)+'</option>').join('') +
       '</select></td>' +
       '<td>' + saldo.toFixed(1) + 'h</td>' +
-      '<td><div style="display:flex;gap:4px;"><input type="number" class="saldo-input" step="0.5" placeholder="±Std." id="saldo-adjust-' + emp.id + '"><button type="button" class="btn fs-saldo-apply" data-staff-id="' + emp.id + '">Buchen</button></div></td>' +
+      '<td><div style="display:flex;gap:4px;flex-wrap:wrap;"><input type="number" class="saldo-input" step="0.5" placeholder="Std." id="saldo-adjust-' + emp.id + '">' +
+        '<button type="button" class="btn fs-saldo-set" data-staff-id="' + emp.id + '" title="Saldo direkt auf diesen Wert setzen — z.B. am Jahresanfang">Setzen</button>' +
+        '<button type="button" class="btn fs-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Saldo addieren (negative Zahl zum Abziehen)">± Buchen</button></div></td>' +
+      '<td><span style="font-weight:600;color:' + (ueberstd<-0.05?"var(--danger)":ueberstd>0.05?"var(--success)":"inherit") + ';">' + (ueberstd>0?"+":"") + ueberstd.toFixed(1) + 'h</span></td>' +
+      '<td><div style="display:flex;gap:4px;flex-wrap:wrap;"><input type="number" class="ueberstd-input" step="0.5" placeholder="Std." id="ueberstd-adjust-' + emp.id + '">' +
+        '<button type="button" class="btn us-saldo-set" data-staff-id="' + emp.id + '" title="Überstunden-Saldo direkt auf diesen Wert setzen">Setzen</button>' +
+        '<button type="button" class="btn us-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Überstunden-Saldo addieren (negative Zahl zum Abziehen)">± Buchen</button></div></td>' +
       '<td><div class="export-btn-row"><button type="button" class="fs-export" data-staff-id="' + emp.id + '" data-mode="week">Woche PDF</button><button type="button" class="fs-export" data-staff-id="' + emp.id + '" data-mode="month">Monat PDF</button></div></td>' +
       '</tr>';
   }).join("");
@@ -2520,16 +2553,55 @@ $("#ferien-saldo-tbody").addEventListener("change", async e=>{
   catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#ferien-saldo-tbody").addEventListener("click", async e=>{
+  var setBtn = e.target.closest(".fs-saldo-set");
+  if(setBtn){
+    var staffId = setBtn.dataset.staffId;
+    var input = $("#saldo-adjust-" + staffId);
+    var val = parseFloat(input.value);
+    if(isNaN(val)){ toast("Bitte die gewünschte Saldo-Stundenzahl eingeben."); return; }
+    try{
+      await updateDoc(doc(db, STAFF_COLLECTION, staffId), { ferienSaldo: val });
+      input.value = "";
+      toast("Feriensaldo auf " + val.toFixed(1) + "h gesetzt.");
+    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
   var applyBtn = e.target.closest(".fs-saldo-apply");
   if(applyBtn){
-    var staffId = applyBtn.dataset.staffId;
-    var input = $("#saldo-adjust-" + staffId);
-    var delta = parseFloat(input.value);
+    var staffId2 = applyBtn.dataset.staffId;
+    var input2 = $("#saldo-adjust-" + staffId2);
+    var delta = parseFloat(input2.value);
     if(!delta){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
     try{
-      await updateDoc(doc(db, STAFF_COLLECTION, staffId), { ferienSaldo: increment(delta) });
-      input.value = "";
+      await updateDoc(doc(db, STAFF_COLLECTION, staffId2), { ferienSaldo: increment(delta) });
+      input2.value = "";
       toast("Feriensaldo angepasst.");
+    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var usSetBtn = e.target.closest(".us-saldo-set");
+  if(usSetBtn){
+    var staffId3 = usSetBtn.dataset.staffId;
+    var input3 = $("#ueberstd-adjust-" + staffId3);
+    var val3 = parseFloat(input3.value);
+    if(isNaN(val3)){ toast("Bitte die gewünschte Überstunden-Stundenzahl eingeben."); return; }
+    try{
+      await updateDoc(doc(db, STAFF_COLLECTION, staffId3), { ueberstundenSaldo: val3 });
+      input3.value = "";
+      toast("Überstunden-Saldo auf " + val3.toFixed(1) + "h gesetzt.");
+    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var usApplyBtn = e.target.closest(".us-saldo-apply");
+  if(usApplyBtn){
+    var staffId4 = usApplyBtn.dataset.staffId;
+    var input4 = $("#ueberstd-adjust-" + staffId4);
+    var delta2 = parseFloat(input4.value);
+    if(!delta2){ toast("Bitte eine Stundenzahl eingeben (positiv oder negativ)."); return; }
+    try{
+      await updateDoc(doc(db, STAFF_COLLECTION, staffId4), { ueberstundenSaldo: increment(delta2) });
+      input4.value = "";
+      toast("Überstunden-Saldo angepasst.");
     }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
     return;
   }
@@ -2590,7 +2662,7 @@ function exportTimesheet(employeeId, mode){
     '<tbody>' + rowsHtml + '</tbody>' +
     '<tfoot><tr><td colspan="4">Summe</td><td>' + habenTotal.toFixed(1) + 'h</td><td>' + sollTotal.toFixed(1) + 'h</td><td>Saldo: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + 'h</td></tr></tfoot>' +
     '</table>' +
-    '<p style="font-size:11px;color:#69737d;margin-top:18px;">Feriensaldo aktuell: ' + (typeof emp.ferienSaldo==="number"?emp.ferienSaldo.toFixed(1):"0.0") + ' Std.</p>' +
+    '<p style="font-size:11px;color:#69737d;margin-top:18px;">Feriensaldo aktuell: ' + (typeof emp.ferienSaldo==="number"?emp.ferienSaldo.toFixed(1):"0.0") + ' Std. · Überstunden-Saldo aktuell: ' + (typeof emp.ueberstundenSaldo==="number"?(emp.ueberstundenSaldo>0?"+":"")+emp.ueberstundenSaldo.toFixed(1):"0.0") + ' Std.</p>' +
     '</body></html>';
   var win = window.open("", "_blank");
   if(!win){ toast("Pop-up wurde blockiert — bitte Pop-ups für diese Seite erlauben."); return; }
