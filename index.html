@@ -154,6 +154,7 @@
   .ferien-badge.ferien{background:var(--accent);}
   .ferien-badge.krank{background:var(--danger);}
   .ferien-badge.kompensation{background:#8a5cf6;}
+  .ferien-badge.schule{background:#2563eb;}
   .ferien-badge.betriebsferien{background:#2a6f6f;}
   .ferien-badge.feiertag{background:#b8860b;}
   .ferien-badge.sonstiges{background:var(--text-muted);}
@@ -436,6 +437,7 @@
   .absence-ferien{background:#e3ebf3;color:var(--accent);}
   .absence-krank{background:var(--warn-soft);color:var(--warn);}
   .absence-kompensation{background:#ede4fd;color:#8a5cf6;}
+  .absence-schule{background:#dbeafe;color:#2563eb;}
   .absence-betriebsferien{background:#deeeee;color:#2a6f6f;}
   .absence-feiertag{background:#faf0d8;color:#b8860b;}
   .absence-sonstiges{background:var(--panel-alt);color:var(--text-muted);border:1px solid var(--border);}
@@ -1322,11 +1324,11 @@
     </form>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Betriebsferien (für alle Mitarbeiter)</h2>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Eine Betriebsferien-Periode gilt automatisch für alle Mitarbeiter als Ferienabwesenheit (erscheint im Ferienplaner) und bucht direkt beim Anlegen die entsprechenden Stunden von jedem Feriensaldo ab — ohne das für jeden Mitarbeiter einzeln eintragen zu müssen.</div>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Eine Betriebsferien-Periode gilt automatisch für alle Mitarbeiter als Abwesenheit (erscheint im Ferienplaner) und bucht direkt beim Anlegen die entsprechenden Stunden ab — ohne das für jeden Mitarbeiter einzeln eintragen zu müssen. Verrechnung wahlweise ab Feriensaldo oder ab Kompensation (Überstunden-Saldo), für alle Mitarbeiter dieser Periode gleich.</div>
     <div class="table-scroll">
       <table class="overview-table" id="betriebsferien-table">
         <thead>
-          <tr><th>Name</th><th>Von</th><th>Bis</th><th>Std./Tag</th><th></th></tr>
+          <tr><th>Name</th><th>Von</th><th>Bis</th><th>Std./Tag</th><th>Verrechnung</th><th></th></tr>
         </thead>
         <tbody id="betriebsferien-tbody"></tbody>
       </table>
@@ -1342,6 +1344,10 @@
         <input type="hidden" id="bf-end">
       </span>
       <input type="number" id="bf-hours" placeholder="Std./Tag" step="0.1" value="8.4" style="max-width:110px;">
+      <select id="bf-booking" style="flex:1 1 170px;">
+        <option value="ferien">ab Feriensaldo</option>
+        <option value="kompensation">ab Kompensation (Überstunden)</option>
+      </select>
       <button type="submit" class="btn primary">+ Betriebsferien</button>
     </form>
 
@@ -1362,6 +1368,48 @@
         <input type="hidden" id="ft-date">
       </span>
       <button type="submit" class="btn primary">+ Feiertag</button>
+    </form>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Terminserien (z. B. Berufsschule für Lehrlinge)</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Trägt für einen Mitarbeiter automatisch wiederkehrend eine Abwesenheit ein (z. B. "jeden Montag Schule"). Wird wie eine normale Abwesenheit behandelt — das Soll bleibt an diesen Tagen bestehen, es wird aber kein Saldo belastet und keine Überzeit erwartet (wie bei "Krank"). Einzelne Tage lassen sich weiterhin über den Ferienplaner manuell überschreiben.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="terminserien-table">
+        <thead>
+          <tr><th>Mitarbeiter</th><th>Art</th><th>Wochentag</th><th>Intervall</th><th>Von</th><th>Bis</th><th></th></tr>
+        </thead>
+        <tbody id="terminserien-tbody"></tbody>
+      </table>
+    </div>
+    <form id="terminserien-add-form" class="zm-add-form">
+      <select id="ts-staff" required style="flex:1 1 160px;">
+        <option value="" disabled selected>Mitarbeiter wählen</option>
+      </select>
+      <select id="ts-type" style="flex:1 1 140px;">
+        <option value="schule">Schule</option>
+        <option value="ferien">Ferien</option>
+        <option value="krank">Krank</option>
+        <option value="kompensation">Kompensation</option>
+        <option value="sonstiges">Sonstiges</option>
+      </select>
+      <select id="ts-weekday" style="flex:0 1 110px;">
+        <option value="1">Montag</option>
+        <option value="2">Dienstag</option>
+        <option value="3">Mittwoch</option>
+        <option value="4">Donnerstag</option>
+        <option value="5">Freitag</option>
+        <option value="6">Samstag</option>
+        <option value="0">Sonntag</option>
+      </select>
+      <input type="number" id="ts-interval" placeholder="Intervall (Wochen)" min="1" value="1" style="max-width:150px;" title="Alle wie viele Wochen (1 = jede Woche, 2 = alle 2 Wochen, ...)">
+      <span class="date-field">
+        <input type="text" id="ts-start-display" class="date-input" readonly placeholder="Von (TT.MM.JJJJ)" autocomplete="off">
+        <input type="hidden" id="ts-start">
+      </span>
+      <span class="date-field">
+        <input type="text" id="ts-end-display" class="date-input" readonly placeholder="Bis (leer = unbegrenzt)" autocomplete="off">
+        <input type="hidden" id="ts-end">
+      </span>
+      <button type="submit" class="btn primary">+ Terminserie</button>
     </form>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter</h2>
@@ -1538,6 +1586,7 @@
           <option value="ferien">Ferien</option>
           <option value="krank">Krank</option>
           <option value="kompensation">Kompensation (Überstunden)</option>
+          <option value="schule">Schule</option>
           <option value="sonstiges">Sonstiges</option>
         </select>
       </div>
@@ -1694,6 +1743,7 @@ const ABSENCES_COLLECTION = "abwesenheiten";
 const ZEITMODELLE_COLLECTION = "zeitmodelle";
 const BETRIEBSFERIEN_COLLECTION = "betriebsferien";
 const FEIERTAGE_COLLECTION = "feiertage";
+const TERMINSERIEN_COLLECTION = "terminserien";
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -1739,6 +1789,7 @@ let unsubAbsences = null;
 let unsubZeitmodelle = null;
 let unsubBetriebsferien = null;
 let unsubFeiertage = null;
+let unsubTerminserien = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -1769,6 +1820,7 @@ onAuthStateChanged(auth, async user => {
     subscribeZeitmodelle();
     subscribeBetriebsferien();
     subscribeFeiertage();
+    subscribeTerminserien();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
@@ -1782,6 +1834,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubZeitmodelle) unsubZeitmodelle();
     if(unsubBetriebsferien) unsubBetriebsferien();
     if(unsubFeiertage) unsubFeiertage();
+    if(unsubTerminserien) unsubTerminserien();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -1837,7 +1890,7 @@ function subscribeStaff(){
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "ferien") renderFerienPage();
     if(state.view === "saldo") renderFerienSaldoPanel();
-    if(state.view === "einstellungen"){ renderMitarbeiterEditPanel(); }
+    if(state.view === "einstellungen"){ renderTerminserienPanel(); renderMitarbeiterEditPanel(); }
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
@@ -1916,11 +1969,23 @@ function subscribeFeiertage(){
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
+function subscribeTerminserien(){
+  const q = query(collection(db, TERMINSERIEN_COLLECTION));
+  unsubTerminserien = onSnapshot(q, snap => {
+    state.terminserien = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if(state.view === "einstellungen") renderTerminserienPanel();
+    if(state.view === "ferien") renderFerienPage();
+    if(state.view === "staff") renderStaffPage();
+    if(state.view === "zeit") renderZeitPage();
+    if(state.view === "saldo") renderFerienSaldoPanel();
+    scheduleAutoBookUeberstunden();
+  }, err => { console.error(err); });
+}
 // (renderZeitPage aktualisiert bei Admin auch gleich die Übersichtstabelle mit.)
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2274,7 +2339,7 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderMitarbeiterEditPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
   if(isVerwaltung){ return; }
   if(isBuchhaltung){ return; }
 }
@@ -2368,7 +2433,11 @@ var STAFF_SEED_NAMES = [
 function absenceForDay(employeeId, iso){
   var real = state.absences.find(a=> a.employeeId===employeeId && iso >= a.startDate && iso <= a.endDate);
   if(real) return real;
-  // Keine individuelle Abwesenheit gefunden — prüfen, ob eine Betriebsferien-Periode greift
+  // Keine individuelle Abwesenheit gefunden — prüfen, ob eine wiederkehrende Terminserie
+  // (z.B. "jeden Montag Schule") für diesen Mitarbeiter an diesem Tag greift.
+  var ts = terminserieForDay(employeeId, iso);
+  if(ts) return ts;
+  // Auch keine Terminserie — prüfen, ob eine Betriebsferien-Periode greift
   // (gilt automatisch für alle Mitarbeiter, ohne eigenen Abwesenheits-Eintrag je Person).
   var bf = betriebsferienForDay(iso);
   if(bf) return { id: "bf_"+bf.id, employeeId: employeeId, type: "betriebsferien", startDate: bf.startDate, endDate: bf.endDate, hours: bf.hoursPerDay, partial: false, isBetriebsferien: true, name: bf.name };
@@ -2378,7 +2447,7 @@ function absenceForDay(employeeId, iso){
   if(ft) return { id: "ft_"+ft.id, employeeId: employeeId, type: "feiertag", startDate: ft.date, endDate: ft.date, hours: null, partial: false, isFeiertag: true, name: ft.name };
   return null;
 }
-function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : type==="kompensation" ? "Kompensation" : type==="betriebsferien" ? "Betriebsferien" : type==="feiertag" ? "Feiertag" : "Abwesend"; }
+function absenceLabel(type){ return type==="ferien" ? "Ferien" : type==="krank" ? "Krank" : type==="kompensation" ? "Kompensation" : type==="schule" ? "Schule" : type==="betriebsferien" ? "Betriebsferien" : type==="feiertag" ? "Feiertag" : "Abwesend"; }
 function absenceFullLabel(absence){
   var base = absenceLabel(absence.type);
   return (absence.partial && absence.hours) ? (base + " (" + absence.hours + "h)") : base;
@@ -2801,6 +2870,7 @@ renderZeitOverview = function(){
 /* ---------- Zeitmodelle & Sollstunden ---------- */
 
 var WEEKDAY_KEYS = ["so","mo","di","mi","do","fr","sa"];
+var WEEKDAY_LABELS = ["So","Mo","Di","Mi","Do","Fr","Sa"];
 function isWeekday(iso){ var d=fromISO(iso).getDay(); return d!==0 && d!==6; }
 // Wandelt eine Eingabe wie "07:00-11:00 13:00-16:00" (auch "07.00-11.00" mit Punkt) in die
 // Summe der Arbeitsstunden um. Mehrere Blöcke können mit Leerzeichen oder Komma getrennt werden.
@@ -3110,9 +3180,9 @@ function renderFerienGrid(){
       var cellClass = "ferien-day-cell" + (isWeekday(iso)?"":" ferien-day-weekend");
       var content = "";
       if(absence){
-        var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : absence.type==="kompensation" ? "KO" : absence.type==="betriebsferien" ? "BF" : absence.type==="feiertag" ? "FT" : "S";
-        var canDelete = state.isAdmin && !absence.isBetriebsferien && !absence.isFeiertag;
-        var titleText = (absence.isBetriebsferien || absence.isFeiertag) ? (absenceFullLabel(absence) + " — " + escapeHtml(absence.name) + " (in Einstellungen verwalten)") : (absenceFullLabel(absence) + (canDelete?' — Klicken zum Bearbeiten':''));
+        var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : absence.type==="kompensation" ? "KO" : absence.type==="schule" ? "S" : absence.type==="betriebsferien" ? "BF" : absence.type==="feiertag" ? "FT" : "A";
+        var canDelete = state.isAdmin && !absence.isBetriebsferien && !absence.isFeiertag && !absence.isTerminserie;
+        var titleText = (absence.isBetriebsferien || absence.isFeiertag || absence.isTerminserie) ? (absenceFullLabel(absence) + (absence.name?(" — " + escapeHtml(absence.name)):"") + " (in Einstellungen verwalten)") : (absenceFullLabel(absence) + (canDelete?' — Klicken zum Bearbeiten':''));
         content = '<span class="ferien-badge ' + absence.type + '" data-absence-id="' + absence.id + '" data-deletable="' + (canDelete?'1':'0') + '" title="' + titleText + '">' + letter + (absence.partial?("·"+absence.hours+"h"):"") + '</span>';
       }
       row += '<td class="' + cellClass + '" data-employee-id="' + emp.id + '" data-date="' + iso + '">' + content + '</td>';
@@ -3195,7 +3265,7 @@ $("#zeitmodell-add-form").addEventListener("submit", async e=>{
 function renderBetriebsferienPanel(){
   var tbody = $("#betriebsferien-tbody");
   if(state.betriebsferien.length===0){
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);font-size:12.5px;">Noch keine Betriebsferien erfasst.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);font-size:12.5px;">Noch keine Betriebsferien erfasst.</td></tr>';
     return;
   }
   tbody.innerHTML = state.betriebsferien.map(bf=>
@@ -3204,7 +3274,8 @@ function renderBetriebsferienPanel(){
     '<td>' + isoToDisplay(bf.startDate) + '</td>' +
     '<td>' + isoToDisplay(bf.endDate) + '</td>' +
     '<td>' + (typeof bf.hoursPerDay==="number"?bf.hoursPerDay.toFixed(1):"–") + 'h</td>' +
-    '<td><button type="button" class="bf-delete" data-bf-id="' + bf.id + '" title="Betriebsferien löschen (bucht die Feriensaldo-Abzüge aller Mitarbeiter wieder zurück)">✕</button></td>' +
+    '<td>' + ((bf.bookFrom||"ferien")==="kompensation" ? "Kompensation" : "Feriensaldo") + '</td>' +
+    '<td><button type="button" class="bf-delete" data-bf-id="' + bf.id + '" title="Betriebsferien löschen (bucht die abgezogenen Stunden aller Mitarbeiter wieder zurück)">✕</button></td>' +
     '</tr>'
   ).join("");
 }
@@ -3214,31 +3285,33 @@ $("#betriebsferien-add-form").addEventListener("submit", async e=>{
   var startDate = $("#bf-start").value;
   var endDate = $("#bf-end").value || startDate;
   var hoursPerDay = parseFloat($("#bf-hours").value);
+  var bookFrom = $("#bf-booking").value === "kompensation" ? "kompensation" : "ferien";
+  var saldoField = bookFrom === "kompensation" ? "ueberstundenSaldo" : "ferienSaldo";
   if(!name || !startDate){ toast("Bitte Name und Von-Datum angeben."); return; }
   if(endDate < startDate){ toast('"Bis" darf nicht vor "Von" liegen.'); return; }
   if(isNaN(hoursPerDay) || hoursPerDay < 0) hoursPerDay = FALLBACK_DAILY_HOURS;
-  // Für jeden Mitarbeiter die beanspruchten Ferienstunden berechnen (eigenes Zeitmodell, sonst
-  // der eingegebene Pauschalwert pro Werktag) und sofort vom jeweiligen Feriensaldo abziehen.
-  // Die berechneten Werte werden im Betriebsferien-Dokument gespeichert, damit beim Löschen
-  // exakt wieder zurückgebucht werden kann.
+  // Für jeden Mitarbeiter die beanspruchten Stunden berechnen (eigenes Zeitmodell, sonst der
+  // eingegebene Pauschalwert pro Werktag) und sofort vom gewählten Saldo (Ferien oder
+  // Kompensation/Überstunden) abziehen. Die berechneten Werte werden im Betriebsferien-Dokument
+  // gespeichert, damit beim Löschen exakt wieder zurückgebucht werden kann.
   var bookedHoursByEmployee = {};
   for(var i=0;i<state.staff.length;i++){
     var emp = state.staff[i];
     var hours = computeAbsenceHours(emp, startDate, endDate, null, hoursPerDay);
     if(hours > 0){
       bookedHoursByEmployee[emp.id] = hours;
-      try{ await updateDoc(doc(db, STAFF_COLLECTION, emp.id), { ferienSaldo: increment(-hours) }); }
-      catch(err){ console.error(err); toast("Feriensaldo-Abzug für " + emp.name + " fehlgeschlagen: " + (err.code || err.message)); }
+      try{ await updateDoc(doc(db, STAFF_COLLECTION, emp.id), { [saldoField]: increment(-hours) }); }
+      catch(err){ console.error(err); toast("Saldo-Abzug für " + emp.name + " fehlgeschlagen: " + (err.code || err.message)); }
     }
   }
   try{
     await addDoc(collection(db, BETRIEBSFERIEN_COLLECTION), {
-      name: name, startDate: startDate, endDate: endDate, hoursPerDay: hoursPerDay,
+      name: name, startDate: startDate, endDate: endDate, hoursPerDay: hoursPerDay, bookFrom: bookFrom,
       bookedHoursByEmployee: bookedHoursByEmployee, createdAt: Date.now()
     });
     $("#bf-name").value = ""; $("#bf-start").value = ""; $("#bf-start-display").value = "";
-    $("#bf-end").value = ""; $("#bf-end-display").value = ""; $("#bf-hours").value = "8.4";
-    toast("Betriebsferien gespeichert — Feriensaldo wurde bei allen Mitarbeitern angepasst.");
+    $("#bf-end").value = ""; $("#bf-end-display").value = ""; $("#bf-hours").value = "8.4"; $("#bf-booking").value = "ferien";
+    toast("Betriebsferien gespeichert — " + (bookFrom==="kompensation"?"Kompensation":"Feriensaldo") + " wurde bei allen Mitarbeitern angepasst.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#betriebsferien-tbody").addEventListener("click", async e=>{
@@ -3246,17 +3319,18 @@ $("#betriebsferien-tbody").addEventListener("click", async e=>{
   if(!delBtn) return;
   var bf = state.betriebsferien.find(b=>b.id===delBtn.dataset.bfId);
   if(!bf) return;
-  if(!confirm('Betriebsferien "' + bf.name + '" wirklich löschen? Die abgezogenen Feriensaldo-Stunden werden bei allen betroffenen Mitarbeitern zurückgebucht.')) return;
+  var saldoField2 = (bf.bookFrom||"ferien") === "kompensation" ? "ueberstundenSaldo" : "ferienSaldo";
+  if(!confirm('Betriebsferien "' + bf.name + '" wirklich löschen? Die abgezogenen Stunden werden bei allen betroffenen Mitarbeitern zurückgebucht.')) return;
   try{
     var booked = bf.bookedHoursByEmployee || {};
     for(var empId in booked){
       if(booked[empId] > 0){
-        try{ await updateDoc(doc(db, STAFF_COLLECTION, empId), { ferienSaldo: increment(booked[empId]) }); }
+        try{ await updateDoc(doc(db, STAFF_COLLECTION, empId), { [saldoField2]: increment(booked[empId]) }); }
         catch(err){ console.error(err); }
       }
     }
     await deleteDoc(doc(db, BETRIEBSFERIEN_COLLECTION, bf.id));
-    toast("Betriebsferien gelöscht, Feriensaldo zurückgebucht.");
+    toast("Betriebsferien gelöscht, Saldo zurückgebucht.");
   }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
 });
 // Liefert die Betriebsferien-Periode (falls vorhanden), die einen bestimmten Tag für einen
@@ -3307,6 +3381,90 @@ $("#feiertage-tbody").addEventListener("click", async e=>{
 // Liefert den Feiertag (falls vorhanden) für ein bestimmtes Datum — gilt für alle Mitarbeiter.
 function feiertagForDay(iso){
   return state.feiertage.find(ft=> ft.date === iso) || null;
+}
+
+/* ---- Terminserien: wiederkehrende Termine je Mitarbeiter (z.B. "jeden Montag Schule" für
+   Lehrlinge) — werden wie eine normale Abwesenheit behandelt (Soll bleibt wie üblich, kein
+   automatischer Saldo-Abzug, analog zu "Krank"). Nur Admin verwaltet die Serien; einzelne Tage
+   werden nicht als eigene Dokumente gespeichert, sondern bei Bedarf aus der Regel berechnet. ---- */
+function renderTerminserienPanel(){
+  var tbody = $("#terminserien-tbody");
+  if(!tbody) return;
+  var staffSel = $("#ts-staff");
+  if(staffSel){
+    var keepSel = staffSel.value;
+    staffSel.innerHTML = '<option value="" disabled' + (keepSel?'':' selected') + '>Mitarbeiter wählen</option>' +
+      state.staff.map(s=>'<option value="'+s.id+'"'+(s.id===keepSel?' selected':'')+'>'+escapeHtml(s.name)+'</option>').join("");
+  }
+  if(state.terminserien.length===0){
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Terminserien erfasst.</td></tr>';
+    return;
+  }
+  var sorted = state.terminserien.slice().sort((a,b)=> (a.startDate||"").localeCompare(b.startDate||""));
+  tbody.innerHTML = sorted.map(ts=>{
+    var emp = state.staff.find(s=>s.id===ts.employeeId);
+    return '<tr data-ts-id="' + ts.id + '">' +
+      '<td>' + escapeHtml(emp ? emp.name : "?") + '</td>' +
+      '<td>' + escapeHtml(absenceLabel(ts.type)) + '</td>' +
+      '<td>' + escapeHtml(WEEKDAY_LABELS[ts.weekday]) + '</td>' +
+      '<td>' + (ts.intervalWeeks===1 ? "jede Woche" : "alle " + ts.intervalWeeks + " Wochen") + '</td>' +
+      '<td>' + isoToDisplay(ts.startDate) + '</td>' +
+      '<td>' + (ts.endDate ? isoToDisplay(ts.endDate) : "unbegrenzt") + '</td>' +
+      '<td><button type="button" class="ts-delete" data-ts-id="' + ts.id + '" title="Terminserie löschen">✕</button></td>' +
+      '</tr>';
+  }).join("");
+}
+$("#terminserien-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var employeeId = $("#ts-staff").value;
+  var type = $("#ts-type").value;
+  var weekday = parseInt($("#ts-weekday").value, 10);
+  var intervalWeeks = parseInt($("#ts-interval").value, 10);
+  var startDate = $("#ts-start").value;
+  var endDate = $("#ts-end").value || null;
+  if(!employeeId || !startDate){ toast("Bitte Mitarbeiter und Startdatum angeben."); return; }
+  if(isNaN(intervalWeeks) || intervalWeeks < 1) intervalWeeks = 1;
+  if(endDate && endDate < startDate){ toast('"Bis" darf nicht vor "Von" liegen.'); return; }
+  try{
+    await addDoc(collection(db, TERMINSERIEN_COLLECTION), {
+      employeeId: employeeId, type: type, weekday: weekday, intervalWeeks: intervalWeeks,
+      startDate: startDate, endDate: endDate, createdAt: Date.now()
+    });
+    $("#ts-start").value = ""; $("#ts-start-display").value = "";
+    $("#ts-end").value = ""; $("#ts-end-display").value = ""; $("#ts-interval").value = "1";
+    toast("Terminserie gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+});
+$("#terminserien-tbody").addEventListener("click", async e=>{
+  var delBtn = e.target.closest(".ts-delete");
+  if(!delBtn) return;
+  var ts = state.terminserien.find(t=>t.id===delBtn.dataset.tsId);
+  if(!ts) return;
+  if(!confirm("Diese Terminserie wirklich löschen? Künftige Termine werden dadurch nicht mehr automatisch eingetragen.")) return;
+  try{
+    await deleteDoc(doc(db, TERMINSERIEN_COLLECTION, ts.id));
+    toast("Terminserie gelöscht.");
+  }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+});
+// Liefert (falls vorhanden) die virtuelle Abwesenheit, die eine Terminserie für einen Mitarbeiter
+// an einem bestimmten Tag erzeugt — berechnet aus Wochentag + Intervall, ohne eigene Tagesdokumente.
+function terminserieForDay(employeeId, iso){
+  var d = fromISO(iso), dow = d.getDay();
+  var match = state.terminserien.find(function(ts){
+    if(ts.employeeId !== employeeId) return false;
+    if(ts.weekday !== dow) return false;
+    if(iso < ts.startDate) return false;
+    if(ts.endDate && iso > ts.endDate) return false;
+    var start = fromISO(ts.startDate);
+    var deltaToFirst = (dow - start.getDay() + 7) % 7;
+    var firstOcc = new Date(start); firstOcc.setDate(firstOcc.getDate() + deltaToFirst);
+    var diffDays = Math.round((d - firstOcc) / 86400000);
+    if(diffDays < 0) return false;
+    var intervalDays = (ts.intervalWeeks || 1) * 7;
+    return (diffDays % intervalDays) === 0;
+  });
+  if(!match) return null;
+  return { id: "ts_"+match.id+"_"+iso, employeeId: employeeId, type: match.type, startDate: iso, endDate: iso, hours: null, partial: false, isTerminserie: true, name: absenceLabel(match.type) + " (Serie)" };
 }
 
 /* ---- Feriensaldo/Überstunden-Saldo auch in den Einstellungen setzbar (eigene IDs, damit sie
