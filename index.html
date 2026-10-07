@@ -653,23 +653,16 @@
     position:relative;
     background:var(--panel);
     border:1px solid var(--border);
-    border-radius:2px;
-    margin-bottom:10px;
-    padding:12px 14px 12px 16px;
+    border-radius:8px;
+    margin-bottom:8px;
+    padding:11px 14px;
     display:flex;
     align-items:center;
     gap:12px;
     cursor:pointer;
-    clip-path:polygon(0 10px, 10px 0, 100% 0, 100% 100%, 0 100%);
+    transition:border-color .12s ease;
   }
-  #lager-page .tag-card::before{
-    content:'';
-    position:absolute;
-    left:6px;top:6px;
-    width:4px;height:4px;
-    border-radius:50%;
-    background:var(--border);
-  }
+  #lager-page .tag-card:hover{border-color:var(--accent-dim);}
   #lager-page .tag-card.low{border-left:3px solid var(--danger);}
   #lager-page .tag-card .info{flex:1;min-width:0;}
   #lager-page .tag-card .name{font-weight:600;font-size:14.5px;margin-bottom:3px;}
@@ -700,7 +693,7 @@
     font-size:12.5px;
     font-weight:600;
     padding:7px 13px;
-    border-radius:20px;
+    border-radius:7px;
     cursor:pointer;
     white-space:nowrap;
   }
@@ -4219,7 +4212,7 @@ function escapeHtml(s){
 
 function render(){
   $('#itemCount').innerHTML = `<span class="conn-dot ${connected?'ok':'err'}" id="lagerConnDot"></span>${articles.length} Artikel`;
-  $('#fab').style.display = ((currentTab === 'articles' && isAdmin) || currentTab === 'wishlist') ? 'flex' : 'none';
+  $('#fab').style.display = (currentTab === 'wishlist') ? 'flex' : 'none';
   if(currentTab==='dashboard') renderDashboard();
   if(currentTab==='articles') renderArticles();
   if(currentTab==='scan') renderScan();
@@ -4268,10 +4261,14 @@ function bindTagCards(){
 
 function renderArticles(){
   const categories = [...new Set(articles.map(a => a.category || 'Sonstiges'))].sort();
-  let html = `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name, ID oder Art. Nr. …">`;
+  let html = '';
   if(isAdmin){
-    html += `<button class="btn btn-secondary btn-block" id="importExcelBtn" style="margin-bottom:14px;">Artikel aus Excel importieren</button>`;
+    html += `<div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-primary btn-block" id="addArticleBtn">+ Artikel</button>
+      <button class="btn btn-secondary btn-block" id="importExcelBtn">Aus Excel importieren</button>
+    </div>`;
   }
+  html += `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name, ID oder Art. Nr. …">`;
   if(categories.length > 1){
     html += `<div class="filter-row" id="catFilterRow">
       <button class="chip-filter active" data-cat="__all">Alle</button>
@@ -4281,6 +4278,7 @@ function renderArticles(){
   html += `<div id="articleList"></div>`;
   main.innerHTML = html;
   if(isAdmin){
+    $('#addArticleBtn').onclick = openAddArticleSheet;
     $('#importExcelBtn').onclick = openImportExcelSheet;
   }
   let activeCat = '__all';
@@ -4308,7 +4306,6 @@ function renderArticles(){
     });
   }
   list();
-  $('#fabAdd').onclick = openAddArticleSheet;
 }
 
 function renderHistory(){
