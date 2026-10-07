@@ -463,6 +463,10 @@
   .assign-chip .a-order{font-family:var(--mono);font-weight:700;}
   .assign-chip .a-hours{color:var(--text-muted);}
   .assign-chip .a-type{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;opacity:.75;}
+  .assign-chip-punchable{outline:2px dashed var(--accent-dim);outline-offset:1px;}
+  .assign-chip-punchable:hover{outline-color:var(--accent);}
+  .assign-chip-active{outline:2px solid var(--success)!important;}
+  .assign-chip .a-punch-live{font-size:9.5px;font-weight:700;color:var(--success);margin-top:1px;}
   .staff-empty-note{font-size:12px;color:var(--text-muted);padding:20px 10px;text-align:center;}
   .table-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
   .table-toolbar #table-search{flex:1;min-width:180px;font:inherit;font-size:13px;padding:8px 11px;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
@@ -1838,6 +1842,7 @@ function subscribeMyTime(){
   unsubMyTime = onSnapshot(q, snap => {
     state.myTime = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(t=>t.uid === state.currentUid);
     if(state.view === "zeit") renderZeitPage();
+    if(state.view === "staff") renderStaffPage();
   }, err => { console.error(err); });
 }
 function subscribeAllTime(){
@@ -2583,6 +2588,33 @@ async function zeitPunch(type){
 }
 $("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
 $("#zeit-gehen").addEventListener("click", ()=>zeitPunch("gehen"));
+
+// Ein- bzw. Ausstempeln direkt über den eigenen Einsatz-Chip in der Personalplanung
+// (nur für den eigenen, heutigen Eintrag — siehe data-punchable in renderStaffGrid).
+async function punchFromAssignment(assignId){
+  if(!state.currentUid) return;
+  var a = state.assignments.find(x=>x.id===assignId);
+  if(!a) return;
+  var meEmp = state.staff.find(s=>s.uid === state.currentUid);
+  if(!meEmp || a.employeeId !== meEmp.id || a.date !== todayISO()){ return; }
+  var order = state.orders.find(x=>x.id===a.orderId);
+  var todayEntries = zeitTodayEntries(state.myTime);
+  var status = zeitCurrentStatus(todayEntries);
+  var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
+  try{
+    if(status === "off"){
+      var data = { uid: state.currentUid, name: state.currentName, type: "kommen", timestamp: Date.now(), date: todayISO() };
+      if(order){ data.orderId = order.id; data.orderNumber = order.orderNumber; }
+      await addDoc(collection(db, TIME_COLLECTION), data);
+      toast("Eingestempelt auf Auftrag " + (order?order.orderNumber:"?") + ".");
+    } else if(lastKommen && lastKommen.orderId === a.orderId){
+      await addDoc(collection(db, TIME_COLLECTION), { uid: state.currentUid, name: state.currentName, type: "gehen", timestamp: Date.now(), date: todayISO() });
+      toast("Ausgestempelt.");
+    } else {
+      toast("Du bist bereits auf einem anderen Auftrag eingestempelt — zuerst dort über die Stempeluhr ausstempeln.");
+    }
+  }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
+}
 $("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 
 function renderZeitOverview(){
@@ -3526,6 +3558,11 @@ function renderStaffGrid(){
   days.forEach(d=> html += '<div>' + fmtDay(d) + ' ' + fmtShort(toISO(d)) + '</div>');
   html += '</div>';
   var canEdit = !!state.isAdmin;
+  var meEmp = !canEdit ? state.staff.find(s=>s.uid === state.currentUid) : null;
+  var todayIso = todayISO();
+  var myTodayEntries = !canEdit ? zeitTodayEntries(state.myTime) : [];
+  var myStatus = !canEdit ? zeitCurrentStatus(myTodayEntries) : "off";
+  var myLastKommen = !canEdit ? myTodayEntries.slice().reverse().find(e=>e.type==="kommen") : null;
   state.staff.forEach(emp=>{
     html += '<div class="staff-row">';
     html += '<div class="staff-row-name"' + (canEdit?' draggable="true"':'') + ' data-staff-id="' + emp.id + '">';
@@ -3543,7 +3580,10 @@ function renderStaffGrid(){
         var o = state.orders.find(x=>x.id===a.orderId);
         var typ = a.type || "werkstatt";
         var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
-        html += '<div class="assign-chip type-' + typ + '"' + (canEdit?' draggable="true"':'') + ' data-assign-id="' + a.id + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div></div>';
+        var isMinePunchable = !canEdit && meEmp && emp.id===meEmp.id && iso===todayIso;
+        var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
+        var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
+        html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
       });
       if(canEdit) html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
       html += '</div>';
@@ -3584,6 +3624,8 @@ $("#staff-seed-btn").addEventListener("click", async ()=>{
 });
 
 $("#staff-grid").addEventListener("click", async e=>{
+  var punchChip = e.target.closest(".assign-chip[data-punchable='1']");
+  if(punchChip){ await punchFromAssignment(punchChip.dataset.assignId); return; }
   if(!state.isAdmin) return;
   var rmBtn = e.target.closest(".staff-remove");
   if(rmBtn){
