@@ -1461,7 +1461,7 @@
 
 <div class="modal-backdrop" id="absence-modal-backdrop">
   <div class="modal" style="max-width:380px;">
-    <h3>Abwesenheit eintragen</h3>
+    <h3 id="absence-modal-title">Abwesenheit eintragen</h3>
     <form id="absence-form">
       <div class="field">
         <label for="absence-staff">Mitarbeiter</label>
@@ -1505,6 +1505,7 @@
         <input type="number" id="absence-hours" min="0.5" step="0.5" placeholder="z. B. 4">
       </div>
       <div class="modal-actions">
+        <button type="button" class="btn" id="absence-delete-btn" style="display:none;color:var(--danger);border-color:var(--danger);">Löschen</button>
         <div style="display:flex;gap:8px;margin-left:auto;">
           <button type="button" class="btn" id="absence-cancel-btn">Abbrechen</button>
           <button type="submit" class="btn primary">Speichern</button>
@@ -2772,21 +2773,44 @@ $("#absence-mode-toggle").addEventListener("click", e=>{
   var b = e.target.closest(".seg-toggle-btn"); if(!b) return;
   setAbsenceMode(b.dataset.mode);
 });
-function openAbsenceModal(prefillEmployeeId, prefillIso){
+// Beim Bearbeiten einer bestehenden Abwesenheit (statt Neuanlage) wird hier die ID gehalten.
+var editingAbsenceId = null;
+function openAbsenceModal(prefillEmployeeId, prefillIso, editAbsence){
   $("#absence-staff").innerHTML = state.staff.map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join("");
-  if(prefillEmployeeId) $("#absence-staff").value = prefillEmployeeId;
-  $("#absence-type").value = "ferien";
-  setAbsenceMode("tage");
-  $("#absence-hours").value = "";
-  var iso = prefillIso || todayISO();
-  $("#absence-start").value = iso; $("#absence-start-display").value = isoToDisplay(iso);
-  $("#absence-end").value = iso; $("#absence-end-display").value = isoToDisplay(iso);
+  if(editAbsence){
+    editingAbsenceId = editAbsence.id;
+    $("#absence-modal-title").textContent = "Abwesenheit bearbeiten";
+    $("#absence-delete-btn").style.display = "block";
+    $("#absence-staff").value = editAbsence.employeeId;
+    $("#absence-type").value = editAbsence.type;
+    setAbsenceMode(editAbsence.partial ? "stunden" : "tage");
+    $("#absence-hours").value = editAbsence.partial ? editAbsence.hours : "";
+    $("#absence-start").value = editAbsence.startDate; $("#absence-start-display").value = isoToDisplay(editAbsence.startDate);
+    $("#absence-end").value = editAbsence.endDate; $("#absence-end-display").value = isoToDisplay(editAbsence.endDate);
+  } else {
+    editingAbsenceId = null;
+    $("#absence-modal-title").textContent = "Abwesenheit eintragen";
+    $("#absence-delete-btn").style.display = "none";
+    if(prefillEmployeeId) $("#absence-staff").value = prefillEmployeeId;
+    $("#absence-type").value = "ferien";
+    setAbsenceMode("tage");
+    $("#absence-hours").value = "";
+    var iso = prefillIso || todayISO();
+    $("#absence-start").value = iso; $("#absence-start-display").value = isoToDisplay(iso);
+    $("#absence-end").value = iso; $("#absence-end-display").value = isoToDisplay(iso);
+  }
   absenceBackdrop.classList.add("open");
 }
 $("#zeit-absence-add-btn").addEventListener("click", ()=> openAbsenceModal());
 $("#ferien-add-btn").addEventListener("click", ()=> openAbsenceModal());
 $("#absence-cancel-btn").addEventListener("click", ()=> absenceBackdrop.classList.remove("open"));
 absenceBackdrop.addEventListener("click", e=>{ if(e.target===absenceBackdrop) absenceBackdrop.classList.remove("open"); });
+$("#absence-delete-btn").addEventListener("click", async ()=>{
+  if(!editingAbsenceId) return;
+  var id = editingAbsenceId;
+  absenceBackdrop.classList.remove("open");
+  await deleteAbsence(id);
+});
 $("#absence-form").addEventListener("submit", async e=>{
   e.preventDefault();
   var employeeId = $("#absence-staff").value;
@@ -2801,18 +2825,43 @@ $("#absence-form").addEventListener("submit", async e=>{
   var emp = state.staff.find(s=>s.id===employeeId);
   var hours = computeAbsenceHours(emp, startDate, endDate, hoursInput);
   try{
-    await addDoc(collection(db, ABSENCES_COLLECTION), {
-      employeeId: employeeId, type: type, startDate: startDate, endDate: endDate,
-      hours: hours, partial: mode==="stunden", createdAt: Date.now()
-    });
-    if(type === "ferien" && emp){
-      await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
+    if(editingAbsenceId){
+      var old = state.absences.find(a=>a.id===editingAbsenceId);
+      // Alte Saldo-Buchung zurückbuchen, bevor die neue angewendet wird.
+      if(old){
+        if(old.type === "ferien" && typeof old.hours === "number"){
+          await updateDoc(doc(db, STAFF_COLLECTION, old.employeeId), { ferienSaldo: increment(old.hours) });
+        }
+        if(old.type === "kompensation" && typeof old.hours === "number"){
+          await updateDoc(doc(db, STAFF_COLLECTION, old.employeeId), { ueberstundenSaldo: increment(old.hours) });
+        }
+      }
+      await updateDoc(doc(db, ABSENCES_COLLECTION, editingAbsenceId), {
+        employeeId: employeeId, type: type, startDate: startDate, endDate: endDate,
+        hours: hours, partial: mode==="stunden"
+      });
+      if(type === "ferien" && emp){
+        await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
+      }
+      if(type === "kompensation" && emp){
+        await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ueberstundenSaldo: increment(-hours) });
+      }
+      absenceBackdrop.classList.remove("open");
+      toast("Abwesenheit aktualisiert.");
+    } else {
+      await addDoc(collection(db, ABSENCES_COLLECTION), {
+        employeeId: employeeId, type: type, startDate: startDate, endDate: endDate,
+        hours: hours, partial: mode==="stunden", createdAt: Date.now()
+      });
+      if(type === "ferien" && emp){
+        await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
+      }
+      if(type === "kompensation" && emp){
+        await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ueberstundenSaldo: increment(-hours) });
+      }
+      absenceBackdrop.classList.remove("open");
+      toast("Abwesenheit eingetragen.");
     }
-    if(type === "kompensation" && emp){
-      await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ueberstundenSaldo: increment(-hours) });
-    }
-    absenceBackdrop.classList.remove("open");
-    toast("Abwesenheit eingetragen.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 // Löscht eine Abwesenheit und bucht — falls es sich um Ferien handelte — die beanspruchten
@@ -2868,7 +2917,7 @@ function renderFerienGrid(){
       if(absence){
         var letter = absence.type==="ferien" ? "F" : absence.type==="krank" ? "K" : absence.type==="kompensation" ? "KO" : absence.type==="betriebsferien" ? "BF" : "S";
         var canDelete = state.isAdmin && !absence.isBetriebsferien;
-        var titleText = absence.isBetriebsferien ? (absenceFullLabel(absence) + " — " + escapeHtml(absence.name) + " (in Einstellungen verwalten)") : (absenceFullLabel(absence) + (canDelete?' — Klicken zum Löschen':''));
+        var titleText = absence.isBetriebsferien ? (absenceFullLabel(absence) + " — " + escapeHtml(absence.name) + " (in Einstellungen verwalten)") : (absenceFullLabel(absence) + (canDelete?' — Klicken zum Bearbeiten':''));
         content = '<span class="ferien-badge ' + absence.type + '" data-absence-id="' + absence.id + '" data-deletable="' + (canDelete?'1':'0') + '" title="' + titleText + '">' + letter + (absence.partial?("·"+absence.hours+"h"):"") + '</span>';
       }
       row += '<td class="' + cellClass + '" data-employee-id="' + emp.id + '" data-date="' + iso + '">' + content + '</td>';
@@ -2879,7 +2928,10 @@ function renderFerienGrid(){
 $("#ferien-grid-body").addEventListener("click", async e=>{
   var badge = e.target.closest(".ferien-badge");
   if(badge){
-    if(badge.dataset.deletable === "1") await deleteAbsence(badge.dataset.absenceId);
+    if(badge.dataset.deletable === "1"){
+      var abs = state.absences.find(a=>a.id===badge.dataset.absenceId);
+      if(abs) openAbsenceModal(null, null, abs);
+    }
     return;
   }
   if(!state.isAdmin) return;
