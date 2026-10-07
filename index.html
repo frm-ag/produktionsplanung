@@ -1120,6 +1120,7 @@
           <button class="side-item sub" data-view="ferien">Ferienplaner</button>
           <button class="side-item sub" data-view="saldo">Stunden- &amp; Feriensaldo</button>
           <button class="side-item sub" data-view="einstellungen">Einstellungen</button>
+          <button class="side-item sub" data-view="verwaltung">Verwaltung</button>
         </div>
       </div>
 
@@ -1129,7 +1130,6 @@
           <button class="side-item sub" data-view="table">Übersicht</button>
           <button class="side-item sub" data-view="staff">Personalplanung</button>
           <button class="side-item sub" data-view="lager">Artikelsammlung</button>
-          <button class="side-item sub" data-view="verwaltung">Verwaltung</button>
         </div>
       </div>
 
@@ -1374,6 +1374,25 @@
         <tbody id="saldo-settings-tbody"></tbody>
       </table>
     </div>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter-Namen &amp; Zugänge</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Name ändern wirkt sich überall aus (Zeiterfassung, Personalplanung, PDFs). "Zugang zurücksetzen" legt ein neues Login für diesen Mitarbeiter an und verknüpft es — praktisch bei vergessenem Passwort, da ein bestehendes Passwort aus technischen Gründen nicht direkt überschrieben werden kann. Das alte Login wird dabei automatisch gesperrt.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="mitarbeiter-edit-table">
+        <thead>
+          <tr><th>Name</th><th></th><th>Login</th><th></th></tr>
+        </thead>
+        <tbody id="mitarbeiter-edit-tbody"></tbody>
+      </table>
+    </div>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Mein Passwort ändern</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Gilt nur für dein eigenes, aktuell angemeldetes Konto.</div>
+    <form id="own-password-form" class="zm-add-form">
+      <input type="password" id="op-current" placeholder="Aktuelles Passwort" autocomplete="current-password" required style="flex:1 1 200px;">
+      <input type="password" id="op-new" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password" required style="flex:1 1 200px;">
+      <button type="submit" class="btn primary">Passwort ändern</button>
+    </form>
   </div>
 
   <div id="verwaltung-page" style="display:none;">
@@ -1649,10 +1668,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
 import {
-  getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, increment
+  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
+  reauthenticateWithCredential, EmailAuthProvider, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ---- Gleiche Firebase-Konfiguration wie Mat.Lager ----
@@ -1667,6 +1687,11 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
+// Zweite, unabhängige Firebase-Instanz: Damit lässt sich für einen Mitarbeiter ein neues
+// Login-Konto anlegen (z.B. beim Zurücksetzen des Zugangs), ohne die eigene (Admin-)Sitzung
+// dabei zu überschreiben.
+const fbAppSecondaryEinst = initializeApp(firebaseConfig, 'SecondaryEinstellungen');
+const authSecondaryEinst = getAuth(fbAppSecondaryEinst);
 const COLLECTION = "produktionsauftraege";
 const STAFF_COLLECTION = "mitarbeiter";
 const ASSIGNMENTS_COLLECTION = "einsaetze";
@@ -1818,7 +1843,7 @@ function subscribeStaff(){
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "ferien") renderFerienPage();
     if(state.view === "saldo") renderFerienSaldoPanel();
-    if(state.view === "einstellungen") renderSaldoSettingsPanel();
+    if(state.view === "einstellungen"){ renderSaldoSettingsPanel(); renderMitarbeiterEditPanel(); }
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
@@ -2255,7 +2280,7 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderSaldoSettingsPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderSaldoSettingsPanel(); renderMitarbeiterEditPanel(); return; }
   if(isVerwaltung){ return; }
   if(isBuchhaltung){ return; }
 }
@@ -3325,6 +3350,94 @@ $("#saldo-settings-tbody").addEventListener("click", async e=>{
     try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId2), { ferienSaldo: increment(delta) }); toast("Feriensaldo angepasst."); }
     catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
     return;
+  }
+});
+
+/* ---- Mitarbeiter-Namen bearbeiten & Zugang zurücksetzen (nur Admin) ---- */
+function renderMitarbeiterEditPanel(){
+  var tbody = $("#mitarbeiter-edit-tbody");
+  if(!tbody) return;
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  tbody.innerHTML = state.staff.map(emp=>{
+    return '<tr data-staff-id="' + emp.id + '">' +
+      '<td><input type="text" class="me-name-input" id="me-name-' + emp.id + '" value="' + escapeHtml(emp.name) + '" style="width:100%;min-width:140px;font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></td>' +
+      '<td><button type="button" class="btn me-name-save" data-staff-id="' + emp.id + '">Speichern</button></td>' +
+      '<td>' + (emp.uid ? '<span style="color:var(--success);font-weight:600;">verknüpft</span>' : '<span style="color:var(--text-muted);">kein Login</span>') + '</td>' +
+      '<td>' + (emp.uid ? ('<button type="button" class="btn me-reset-btn" data-staff-id="' + emp.id + '">Zugang zurücksetzen</button>') : '<span style="color:var(--text-muted);font-size:11px;">— Konto in Zeiterfassung &gt; Alle Mitarbeiter verknüpfen —</span>') + '</td>' +
+      '</tr>';
+  }).join("");
+}
+$("#mitarbeiter-edit-tbody").addEventListener("click", async e=>{
+  var saveBtn = e.target.closest(".me-name-save");
+  if(saveBtn){
+    var staffId = saveBtn.dataset.staffId;
+    var val = $("#me-name-" + staffId).value.trim();
+    if(!val){ toast("Bitte einen Namen eingeben."); return; }
+    try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId), { name: val }); toast("Name gespeichert."); }
+    catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var resetBtn = e.target.closest(".me-reset-btn");
+  if(resetBtn){ await resetMitarbeiterZugang(resetBtn.dataset.staffId); return; }
+});
+// Legt für einen Mitarbeiter ein neues Login-Konto an und verknüpft es (uid) — das bisherige
+// Konto wird gesperrt. Nötig, weil ein bestehendes Passwort aus einer reinen Client-App heraus
+// nicht direkt überschrieben werden kann (kein Admin-SDK/Server vorhanden).
+async function resetMitarbeiterZugang(empId){
+  var emp = state.staff.find(x=>x.id===empId);
+  if(!emp) return;
+  var newUsername = prompt('Neuer Benutzername für "' + emp.name + '" (nur Buchstaben, Zahlen, - und _):');
+  if(newUsername===null) return;
+  newUsername = newUsername.trim();
+  if(!newUsername || !/^[a-zA-Z0-9_-]+$/.test(newUsername)){ toast("Ungültiger Benutzername."); return; }
+  var newPassword = prompt('Neues Passwort für "' + newUsername + '" (mind. 6 Zeichen):');
+  if(newPassword===null) return;
+  if(!newPassword || newPassword.length<6){ toast("Passwort braucht mindestens 6 Zeichen."); return; }
+  if(!confirm('Neuen Zugang "' + newUsername + '" für "' + emp.name + '" anlegen und das bisherige Login sperren?')) return;
+  var oldUid = emp.uid || null;
+  try{
+    var email = usernameToAuthEmail(newUsername);
+    var cred = await createUserWithEmailAndPassword(authSecondaryEinst, email, newPassword);
+    var newUid = cred.user.uid;
+    var wasAdmin = false;
+    if(oldUid){
+      try{ var roleSnap = await getDoc(doc(db,'roles', oldUid)); wasAdmin = !!(roleSnap.exists() && roleSnap.data().role==='admin'); }catch(e){}
+    }
+    await setDoc(doc(db,'profiles', newUid), { username: newUsername.toLowerCase(), createdAt: Date.now(), createdBy: state.currentName });
+    if(wasAdmin) await setDoc(doc(db,'roles', newUid), { role: 'admin' });
+    await updateDoc(doc(db, STAFF_COLLECTION, empId), { uid: newUid });
+    if(oldUid){
+      await setDoc(doc(db,'profiles', oldUid), { blocked: true }, { merge: true });
+      await deleteDoc(doc(db,'roles', oldUid)).catch(()=>{});
+    }
+    await signOut(authSecondaryEinst);
+    toast('Neuer Zugang "' + newUsername + '" erstellt und mit "' + emp.name + '" verknüpft.');
+  }catch(err){
+    console.error(err);
+    var map = { 'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.', 'auth/weak-password': 'Passwort zu schwach (mind. 6 Zeichen).' };
+    toast(map[err.code] || ('Fehlgeschlagen: ' + (err.code || err.message)));
+  }
+}
+
+/* ---- Eigenes Passwort ändern (jeder angemeldete Nutzer) ---- */
+$("#own-password-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var currentPw = $("#op-current").value;
+  var newPw = $("#op-new").value;
+  if(!currentPw || !newPw){ toast("Bitte beide Felder ausfüllen."); return; }
+  if(newPw.length<6){ toast("Neues Passwort braucht mindestens 6 Zeichen."); return; }
+  var user = auth.currentUser;
+  if(!user || !user.email){ toast("Nicht angemeldet."); return; }
+  try{
+    var cred2 = EmailAuthProvider.credential(user.email, currentPw);
+    await reauthenticateWithCredential(user, cred2);
+    await updatePassword(user, newPw);
+    $("#op-current").value = ""; $("#op-new").value = "";
+    toast("Passwort geändert.");
+  }catch(err){
+    console.error(err);
+    var map2 = { 'auth/wrong-password': 'Aktuelles Passwort ist falsch.', 'auth/invalid-credential': 'Aktuelles Passwort ist falsch.', 'auth/weak-password': 'Neues Passwort zu schwach (mind. 6 Zeichen).', 'auth/too-many-requests': 'Zu viele Versuche — bitte kurz warten.' };
+    toast(map2[err.code] || ('Fehlgeschlagen: ' + (err.code || err.message)));
   }
 });
 
