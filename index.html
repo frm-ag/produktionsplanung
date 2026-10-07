@@ -404,6 +404,9 @@
   .zeit-status-pill.abwesend{background:#e3ebf3;color:var(--accent);}
   .zeit-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--border);}
   .zeit-edit-row select{flex:1 1 130px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
+  .zeit-edit-row .ze-type-label{flex:1 1 130px;font-size:12.5px;font-weight:700;padding:7px 8px;border-radius:5px;border:1px solid transparent;text-align:center;}
+  .zeit-edit-row .ze-type-kommen{background:var(--success-bg,#e4f6ec);color:var(--success,#1f9d55);}
+  .zeit-edit-row .ze-type-gehen{background:var(--danger-bg,#fbe6e6);color:var(--danger,#d64545);}
   .zeit-edit-row input[type="time"]{flex:1 1 90px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row input.ze-order{flex:1 1 100%;font:inherit;font-size:12px;padding:6px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row .zeit-edit-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
@@ -2520,44 +2523,67 @@ function timeInputToTs(dateIso, hhmm){
   d.setHours(parseInt(parts[0],10)||0, parseInt(parts[1],10)||0, 0, 0);
   return d.getTime();
 }
+// Der Typ (Kommen/Gehen) wird nicht mehr manuell gewählt, sondern ergibt sich automatisch
+// aus der zeitlichen Reihenfolge der Einträge eines Tages: 1./3./5. Eintrag = Kommen,
+// 2./4./6. Eintrag = Gehen. So entsteht immer schön abwechselnd Kommen/Gehen/Kommen/Gehen.
+function zeitEditTypeForIndex(i){ return i%2===0 ? "kommen" : "gehen"; }
 function renderZeitEditRows(){
   if(!zeitEditUid) return;
   var entries = timeEntriesForUid(zeitEditUid).filter(t=>t.date===zeitEditDate).sort((a,b)=>a.timestamp-b.timestamp);
   var list = $("#zeit-edit-rows");
   if(entries.length===0){ list.innerHTML = '<div class="empty-note">Keine Einträge an diesem Tag.</div>'; return; }
-  list.innerHTML = entries.map(e=>
+  list.innerHTML = entries.map((e,i)=>
     '<div class="zeit-edit-row" data-id="' + e.id + '">' +
-    '<select class="ze-type"><option value="kommen"' + (e.type==="kommen"?" selected":"") + '>Kommen</option><option value="gehen"' + (e.type==="gehen"?" selected":"") + '>Gehen</option></select>' +
+    '<span class="ze-type-label ' + (zeitEditTypeForIndex(i)==="kommen"?"ze-type-kommen":"ze-type-gehen") + '">' + (zeitEditTypeForIndex(i)==="kommen"?"Kommen":"Gehen") + '</span>' +
     '<input type="time" class="ze-time" value="' + tsToTimeInput(e.timestamp) + '">' +
     '<button type="button" class="zeit-edit-remove" aria-label="Eintrag löschen">✕</button>' +
     '<input type="text" class="ze-order" list="zeit-edit-order-list" placeholder="Auftrag (optional)" value="' + escapeHtml(e.orderNumber||"") + '">' +
     '</div>'
   ).join("");
 }
+// Gleicht nach einer Änderung (Hinzufügen/Zeit ändern/Löschen) den "type" aller Einträge eines
+// Tages mit der chronologischen Reihenfolge ab, damit Statistiken/PDF/Export immer korrekt
+// zwischen Kommen und Gehen unterscheiden.
+async function syncZeitEditTypes(uid, dateIso){
+  var entries = timeEntriesForUid(uid).filter(t=>t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp);
+  for(var i=0;i<entries.length;i++){
+    var expected = zeitEditTypeForIndex(i);
+    if(entries[i].type !== expected){
+      try{ await updateDoc(doc(db, TIME_COLLECTION, entries[i].id), { type: expected }); }
+      catch(err){ console.error(err); }
+    }
+  }
+}
 $("#zeit-edit-add-btn").addEventListener("click", async ()=>{
   if(!zeitEditUid) return;
   try{
-    await addDoc(collection(db, TIME_COLLECTION), { uid: zeitEditUid, name: zeitEditName, type: "kommen", timestamp: timeInputToTs(zeitEditDate, "08:00"), date: zeitEditDate });
+    var entries = timeEntriesForUid(zeitEditUid).filter(t=>t.date===zeitEditDate);
+    var nextType = zeitEditTypeForIndex(entries.length);
+    await addDoc(collection(db, TIME_COLLECTION), { uid: zeitEditUid, name: zeitEditName, type: nextType, timestamp: timeInputToTs(zeitEditDate, "08:00"), date: zeitEditDate });
+    await syncZeitEditTypes(zeitEditUid, zeitEditDate);
   }catch(err){ console.error(err); toast("Hinzufügen fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#zeit-edit-rows").addEventListener("click", async e=>{
   var rmBtn = e.target.closest(".zeit-edit-remove"); if(!rmBtn) return;
   var id = rmBtn.closest(".zeit-edit-row").dataset.id;
-  try{ await deleteDoc(doc(db, TIME_COLLECTION, id)); } catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+  try{
+    await deleteDoc(doc(db, TIME_COLLECTION, id));
+    await syncZeitEditTypes(zeitEditUid, zeitEditDate);
+  } catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#zeit-edit-rows").addEventListener("change", async e=>{
   var row = e.target.closest(".zeit-edit-row"); if(!row) return;
   var id = row.dataset.id;
-  var type = row.querySelector(".ze-type").value;
   var time = row.querySelector(".ze-time").value;
   var orderTyped = row.querySelector(".ze-order").value.trim();
   var match = orderTyped ? resolveOrderFromText(orderTyped) : null;
-  var data = { type: type, timestamp: timeInputToTs(zeitEditDate, time) };
+  var data = { timestamp: timeInputToTs(zeitEditDate, time) };
   data.orderId = match ? match.id : null;
   data.orderNumber = match ? match.orderNumber : null;
   if(orderTyped && !match) toast('Kein offener Auftrag mit der Nummer "' + orderTyped + '" gefunden — Auftrag nicht gespeichert.');
   try{
     await updateDoc(doc(db, TIME_COLLECTION, id), data);
+    await syncZeitEditTypes(zeitEditUid, zeitEditDate);
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 // Während das Bearbeiten-Fenster offen ist, Liste bei neuen Daten aktuell halten.
@@ -3129,7 +3155,7 @@ function buildTimesheetSectionHtml(emp, mode){
     days = daysInMonthIso(toISO(refD)).map(iso=>fromISO(iso));
     rangeLabel = ferienMonthLabel(toISO(refD));
   }
-  var sollTotal = 0, habenTotal = 0;
+  var sollTotal = 0, habenTotal = 0, ferienUsedTotal = 0, kompensationUsedTotal = 0, krankTotal = 0;
   var rowsHtml = days.map(d=>{
     var iso = toISO(d);
     var absence = absenceForDay(emp.id, iso);
@@ -3148,7 +3174,14 @@ function buildTimesheetSectionHtml(emp, mode){
     var totalMs = (kommen && gehen) ? (gehen - kommen - pauseMs) : null;
     var habenH = totalMs!=null ? totalMs/3600000 : 0;
     var soll = sollHoursForDate(emp, iso);
+    var sollVorAbwesenheit = soll;
     if(soll != null && absence){ soll = absence.partial ? Math.max(0, soll - (absence.hours||0)) : 0; }
+    if(absence){
+      var usedH = absence.partial ? (absence.hours||0) : (sollVorAbwesenheit!=null?sollVorAbwesenheit:0);
+      if(absence.type==="ferien" || absence.type==="betriebsferien") ferienUsedTotal += usedH;
+      else if(absence.type==="kompensation") kompensationUsedTotal += usedH;
+      else if(absence.type==="krank") krankTotal += usedH;
+    }
     if(soll != null) sollTotal += soll;
     habenTotal += habenH;
     return '<tr>' +
@@ -3170,7 +3203,13 @@ function buildTimesheetSectionHtml(emp, mode){
     '<tbody>' + rowsHtml + '</tbody>' +
     '<tfoot><tr><td colspan="4">Summe</td><td>' + habenTotal.toFixed(1) + 'h</td><td>' + sollTotal.toFixed(1) + 'h</td><td>Saldo: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + 'h</td><td></td></tr></tfoot>' +
     '</table>' +
-    '<p style="font-size:11px;color:#69737d;margin-top:18px;">Feriensaldo aktuell: ' + (typeof emp.ferienSaldo==="number"?emp.ferienSaldo.toFixed(1):"0.0") + ' Std. · Überstunden-Saldo aktuell: ' + (typeof emp.ueberstundenSaldo==="number"?(emp.ueberstundenSaldo>0?"+":"")+emp.ueberstundenSaldo.toFixed(1):"0.0") + ' Std.</p>'
+    '<p style="font-size:11px;color:#69737d;margin-top:18px;line-height:1.6;">' +
+      '<strong>Aktueller Stand:</strong> Überstunden-Saldo: ' + (typeof emp.ueberstundenSaldo==="number"?(emp.ueberstundenSaldo>0?"+":"")+emp.ueberstundenSaldo.toFixed(1):"0.0") + ' Std. · Feriensaldo: ' + (typeof emp.ferienSaldo==="number"?emp.ferienSaldo.toFixed(1):"0.0") + ' Std.' +
+      '<br><strong>In diesem Zeitraum (' + rangeLabel + '):</strong> Saldo-Veränderung: ' + (saldoTotal>0?"+":"") + saldoTotal.toFixed(1) + ' Std.' +
+      (ferienUsedTotal>0.01 ? ' · Ferien verwendet: ' + ferienUsedTotal.toFixed(1) + ' Std.' : '') +
+      (kompensationUsedTotal>0.01 ? ' · Kompensation bezogen: ' + kompensationUsedTotal.toFixed(1) + ' Std.' : '') +
+      (krankTotal>0.01 ? ' · Krank: ' + krankTotal.toFixed(1) + ' Std.' : '') +
+    '</p>'
   };
 }
 var TIMESHEET_PRINT_STYLE = '<style>body{font-family:Arial,sans-serif;padding:24px;color:#1f2933;} h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#69737d;margin-bottom:18px;} table{width:100%;border-collapse:collapse;font-size:12px;} th,td{border:1px solid #dde2e7;padding:5px 7px;text-align:left;} th{background:#eef1f4;} tfoot td{font-weight:700;background:#f3f5f7;} .ts-section{page-break-after:always;} .ts-section:last-child{page-break-after:auto;}</style>';
