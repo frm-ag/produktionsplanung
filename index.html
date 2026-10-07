@@ -1374,6 +1374,10 @@
         <tbody id="mitarbeiter-edit-tbody"></tbody>
       </table>
     </div>
+  </div>
+
+  <div id="verwaltung-page" style="display:none;">
+    <div id="verwaltung-main"></div>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Mein Zugang</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Gilt nur für dein eigenes, aktuell angemeldetes Konto.</div>
@@ -1387,10 +1391,6 @@
       <input type="password" id="op-new" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password" required style="flex:1 1 200px;">
       <button type="submit" class="btn primary">Passwort ändern</button>
     </form>
-  </div>
-
-  <div id="verwaltung-page" style="display:none;">
-    <div id="verwaltung-main"></div>
   </div>
 
   <div id="lager-page">
@@ -1666,7 +1666,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
-  reauthenticateWithCredential, EmailAuthProvider, updatePassword, updateEmail
+  reauthenticateWithCredential, EmailAuthProvider, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ---- Gleiche Firebase-Konfiguration wie Mat.Lager ----
@@ -3401,7 +3401,11 @@ async function resetMitarbeiterZugang(empId){
   }
 }
 
-/* ---- Eigenen Login-Namen ändern (jeder angemeldete Nutzer) ---- */
+/* ---- Eigenen Login-Namen ändern (jeder angemeldete Nutzer) ----
+   Firebase erlaubt bei diesem Projekt kein direktes updateEmail() mehr (auth/operation-not-allowed,
+   da E-Mail-Änderungen eine Verifizierung verlangen — für unsere Fake-Domain @matlager.local nicht
+   möglich). Deshalb über denselben "neues Konto anlegen & verknüpfen"-Mechanismus wie beim Zugang-
+   Zurücksetzen für andere Mitarbeiter, nur für das eigene Konto: Passwort bleibt dabei unverändert. */
 $("#own-username-form").addEventListener("submit", async e=>{
   e.preventDefault();
   var currentPw2 = $("#ou-current-pw").value;
@@ -3410,15 +3414,27 @@ $("#own-username-form").addEventListener("submit", async e=>{
   if(!/^[a-zA-Z0-9_-]+$/.test(newUsername2)){ toast("Nur Buchstaben, Zahlen, - und _ erlaubt."); return; }
   var user2 = auth.currentUser;
   if(!user2 || !user2.email){ toast("Nicht angemeldet."); return; }
+  if(!confirm('Login-Name auf "' + newUsername2 + '" ändern? Du wirst danach automatisch neu angemeldet, das Passwort bleibt gleich.')) return;
+  var oldUid = user2.uid;
+  var oldEmail = user2.email;
+  var newEmail = usernameToAuthEmail(newUsername2);
   try{
-    var cred3 = EmailAuthProvider.credential(user2.email, currentPw2);
+    var cred3 = EmailAuthProvider.credential(oldEmail, currentPw2);
     await reauthenticateWithCredential(user2, cred3);
-    var newEmail = usernameToAuthEmail(newUsername2);
-    await updateEmail(user2, newEmail);
-    await setDoc(doc(db, 'profiles', user2.uid), { username: newUsername2.toLowerCase() }, { merge: true });
-    state.currentName = newUsername2.toLowerCase();
+    var cred4 = await createUserWithEmailAndPassword(authSecondaryEinst, newEmail, currentPw2);
+    var newUid = cred4.user.uid;
+    var wasAdmin2 = state.isAdmin;
+    await setDoc(doc(db,'profiles', newUid), { username: newUsername2.toLowerCase(), createdAt: Date.now(), createdBy: state.currentName });
+    if(wasAdmin2) await setDoc(doc(db,'roles', newUid), { role: 'admin' });
+    var meEmp2 = state.staff.find(s=>s.uid===oldUid);
+    if(meEmp2) await updateDoc(doc(db, STAFF_COLLECTION, meEmp2.id), { uid: newUid });
+    await setDoc(doc(db,'profiles', oldUid), { blocked: true }, { merge: true });
+    await deleteDoc(doc(db,'roles', oldUid)).catch(()=>{});
+    await signOut(authSecondaryEinst);
     $("#ou-current-pw").value = ""; $("#ou-new-username").value = "";
-    toast("Login-Name geändert auf \"" + newUsername2 + "\".");
+    toast('Login-Name geändert auf "' + newUsername2 + '" — du wirst neu angemeldet…');
+    await signOut(auth);
+    await signInWithEmailAndPassword(auth, newEmail, currentPw2);
   }catch(err){
     console.error(err);
     var map3 = { 'auth/wrong-password': 'Aktuelles Passwort ist falsch.', 'auth/invalid-credential': 'Aktuelles Passwort ist falsch.', 'auth/email-already-in-use': 'Dieser Login-Name ist bereits vergeben.', 'auth/too-many-requests': 'Zu viele Versuche — bitte kurz warten.' };
