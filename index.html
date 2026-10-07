@@ -480,6 +480,20 @@
   .ov-orderno{font-family:var(--mono);font-weight:700;}
   .ov-customer{font-weight:600;}
   .ov-desc{color:var(--text-muted);font-size:11px;margin-top:1px;}
+  /* Zeiterfassung-Übersicht: feste, prozentuale Spaltenbreiten statt am Inhalt orientierter
+     Breite — damit die Tabelle immer in die verfügbare Breite passt, ohne seitlich zu scrollen. */
+  #zeit-admin-table{min-width:0;table-layout:fixed;}
+  #zeit-admin-table th, #zeit-admin-table td{padding:8px 6px;overflow:hidden;text-overflow:ellipsis;}
+  #zeit-admin-table th:nth-child(1), #zeit-admin-table td:nth-child(1){width:17%;white-space:normal;}
+  #zeit-admin-table th:nth-child(2), #zeit-admin-table td:nth-child(2){width:13%;}
+  #zeit-admin-table th:nth-child(3), #zeit-admin-table td:nth-child(3){width:14%;}
+  #zeit-admin-table th:nth-child(4), #zeit-admin-table td:nth-child(4){width:12%;white-space:normal;}
+  #zeit-admin-table th:nth-child(5), #zeit-admin-table td:nth-child(5){width:11%;}
+  #zeit-admin-table th:nth-child(6), #zeit-admin-table td:nth-child(6){width:11%;}
+  #zeit-admin-table th:nth-child(7), #zeit-admin-table td:nth-child(7){width:11%;}
+  #zeit-admin-table th:nth-child(8), #zeit-admin-table td:nth-child(8){width:11%;}
+  #zeit-admin-table .staff-link-select{font-size:9.5px;padding:3px 2px;}
+  #zeit-admin-table .zeit-status-pill{white-space:nowrap;}
   .ov-mat-line{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;white-space:nowrap;}
   .ov-mat-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
   .ov-mat-line .mdot.ok{background:var(--success);}
