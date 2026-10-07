@@ -407,6 +407,9 @@
   .zeit-edit-row .ze-type-label{flex:1 1 130px;font-size:12.5px;font-weight:700;padding:7px 8px;border-radius:5px;border:1px solid transparent;text-align:center;}
   .zeit-edit-row .ze-type-kommen{background:var(--success-bg,#e4f6ec);color:var(--success,#1f9d55);}
   .zeit-edit-row .ze-type-gehen{background:var(--danger-bg,#fbe6e6);color:var(--danger,#d64545);}
+  .zeit-edit-row .ze-time-group{flex:1 1 110px;display:flex;align-items:center;gap:3px;}
+  .zeit-edit-row .ze-time-group select{flex:1 1 44px;font:inherit;font-size:13px;padding:7px 4px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);text-align:center;}
+  .zeit-edit-row .ze-time-sep{font-weight:700;color:var(--text-muted);}
   .zeit-edit-row input[type="time"]{flex:1 1 90px;font:inherit;font-size:12.5px;padding:7px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row input.ze-order{flex:1 1 100%;font:inherit;font-size:12px;padding:6px 8px;border-radius:5px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .zeit-edit-row .zeit-edit-remove{border:none;background:transparent;color:#a9b2b8;cursor:pointer;font-size:15px;width:26px;height:26px;border-radius:5px;flex:none;}
@@ -1213,7 +1216,7 @@
       <div class="table-scroll">
         <table class="overview-table" id="zeit-admin-table">
           <thead>
-            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Total</th><th>Soll</th><th>Saldo</th><th>Überstd.</th></tr>
+            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Pause</th><th>Haben</th><th>Soll</th><th>Saldo</th></tr>
           </thead>
           <tbody id="zeit-admin-tbody"></tbody>
         </table>
@@ -2440,7 +2443,7 @@ $("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 function renderZeitOverview(){
   var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
   var tbody = $("#zeit-admin-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="10">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="9">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
   var rows = state.staff.map(emp=>{
     var absence = absenceForDay(emp.id, dateIso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
@@ -2474,10 +2477,9 @@ function renderZeitOverview(){
     '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + (r.orderNumbers.length?('<br><span style="font-size:9.5px;color:var(--accent);">Auftr. ' + r.orderNumbers.map(escapeHtml).join(", ") + '</span>'):"") + '</td>' +
     '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
     '<td data-label="Pause">' + (r.pauseMs?fmtDuration(r.pauseMs):"–") + '</td>' +
-    '<td data-label="Total">' + fmtDuration(r.totalMs) + '</td>' +
+    '<td data-label="Haben">' + fmtDuration(r.totalMs) + '</td>' +
     '<td data-label="Soll">' + (r.soll!=null ? r.soll.toFixed(1)+"h" : "–") + '</td>' +
-    '<td data-label="Saldo">' + (r.saldo!=null ? ('<span style="color:'+(r.saldo<-0.05?"var(--danger)":r.saldo>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.saldo>0?"+":"")+r.saldo.toFixed(1)+"h</span>") : "–") + '</td>' +
-    '<td data-label="Überstd.">' + '<span style="color:'+(r.ueberstd<-0.05?"var(--danger)":r.ueberstd>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.ueberstd>0?"+":"")+r.ueberstd.toFixed(1)+"h</span>" + '</td></tr>'
+    '<td data-label="Saldo">' + (r.saldo!=null ? ('<span style="color:'+(r.saldo<-0.05?"var(--danger)":r.saldo>0.05?"var(--success)":"inherit")+';font-weight:600;">'+(r.saldo>0?"+":"")+r.saldo.toFixed(1)+"h</span>") : "–") + '</td></tr>'
   ).join("");
 }
 $("#zeit-admin-tbody").addEventListener("click", e=>{
@@ -2527,19 +2529,30 @@ function timeInputToTs(dateIso, hhmm){
 // aus der zeitlichen Reihenfolge der Einträge eines Tages: 1./3./5. Eintrag = Kommen,
 // 2./4./6. Eintrag = Gehen. So entsteht immer schön abwechselnd Kommen/Gehen/Kommen/Gehen.
 function zeitEditTypeForIndex(i){ return i%2===0 ? "kommen" : "gehen"; }
+// Zwei einfache Dropdowns (Stunde/Minute) statt des nativen "time"-Eingabefelds — zuverlässiger
+// und einfacher zu bedienen als die browsereigene Zeit-Auswahl, besonders auf Tablets.
+var ZE_HOUR_OPTIONS = Array.from({length:24}, (_,i)=> String(i).padStart(2,"0"));
+var ZE_MIN_OPTIONS = Array.from({length:60}, (_,i)=> String(i).padStart(2,"0"));
+function zeHourSelectHtml(selectedH){
+  return '<select class="ze-hour">' + ZE_HOUR_OPTIONS.map(h=>'<option value="'+h+'"'+(h===selectedH?" selected":"")+'>'+h+'</option>').join("") + '</select>';
+}
+function zeMinSelectHtml(selectedM){
+  return '<select class="ze-min">' + ZE_MIN_OPTIONS.map(m=>'<option value="'+m+'"'+(m===selectedM?" selected":"")+'>'+m+'</option>').join("") + '</select>';
+}
 function renderZeitEditRows(){
   if(!zeitEditUid) return;
   var entries = timeEntriesForUid(zeitEditUid).filter(t=>t.date===zeitEditDate).sort((a,b)=>a.timestamp-b.timestamp);
   var list = $("#zeit-edit-rows");
   if(entries.length===0){ list.innerHTML = '<div class="empty-note">Keine Einträge an diesem Tag.</div>'; return; }
-  list.innerHTML = entries.map((e,i)=>
-    '<div class="zeit-edit-row" data-id="' + e.id + '">' +
+  list.innerHTML = entries.map((e,i)=>{
+    var hhmm = tsToTimeInput(e.timestamp).split(":");
+    return '<div class="zeit-edit-row" data-id="' + e.id + '">' +
     '<span class="ze-type-label ' + (zeitEditTypeForIndex(i)==="kommen"?"ze-type-kommen":"ze-type-gehen") + '">' + (zeitEditTypeForIndex(i)==="kommen"?"Kommen":"Gehen") + '</span>' +
-    '<input type="time" class="ze-time" value="' + tsToTimeInput(e.timestamp) + '">' +
+    '<span class="ze-time-group">' + zeHourSelectHtml(hhmm[0]) + '<span class="ze-time-sep">:</span>' + zeMinSelectHtml(hhmm[1]) + '</span>' +
     '<button type="button" class="zeit-edit-remove" aria-label="Eintrag löschen">✕</button>' +
     '<input type="text" class="ze-order" list="zeit-edit-order-list" placeholder="Auftrag (optional)" value="' + escapeHtml(e.orderNumber||"") + '">' +
-    '</div>'
-  ).join("");
+    '</div>';
+  }).join("");
 }
 // Gleicht nach einer Änderung (Hinzufügen/Zeit ändern/Löschen) den "type" aller Einträge eines
 // Tages mit der chronologischen Reihenfolge ab, damit Statistiken/PDF/Export immer korrekt
@@ -2574,7 +2587,7 @@ $("#zeit-edit-rows").addEventListener("click", async e=>{
 $("#zeit-edit-rows").addEventListener("change", async e=>{
   var row = e.target.closest(".zeit-edit-row"); if(!row) return;
   var id = row.dataset.id;
-  var time = row.querySelector(".ze-time").value;
+  var time = row.querySelector(".ze-hour").value + ":" + row.querySelector(".ze-min").value;
   var orderTyped = row.querySelector(".ze-order").value.trim();
   var match = orderTyped ? resolveOrderFromText(orderTyped) : null;
   var data = { timestamp: timeInputToTs(zeitEditDate, time) };
