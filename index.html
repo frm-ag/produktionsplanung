@@ -2589,8 +2589,8 @@ async function zeitPunch(type){
 }
 $("#zeit-punch-order").addEventListener("input", e=>{ if(!e.target.disabled) updateZeitPunchKostenartField(resolveOrderFromText(e.target.value), false); });
 $("#zeit-punch-order-select").addEventListener("change", e=>{ if(!e.target.disabled) updateZeitPunchKostenartField(state.orders.find(x=>x.id===e.target.value), false); });
-$("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
-$("#zeit-gehen").addEventListener("click", ()=>zeitPunch("gehen"));
+$("#zeit-kommen").addEventListener("click", ()=>{ if(confirm("Jetzt einstempeln?")) zeitPunch("kommen"); });
+$("#zeit-gehen").addEventListener("click", ()=>{ if(confirm("Jetzt ausstempeln?")) zeitPunch("gehen"); });
 
 // Ein- bzw. Ausstempeln direkt über den eigenen Einsatz-Chip in der Personalplanung
 // (nur für den eigenen, heutigen Eintrag — siehe data-punchable in renderStaffGrid).
