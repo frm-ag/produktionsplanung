@@ -1404,12 +1404,13 @@
     <div class="table-scroll">
       <table class="overview-table" id="kostenarten-stamm-table">
         <thead>
-          <tr><th>Bezeichnung</th><th>Standard-Ansatz (Fr./Std.)</th><th></th><th></th></tr>
+          <tr><th>Nummer</th><th>Bezeichnung</th><th>Standard-Ansatz (Fr./Std.)</th><th></th><th></th></tr>
         </thead>
         <tbody id="kostenarten-stamm-tbody"></tbody>
       </table>
     </div>
     <form id="kostenarten-stamm-add-form" class="zm-add-form">
+      <input type="text" id="ks-nummer" placeholder="Nr., z. B. 3001" style="max-width:120px;">
       <input type="text" id="ks-bezeichnung" placeholder="Bezeichnung, z. B. Montage" required style="flex:1 1 220px;">
       <input type="number" id="ks-ansatz" placeholder="Fr./Std." min="0" step="0.01" style="max-width:140px;">
       <button type="submit" class="btn primary" id="kostenarten-stamm-submit-btn">+ Kostenart</button>
@@ -3556,15 +3557,16 @@ function feiertagForDay(iso){
 function renderKostenartenStammPanel(){
   var tbody = $("#kostenarten-stamm-tbody");
   if(!tbody) return;
-  var sorted = state.kostenartenStamm.slice().sort((a,b)=> (a.bezeichnung||"").localeCompare(b.bezeichnung||""));
+  var sorted = state.kostenartenStamm.slice().sort((a,b)=> (a.nummer||"").localeCompare(b.nummer||"", undefined, {numeric:true}) || (a.bezeichnung||"").localeCompare(b.bezeichnung||""));
   var dl = $("#kostenarten-stamm-list");
   if(dl) dl.innerHTML = sorted.map(k=>'<option value="' + escapeHtml(k.bezeichnung) + '">').join("");
   if(sorted.length===0){
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);font-size:12.5px;">Noch keine Kostenarten erfasst.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);font-size:12.5px;">Noch keine Kostenarten erfasst.</td></tr>';
     return;
   }
   tbody.innerHTML = sorted.map(k=>
     '<tr data-ks-id="' + k.id + '" class="ks-row" style="cursor:pointer;">' +
+    '<td>' + escapeHtml(k.nummer||"") + '</td>' +
     '<td>' + escapeHtml(k.bezeichnung) + '</td>' +
     '<td>' + (k.ansatz!=null ? fmtChf(k.ansatz) : '–') + '</td>' +
     '<td><button type="button" class="ks-to-kostenstelle" data-ks-id="' + k.id + '" title="Als Kostenstelle statt Kostenart führen">→ Kostenstelle</button></td>' +
@@ -3575,6 +3577,7 @@ function renderKostenartenStammPanel(){
 var editingKostenartStammId = null;
 function startEditKostenartStamm(k){
   editingKostenartStammId = k.id;
+  $("#ks-nummer").value = k.nummer || "";
   $("#ks-bezeichnung").value = k.bezeichnung || "";
   $("#ks-ansatz").value = (k.ansatz!=null) ? k.ansatz : "";
   $("#kostenarten-stamm-submit-btn").textContent = "Speichern";
@@ -3583,18 +3586,19 @@ function startEditKostenartStamm(k){
 }
 function cancelEditKostenartStamm(){
   editingKostenartStammId = null;
-  $("#ks-bezeichnung").value = ""; $("#ks-ansatz").value = "";
+  $("#ks-nummer").value = ""; $("#ks-bezeichnung").value = ""; $("#ks-ansatz").value = "";
   $("#kostenarten-stamm-submit-btn").textContent = "+ Kostenart";
   $("#kostenarten-stamm-cancel-btn").style.display = "none";
 }
 $("#kostenarten-stamm-cancel-btn").addEventListener("click", cancelEditKostenartStamm);
 $("#kostenarten-stamm-add-form").addEventListener("submit", async e=>{
   e.preventDefault();
+  var nummer = $("#ks-nummer").value.trim();
   var bezeichnung = $("#ks-bezeichnung").value.trim();
   var ansatzVal = $("#ks-ansatz").value;
   if(!bezeichnung){ toast("Bitte eine Bezeichnung angeben."); return; }
   try{
-    var payload = { bezeichnung: bezeichnung, ansatz: ansatzVal===""?null:parseFloat(ansatzVal) };
+    var payload = { nummer: nummer, bezeichnung: bezeichnung, ansatz: ansatzVal===""?null:parseFloat(ansatzVal) };
     if(editingKostenartStammId){
       await updateDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, editingKostenartStammId), payload);
       toast("Kostenart aktualisiert.");
@@ -3625,10 +3629,12 @@ $("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
     if(!km) return;
     if(!(await showConfirm('"' + km.bezeichnung + '" als Kostenstelle statt Kostenart führen? Wird dort neu angelegt und hier entfernt.'))) return;
     try{
-      var bez = (km.bezeichnung||"").trim();
-      var m = bez.match(/^(\S+)\s+(.+)$/);
-      var nummer = m ? m[1] : "";
-      var rest = m ? m[2] : bez;
+      var nummer = km.nummer || "";
+      var rest = (km.bezeichnung||"").trim();
+      if(!nummer){
+        var m = rest.match(/^(\S+)\s+(.+)$/);
+        if(m){ nummer = m[1]; rest = m[2]; }
+      }
       await addDoc(collection(db, KOSTENSTELLEN_COLLECTION), { nummer: nummer, bezeichnung: rest, createdAt: Date.now() });
       await deleteDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, km.id));
       if(editingKostenartStammId === km.id) cancelEditKostenartStamm();
