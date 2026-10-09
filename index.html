@@ -1397,7 +1397,7 @@
     <div class="table-scroll">
       <table class="overview-table" id="mitarbeiter-edit-table">
         <thead>
-          <tr><th>Name</th><th></th><th>Konto</th><th>Login</th><th></th><th>Feriensaldo</th><th>Anpassen</th></tr>
+          <tr><th>Name</th><th></th><th>Konto</th><th>Login</th><th></th><th>Feriensaldo</th><th>Anpassen</th><th></th></tr>
         </thead>
         <tbody id="mitarbeiter-edit-tbody"></tbody>
       </table>
@@ -1630,6 +1630,71 @@
         <div style="display:flex;gap:8px;margin-left:auto;">
           <button type="button" class="btn" id="staff-add-cancel-btn">Abbrechen</button>
           <button type="submit" class="btn primary">Hinzufügen</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="ma-detail-modal-backdrop">
+  <div class="modal" style="max-width:520px;">
+    <h3 id="ma-detail-modal-title">Mitarbeiterdaten</h3>
+    <form id="ma-detail-form">
+      <div class="field-row">
+        <div class="field"><label for="ma-beruf">Beruf</label><input id="ma-beruf"></div>
+        <div class="field"><label for="ma-initialen">Initialen</label><input id="ma-initialen" maxlength="6"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-geschlecht">Geschlecht</label>
+          <select id="ma-geschlecht"><option value="">—</option><option value="m">Männlich</option><option value="w">Weiblich</option><option value="d">Divers</option></select>
+        </div>
+        <div class="field"><label for="ma-zivilstand">Zivilstand</label>
+          <select id="ma-zivilstand"><option value="">—</option><option value="ledig">Ledig</option><option value="verheiratet">Verheiratet</option><option value="geschieden">Geschieden</option><option value="verwitwet">Verwitwet</option><option value="partnerschaft">Partnerschaft</option></select>
+        </div>
+      </div>
+      <div class="field"><label for="ma-ehepartner">Ehepartner/in</label><input id="ma-ehepartner"></div>
+      <div class="field-row">
+        <div class="field"><label for="ma-geburtsdatum">Geburtsdatum</label><input type="date" id="ma-geburtsdatum"></div>
+        <div class="field"><label for="ma-heimatort">Heimatort</label><input id="ma-heimatort"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-sprache">Sprache</label><input id="ma-sprache"></div>
+        <div class="field"><label for="ma-nation">Nation</label><input id="ma-nation"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-abteilung">Abteilung</label><input id="ma-abteilung"></div>
+        <div class="field"><label for="ma-vorgesetzter">Vorgesetzter</label>
+          <select id="ma-vorgesetzter"><option value="">—</option></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-sozvnr">SozV-Nr.</label><input id="ma-sozvnr"></div>
+        <div class="field"><label for="ma-interne-nr">Interne Nr.</label><input id="ma-interne-nr"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0;"><input type="checkbox" id="ma-kadermitglied" style="width:auto;"> Kadermitglied</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0;"><input type="checkbox" id="ma-fehlstunden-anzeigen" style="width:auto;"> Fehlstunden anzeigen</label>
+      <div class="field-row">
+        <div class="field"><label for="ma-zeiterfassung-typ">Zeiterfassung-Typ</label>
+          <select id="ma-zeiterfassung-typ"><option value="">—</option><option value="stempeln">Stempeln</option><option value="fix">Fixe Zeiten</option><option value="keine">Keine Zeiterfassung</option></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-fix-start">Fixe Start-Zeit</label><input type="time" id="ma-fix-start"></div>
+        <div class="field"><label for="ma-fix-stop">Fixe Stop-Zeit</label><input type="time" id="ma-fix-stop"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-eintritt">Eintritt</label><input type="date" id="ma-eintritt"></div>
+        <div class="field"><label for="ma-probezeit">Probezeit (Monate)</label><input type="number" id="ma-probezeit" step="1" min="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="ma-austritt">Austritt</label><input type="date" id="ma-austritt"></div>
+        <div class="field"><label for="ma-ferienanspruch">Ferienanspruch (Tage/Jahr)</label><input type="number" id="ma-ferienanspruch" step="0.5" min="0"></div>
+      </div>
+      <div class="field"><label for="ma-anmerkung">Anmerkung</label><textarea id="ma-anmerkung" rows="2" style="width:100%;font:inherit;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></textarea></div>
+      <div class="modal-actions">
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button type="button" class="btn" id="ma-detail-cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Speichern</button>
         </div>
       </div>
     </form>
@@ -3389,7 +3454,7 @@ function terminserieForDay(employeeId, iso){
 function renderMitarbeiterEditPanel(){
   var tbody = $("#mitarbeiter-edit-tbody");
   if(!tbody) return;
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
     var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
     return '<tr data-staff-id="' + emp.id + '">' +
@@ -3405,10 +3470,13 @@ function renderMitarbeiterEditPanel(){
         '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="Neuer Wert" id="set-saldo-set-' + emp.id + '"><button type="button" class="btn set-fs-saldo-set" data-staff-id="' + emp.id + '" title="Feriensaldo direkt auf diesen Wert setzen — z.B. am Jahresanfang">Setzen</button></div>' +
         '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="± Std." id="set-saldo-adjust-' + emp.id + '"><button type="button" class="btn set-fs-saldo-apply" data-staff-id="' + emp.id + '" title="Eingegebene Stunden zum aktuellen Feriensaldo dazuzählen (negative Zahl zum Abziehen)">± Buchen</button></div>' +
       '</div></td>' +
+      '<td><button type="button" class="btn me-detail-btn" data-staff-id="' + emp.id + '" title="Personal- &amp; Mitarbeiterdaten anzeigen/bearbeiten">Details</button></td>' +
       '</tr>';
   }).join("");
 }
 $("#mitarbeiter-edit-tbody").addEventListener("click", async e=>{
+  var detailBtn = e.target.closest(".me-detail-btn");
+  if(detailBtn){ openMaDetailModal(detailBtn.dataset.staffId); return; }
   var saveBtn = e.target.closest(".me-name-save");
   if(saveBtn){
     var staffId = saveBtn.dataset.staffId;
@@ -3447,6 +3515,79 @@ $("#mitarbeiter-edit-tbody").addEventListener("change", async e=>{
     await updateDoc(doc(db, STAFF_COLLECTION, staffId3), { uid: uid2 || null });
     toast(uid2 ? "Konto verknüpft." : "Verknüpfung entfernt.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+var maDetailBackdrop = $("#ma-detail-modal-backdrop");
+var maDetailStaffId = null;
+function openMaDetailModal(staffId){
+  var emp = state.staff.find(x=>x.id===staffId);
+  if(!emp) return;
+  maDetailStaffId = staffId;
+  $("#ma-detail-modal-title").textContent = "Mitarbeiterdaten — " + emp.name;
+  var vSel = $("#ma-vorgesetzter");
+  vSel.innerHTML = '<option value="">—</option>' + state.staff.filter(s=>s.id!==staffId).map(s=>'<option value="'+s.id+'">'+escapeHtml(s.name)+'</option>').join('');
+  $("#ma-beruf").value = emp.beruf || "";
+  $("#ma-initialen").value = emp.initialen || "";
+  $("#ma-geschlecht").value = emp.geschlecht || "";
+  $("#ma-zivilstand").value = emp.zivilstand || "";
+  $("#ma-ehepartner").value = emp.ehepartner || "";
+  $("#ma-geburtsdatum").value = emp.geburtsdatum || "";
+  $("#ma-heimatort").value = emp.heimatort || "";
+  $("#ma-sprache").value = emp.sprache || "";
+  $("#ma-nation").value = emp.nation || "";
+  $("#ma-abteilung").value = emp.abteilung || "";
+  vSel.value = emp.vorgesetzterId || "";
+  $("#ma-sozvnr").value = emp.sozvNr || "";
+  $("#ma-interne-nr").value = emp.interneNr || "";
+  $("#ma-kadermitglied").checked = !!emp.kadermitglied;
+  $("#ma-fehlstunden-anzeigen").checked = !!emp.fehlstundenAnzeigen;
+  $("#ma-zeiterfassung-typ").value = emp.zeiterfassungTyp || "";
+  $("#ma-fix-start").value = emp.fixStart || "";
+  $("#ma-fix-stop").value = emp.fixStop || "";
+  $("#ma-eintritt").value = emp.eintritt || "";
+  $("#ma-probezeit").value = (emp.probezeitMonate!=null) ? emp.probezeitMonate : "";
+  $("#ma-austritt").value = emp.austritt || "";
+  $("#ma-ferienanspruch").value = (emp.ferienanspruch!=null) ? emp.ferienanspruch : "";
+  $("#ma-anmerkung").value = emp.anmerkung || "";
+  maDetailBackdrop.classList.add("open");
+}
+function closeMaDetailModal(){ maDetailBackdrop.classList.remove("open"); maDetailStaffId = null; }
+$("#ma-detail-cancel-btn").addEventListener("click", closeMaDetailModal);
+maDetailBackdrop.addEventListener("click", e=>{ if(e.target===maDetailBackdrop) closeMaDetailModal(); });
+$("#ma-detail-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  if(!maDetailStaffId) return;
+  var probezeitVal = $("#ma-probezeit").value;
+  var ferienVal = $("#ma-ferienanspruch").value;
+  var payload = {
+    beruf: $("#ma-beruf").value.trim(),
+    initialen: $("#ma-initialen").value.trim(),
+    geschlecht: $("#ma-geschlecht").value,
+    zivilstand: $("#ma-zivilstand").value,
+    ehepartner: $("#ma-ehepartner").value.trim(),
+    geburtsdatum: $("#ma-geburtsdatum").value,
+    heimatort: $("#ma-heimatort").value.trim(),
+    sprache: $("#ma-sprache").value.trim(),
+    nation: $("#ma-nation").value.trim(),
+    abteilung: $("#ma-abteilung").value.trim(),
+    vorgesetzterId: $("#ma-vorgesetzter").value,
+    sozvNr: $("#ma-sozvnr").value.trim(),
+    interneNr: $("#ma-interne-nr").value.trim(),
+    kadermitglied: $("#ma-kadermitglied").checked,
+    fehlstundenAnzeigen: $("#ma-fehlstunden-anzeigen").checked,
+    zeiterfassungTyp: $("#ma-zeiterfassung-typ").value,
+    fixStart: $("#ma-fix-start").value,
+    fixStop: $("#ma-fix-stop").value,
+    eintritt: $("#ma-eintritt").value,
+    probezeitMonate: probezeitVal==="" ? null : parseFloat(probezeitVal),
+    austritt: $("#ma-austritt").value,
+    ferienanspruch: ferienVal==="" ? null : parseFloat(ferienVal),
+    anmerkung: $("#ma-anmerkung").value.trim()
+  };
+  try{
+    await updateDoc(doc(db, STAFF_COLLECTION, maDetailStaffId), payload);
+    closeMaDetailModal();
+    toast("Mitarbeiterdaten gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 // Legt für einen Mitarbeiter ein neues Login-Konto an und verknüpft es (uid) — das bisherige
 // Konto wird gesperrt. Nötig, weil ein bestehendes Passwort aus einer reinen Client-App heraus
