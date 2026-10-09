@@ -1415,6 +1415,23 @@
       <button type="button" class="btn" id="kostenarten-stamm-cancel-btn" style="display:none;">Abbrechen</button>
       <button type="button" class="btn" id="kostenarten-stamm-backfill-btn" title="Trägt alle Kostenarten, die bereits auf bestehenden Aufträgen erfasst sind, hier als Standard nach">Aus bestehenden Aufträgen übernehmen</button>
     </form>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Kostenstellen</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Stamm aller Kostenstellen, z. B. zur internen Zuordnung/Auswertung.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="kostenstellen-table">
+        <thead>
+          <tr><th>Nummer</th><th>Bezeichnung</th><th></th></tr>
+        </thead>
+        <tbody id="kostenstellen-tbody"></tbody>
+      </table>
+    </div>
+    <form id="kostenstellen-add-form" class="zm-add-form">
+      <input type="text" id="kst-nummer" placeholder="Nr., z. B. 100" style="max-width:120px;">
+      <input type="text" id="kst-bezeichnung" placeholder="Bezeichnung, z. B. Fertigung" required style="flex:1 1 220px;">
+      <button type="submit" class="btn primary" id="kostenstellen-submit-btn">+ Kostenstelle</button>
+      <button type="button" class="btn" id="kostenstellen-cancel-btn" style="display:none;">Abbrechen</button>
+    </form>
   </div>
 
   <div id="verwaltung-page" style="display:none;">
@@ -1712,8 +1729,9 @@
       </div>
       <div class="field-row">
         <div class="field"><label for="ma-austritt">Austritt</label><input type="date" id="ma-austritt"></div>
-        <div class="field"><label for="ma-ferienanspruch">Ferienanspruch (Tage/Jahr)</label><input type="number" id="ma-ferienanspruch" step="0.5" min="0"></div>
+        <div class="field"><label for="ma-ferienanspruch">Ferienanspruch (Std./Jahr)</label><input type="number" id="ma-ferienanspruch" step="1" min="0" placeholder="z. B. 210"></div>
       </div>
+      <div style="font-size:11px;color:var(--text-muted);margin:-6px 0 10px;">Wird automatisch einmal pro Kalenderjahr dem Feriensaldo gutgeschrieben (unter Verwaltung) — keine manuelle Eingabe dort mehr nötig.</div>
       <div class="field"><label for="ma-anmerkung">Anmerkung</label><textarea id="ma-anmerkung" rows="2" style="width:100%;font:inherit;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></textarea></div>
       <div class="modal-actions">
         <div style="display:flex;gap:8px;margin-left:auto;">
@@ -1923,6 +1941,7 @@ const FEIERTAGE_COLLECTION = "feiertage";
 const TERMINSERIEN_COLLECTION = "terminserien";
 const KUNDEN_COLLECTION = "kunden";
 const KOSTENARTEN_STAMM_COLLECTION = "kostenarten";
+const KOSTENSTELLEN_COLLECTION = "kostenstellen";
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -1971,6 +1990,7 @@ let unsubFeiertage = null;
 let unsubTerminserien = null;
 let unsubKunden = null;
 let unsubKostenartenStamm = null;
+let unsubKostenstellen = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -1995,6 +2015,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubFeiertage) unsubFeiertage();
     if(unsubKunden) unsubKunden();
     if(unsubKostenartenStamm) unsubKostenartenStamm();
+    if(unsubKostenstellen) unsubKostenstellen();
     subscribeOrders();
     subscribeStaff();
     subscribeAssignments();
@@ -2006,6 +2027,7 @@ onAuthStateChanged(auth, async user => {
     subscribeTerminserien();
     subscribeKunden();
     subscribeKostenartenStamm();
+    subscribeKostenstellen();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
@@ -2022,6 +2044,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubTerminserien) unsubTerminserien();
     if(unsubKunden) unsubKunden();
     if(unsubKostenartenStamm) unsubKostenartenStamm();
+    if(unsubKostenstellen) unsubKostenstellen();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -2076,6 +2099,14 @@ function subscribeKostenartenStamm(){
   }, err => { console.error(err); });
 }
 
+function subscribeKostenstellen(){
+  const q = query(collection(db, KOSTENSTELLEN_COLLECTION), orderBy('bezeichnung'));
+  unsubKostenstellen = onSnapshot(q, snap => {
+    state.kostenstellen = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => { console.error(err); });
+}
+
 function subscribeStaff(){
   const q = query(collection(db, STAFF_COLLECTION), orderBy('name'));
   unsubStaff = onSnapshot(q, snap => {
@@ -2095,6 +2126,7 @@ function subscribeStaff(){
     if(state.view === "einstellungen"){ renderMitarbeiterEditPanel(); }
     if(state.view === "verwaltung"){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); }
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 function subscribeProfiles(){
@@ -2128,6 +2160,7 @@ function subscribeAllTime(){
     if(state.view === "zeit") renderZeitOverview();
     if(state.view === "ferien") renderFerienPage();
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 function subscribeAbsences(){
@@ -2138,6 +2171,7 @@ function subscribeAbsences(){
     if(state.view === "staff") renderStaffPage();
     if(state.view === "ferien") renderFerienPage();
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 function subscribeZeitmodelle(){
@@ -2150,6 +2184,7 @@ function subscribeZeitmodelle(){
     if(state.view === "saldo") renderFerienSaldoPanel();
     if(state.view === "verwaltung") renderVerwaltungZeitmodellPanel();
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 function subscribeBetriebsferien(){
@@ -2161,6 +2196,7 @@ function subscribeBetriebsferien(){
     if(state.view === "zeit") renderZeitOverview();
     if(state.view === "saldo") renderFerienSaldoPanel();
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 function subscribeFeiertage(){
@@ -2172,6 +2208,7 @@ function subscribeFeiertage(){
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "saldo") renderFerienSaldoPanel();
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 function subscribeTerminserien(){
@@ -2184,13 +2221,14 @@ function subscribeTerminserien(){
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "saldo") renderFerienSaldoPanel();
     scheduleAutoBookUeberstunden();
+    scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
 }
 // (renderZeitPage aktualisiert bei Admin auch gleich die Übersichtstabelle mit.)
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2361,7 +2399,7 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); renderKostenstellenPanel(); return; }
   if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
   if(isBuchhaltung){ return; }
 }
@@ -3100,6 +3138,41 @@ function scheduleAutoBookUeberstunden(){
   clearTimeout(ueberstundenAutoBookTimer);
   ueberstundenAutoBookTimer = setTimeout(autoBookUeberstunden, 800);
 }
+
+/* ---- Ferienanspruch: automatische Jahresgutschrift ans Feriensaldo ----
+   Trägt den bei einem Mitarbeiter hinterlegten Ferienanspruch (Std./Jahr) einmal pro
+   Kalenderjahr automatisch ins Feriensaldo ein (ferienanspruchGebuchtJahr merkt sich das
+   zuletzt verbuchte Jahr je Mitarbeiter, damit nichts doppelt gutgeschrieben wird). Die
+   manuellen "Setzen"/"± Buchen"-Felder in der Verwaltung bleiben für Korrekturen/Startwerte
+   weiterhin verfügbar. */
+var ferienanspruchAutoBookBusy = false, ferienanspruchAutoBookQueued = false;
+async function autoBookFerienanspruch(){
+  if(!state.isAdmin) return;
+  if(ferienanspruchAutoBookBusy){ ferienanspruchAutoBookQueued = true; return; }
+  ferienanspruchAutoBookBusy = true;
+  try{
+    var currentYear = new Date().getFullYear();
+    for(var i=0;i<state.staff.length;i++){
+      var emp = state.staff[i];
+      var anspruch = emp.ferienanspruch;
+      if(anspruch==null || isNaN(anspruch) || anspruch<=0) continue;
+      var lastBooked = emp.ferienanspruchGebuchtJahr || null;
+      if(lastBooked === currentYear) continue;
+      try{
+        await updateDoc(doc(db, STAFF_COLLECTION, emp.id), { ferienSaldo: increment(anspruch), ferienanspruchGebuchtJahr: currentYear });
+      }catch(err){ console.error(err); }
+    }
+  } finally {
+    ferienanspruchAutoBookBusy = false;
+    if(ferienanspruchAutoBookQueued){ ferienanspruchAutoBookQueued = false; autoBookFerienanspruch(); }
+  }
+}
+var ferienanspruchAutoBookTimer = null;
+function scheduleAutoBookFerienanspruch(){
+  if(!state.isAdmin) return;
+  clearTimeout(ferienanspruchAutoBookTimer);
+  ferienanspruchAutoBookTimer = setTimeout(autoBookFerienanspruch, 900);
+}
 // Berechnet, wie viele Stunden eine Abwesenheit vom Feriensaldo beansprucht.
 // Im Stunden-Modus ist das einfach der eingegebene Wert; bei ganzen Tagen wird für jeden
 // Werktag im Zeitraum das Soll aus dem Zeitmodell (oder der Fallback-Wert) aufsummiert.
@@ -3550,6 +3623,78 @@ $("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
     if(kRow) startEditKostenartStamm(kRow);
   }
 });
+
+/* ---- Kostenstellen: einfacher Stamm (Nummer + Bezeichnung) zur internen Zuordnung. ---- */
+function renderKostenstellenPanel(){
+  var tbody = $("#kostenstellen-tbody");
+  if(!tbody) return;
+  var sorted = state.kostenstellen.slice().sort((a,b)=> (a.nummer||"").localeCompare(b.nummer||"", undefined, {numeric:true}) || (a.bezeichnung||"").localeCompare(b.bezeichnung||""));
+  if(sorted.length===0){
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:12.5px;">Noch keine Kostenstellen erfasst.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(k=>
+    '<tr data-kst-id="' + k.id + '" class="kst-row" style="cursor:pointer;">' +
+    '<td>' + escapeHtml(k.nummer||"") + '</td>' +
+    '<td>' + escapeHtml(k.bezeichnung) + '</td>' +
+    '<td><button type="button" class="kst-delete" data-kst-id="' + k.id + '" title="Kostenstelle löschen">✕</button></td>' +
+    '</tr>'
+  ).join("");
+}
+var editingKostenstelleId = null;
+function startEditKostenstelle(k){
+  editingKostenstelleId = k.id;
+  $("#kst-nummer").value = k.nummer || "";
+  $("#kst-bezeichnung").value = k.bezeichnung || "";
+  $("#kostenstellen-submit-btn").textContent = "Speichern";
+  $("#kostenstellen-cancel-btn").style.display = "inline-block";
+  $("#kst-bezeichnung").focus();
+}
+function cancelEditKostenstelle(){
+  editingKostenstelleId = null;
+  $("#kst-nummer").value = ""; $("#kst-bezeichnung").value = "";
+  $("#kostenstellen-submit-btn").textContent = "+ Kostenstelle";
+  $("#kostenstellen-cancel-btn").style.display = "none";
+}
+$("#kostenstellen-cancel-btn").addEventListener("click", cancelEditKostenstelle);
+$("#kostenstellen-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var nummer = $("#kst-nummer").value.trim();
+  var bezeichnung = $("#kst-bezeichnung").value.trim();
+  if(!bezeichnung){ toast("Bitte eine Bezeichnung angeben."); return; }
+  try{
+    var payload = { nummer: nummer, bezeichnung: bezeichnung };
+    if(editingKostenstelleId){
+      await updateDoc(doc(db, KOSTENSTELLEN_COLLECTION, editingKostenstelleId), payload);
+      toast("Kostenstelle aktualisiert.");
+    }else{
+      payload.createdAt = Date.now();
+      await addDoc(collection(db, KOSTENSTELLEN_COLLECTION), payload);
+      toast("Kostenstelle gespeichert.");
+    }
+    cancelEditKostenstelle();
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+});
+$("#kostenstellen-tbody").addEventListener("click", async e=>{
+  var delBtn = e.target.closest(".kst-delete");
+  if(delBtn){
+    var k = state.kostenstellen.find(x=>x.id===delBtn.dataset.kstId);
+    if(!k) return;
+    if(!(await showConfirm('Kostenstelle "' + k.bezeichnung + '" wirklich löschen?'))) return;
+    try{
+      await deleteDoc(doc(db, KOSTENSTELLEN_COLLECTION, k.id));
+      if(editingKostenstelleId === k.id) cancelEditKostenstelle();
+      toast("Kostenstelle gelöscht.");
+    }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var row = e.target.closest(".kst-row");
+  if(row){
+    var kRow = state.kostenstellen.find(x=>x.id===row.dataset.kstId);
+    if(kRow) startEditKostenstelle(kRow);
+  }
+});
+
 // Nimmt eine Liste von Kostenarten (z.B. von einem gerade gespeicherten Auftrag) und legt jede
 // Bezeichnung, die im Stamm (Einstellungen) noch fehlt, dort automatisch neu an — so bleibt der
 // Stamm immer mit den tatsächlich verwendeten Kostenarten synchron, ohne dass man sie doppelt
