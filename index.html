@@ -1715,6 +1715,11 @@
   <div class="modal">
     <h3 id="modal-title">Neuer Auftrag</h3>
     <form id="order-form">
+      <div class="field materials-box" style="margin-bottom:14px;">
+        <label for="voka-import-input">VOKA-Kalkulation importieren (optional)</label>
+        <input type="file" id="voka-import-input" accept=".xlsx,.xlsm,.xls">
+        <small class="week-hint" id="voka-import-status"></small>
+      </div>
       <div class="field-row">
         <div class="field"><label for="f-orderNumber">Auftragsnummer</label><input id="f-orderNumber" required placeholder="z. B. 26246"></div>
         <div class="field">
@@ -1747,7 +1752,10 @@
           </select>
         </div>
       </div>
-      <div class="field"><label for="f-auftragswert">Auftragswert (CHF)</label><input type="number" id="f-auftragswert" min="0" step="0.05" placeholder="0.00"></div>
+      <div class="field-row">
+        <div class="field"><label for="f-auftragswert">Auftragswert (CHF)</label><input type="number" id="f-auftragswert" min="0" step="0.05" placeholder="0.00"></div>
+        <div class="field"><label for="f-materialplan">Material Plan (CHF)</label><input type="number" id="f-materialplan" min="0" step="0.05" placeholder="0.00"></div>
+      </div>
       <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
         <span class="date-field">
           <input type="text" id="f-productionStart-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
@@ -4219,6 +4227,121 @@ $("#todos-list").addEventListener("change", e=>{
   }
 });
 
+/* ---------- VOKA-Excel-Import ---------- */
+// Liest eine aus VOKA exportierte Kalkulations-Excel (Tabs "Budget_Zusammenzug"/"ERP_Zusammenzug",
+// "Arbeit", "Warengruppen") und füllt daraus Auftragsnummer, Kunde, BKP, Auftragswert,
+// Kostenarten (Plan-Std/Ansatz) und Material-Plan vor. Die Felder bleiben danach normal
+// editierbar — der Import ist eine Vorausfüllung, keine automatische Buchung.
+
+function vokaCellStr(row, idx){ return row && row[idx]!=null ? String(row[idx]).trim() : ""; }
+function vokaCellNum(row, idx){ var n = parseFloat(row ? row[idx] : null); return isNaN(n) ? 0 : n; }
+
+function parseVokaWorkbook(wb){
+  var result = { orderNumber:"", description:"", bkp:"", kundeFirma:"", kundeStrasse:"", kundePlz:"", kundeOrt:"", auftragswert:0, kostenarten:[], materialPlan:0 };
+
+  var headerSheet = wb.Sheets["Budget_Zusammenzug"] || wb.Sheets["ERP_Zusammenzug"];
+  if(headerSheet){
+    var rows = XLSX.utils.sheet_to_json(headerSheet, { header:1, defval:"" });
+    var kundeRaw = vokaCellStr(rows[3], 1);
+    var objektRaw = vokaCellStr(rows[4], 1);
+    result.bkp = vokaCellStr(rows[5], 1);
+
+    if(kundeRaw){
+      // Erwartetes Format: "Firma, Strasse X, PLZ Ort"
+      var m3 = kundeRaw.match(/^(.*?),\s*(.*?),\s*(\d{4})\s+(.+)$/);
+      if(m3){
+        result.kundeFirma = m3[1].trim(); result.kundeStrasse = m3[2].trim();
+        result.kundePlz = m3[3].trim(); result.kundeOrt = m3[4].trim();
+      }else{
+        // Fallback: "Firma, PLZ Ort" (ohne separate Strasse)
+        var parts = kundeRaw.split(",").map(function(s){return s.trim();}).filter(Boolean);
+        result.kundeFirma = parts[0] || kundeRaw;
+        var last = parts[parts.length-1] || "";
+        var m2 = last.match(/^(\d{4})\s+(.+)$/);
+        if(m2){ result.kundePlz = m2[1]; result.kundeOrt = m2[2]; }
+        if(parts.length > 2) result.kundeStrasse = parts[1];
+      }
+    }
+
+    if(objektRaw){
+      var dashIdx = objektRaw.indexOf(" - ");
+      var numPart = dashIdx>-1 ? objektRaw.slice(0,dashIdx) : objektRaw;
+      result.description = dashIdx>-1 ? objektRaw.slice(dashIdx+3).trim() : "";
+      var tokens = numPart.split("/").map(function(s){return s.trim();}).filter(Boolean);
+      var candidates = tokens.filter(function(t){return /^\d{4,6}$/.test(t);}).sort(function(a,b){return b.length-a.length;});
+      result.orderNumber = candidates[0] || tokens[tokens.length-1] || "";
+    }
+
+    for(var r=0;r<rows.length;r++){
+      if(vokaCellStr(rows[r], 0).replace(/:$/,"") === "Total Umsatz"){ result.auftragswert = vokaCellNum(rows[r], 4); break; }
+    }
+  }
+
+  var arbeitSheet = wb.Sheets["Arbeit"];
+  if(arbeitSheet){
+    var arows = XLSX.utils.sheet_to_json(arbeitSheet, { header:1, defval:"" });
+    for(var i=8;i<arows.length;i++){
+      var name = vokaCellStr(arows[i], 0);
+      if(!name) continue;
+      var std = vokaCellNum(arows[i], 1), ansatz = vokaCellNum(arows[i], 2), betrag = vokaCellNum(arows[i], 3);
+      if(std<=0 && betrag<=0) continue;
+      result.kostenarten.push({ bezeichnung: name, stunden: std, ansatz: ansatz });
+    }
+  }
+
+  var wgSheet = wb.Sheets["Warengruppen"];
+  if(wgSheet){
+    var wrows = XLSX.utils.sheet_to_json(wgSheet, { header:1, defval:"" });
+    var sum = 0;
+    for(var j=8;j<wrows.length;j++) sum += vokaCellNum(wrows[j], 5);
+    result.materialPlan = Math.round(sum*100)/100;
+  }
+  return result;
+}
+
+$("#voka-import-input").addEventListener("change", async e=>{
+  var file = e.target.files[0]; if(!file) return;
+  var statusEl = $("#voka-import-status");
+  statusEl.textContent = "Lese Datei…";
+  try{
+    var buf = await file.arrayBuffer();
+    var wb = XLSX.read(buf, { type:"array" });
+    var parsed = parseVokaWorkbook(wb);
+    if(parsed.orderNumber) $("#f-orderNumber").value = parsed.orderNumber;
+    if(parsed.description) $("#f-description").value = parsed.description;
+    if(parsed.bkp) $("#f-bkp").value = parsed.bkp;
+    if(parsed.auftragswert) $("#f-auftragswert").value = parsed.auftragswert;
+    if(parsed.materialPlan) $("#f-materialplan").value = parsed.materialPlan;
+    if(parsed.kundeFirma){
+      var existing = state.kunden.find(k=>(k.firma||"").trim().toLowerCase() === parsed.kundeFirma.trim().toLowerCase());
+      if(existing){
+        populateKundeSelect(existing.id);
+        $("#f-kunde-new-box").style.display = "none";
+      }else{
+        populateKundeSelect(null);
+        $("#f-kunde").value = "__new__";
+        $("#f-kunde-new-box").style.display = "block";
+        $("#f-kunde-firma").value = parsed.kundeFirma;
+        $("#f-kunde-strasse").value = parsed.kundeStrasse;
+        $("#f-kunde-plz").value = parsed.kundePlz;
+        $("#f-kunde-ort").value = parsed.kundeOrt;
+      }
+    }
+    if(parsed.kostenarten.length>0){
+      state.modalKostenarten = parsed.kostenarten.map(function(k){ return { bezeichnung:k.bezeichnung, stunden: Math.round(k.stunden*100)/100, ansatz: Math.round(k.ansatz*100)/100 }; });
+      renderKostenartenRows();
+    }
+    statusEl.textContent = "Importiert — bitte Angaben prüfen (Werkstatt, Termine, Status sind nicht in der Excel enthalten).";
+    toast("VOKA-Kalkulation importiert — bitte prüfen.");
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = "";
+    toast("Import fehlgeschlagen: " + (err && err.message ? err.message : err));
+  }finally{
+    e.target.value = "";
+  }
+});
+
 /* ---------- Modal ---------- */
 
 var backdrop = $("#modal-backdrop");
@@ -4249,6 +4372,9 @@ function openModal(order, prefillDate){
   $("#f-workshop").value = order ? order.workshop : "stahl";
   $("#f-status").value = order ? (order.status || (order.completed ? "abgeschlossen" : "fabrikation")) : "fabrikation";
   $("#f-auftragswert").value = (order && order.auftragswert) ? order.auftragswert : "";
+  $("#f-materialplan").value = (order && order.materialPlan) ? order.materialPlan : "";
+  $("#voka-import-status").textContent = "";
+  $("#voka-import-input").value = "";
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
   $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
@@ -4314,6 +4440,7 @@ form.addEventListener("submit", async e=>{
       status: status,
       completed: status !== "fabrikation",
       auftragswert: parseFloat($("#f-auftragswert").value) || 0,
+      materialPlan: parseFloat($("#f-materialplan").value) || 0,
       productionStart: $("#f-productionStart").value,
       assemblyDate: $("#f-assemblyDate").value,
       kostenarten: kostenarten,
