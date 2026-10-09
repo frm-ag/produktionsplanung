@@ -1122,6 +1122,7 @@
     </div>
     <nav class="side-nav" id="sidebar-nav">
       <button class="side-item home" data-view="zeit"><span class="side-icon">⌂</span>Home</button>
+      <button class="side-item home" data-view="einstellungen"><span class="side-icon">⚙</span>Einstellungen</button>
 
       <div class="side-section open" data-section="zeit">
         <button type="button" class="side-section-head" data-toggle="zeit"><span class="side-arrow">▸</span>Zeitverwaltung</button>
@@ -1129,7 +1130,6 @@
           <button class="side-item sub" data-view="zeit">Zeiterfassung</button>
           <button class="side-item sub" data-view="ferien">Ferienplaner</button>
           <button class="side-item sub" data-view="saldo">Stunden- &amp; Feriensaldo</button>
-          <button class="side-item sub" data-view="einstellungen">Einstellungen</button>
           <button class="side-item sub" data-view="verwaltung">Verwaltung</button>
         </div>
       </div>
@@ -1398,6 +1398,26 @@
       <button type="submit" class="btn primary">+ Feiertag</button>
     </form>
 
+    <h2 class="zeit-h2" style="margin-top:22px;">Kostenarten</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Stamm-Kostenarten mit Standard-Ansatz (Fr./Std.) — stehen beim Erfassen eines Auftrags als Vorschlag zur Verfügung. Löschen hier entfernt nur den Stammeintrag, bereits erfasste Kostenarten auf Aufträgen bleiben unverändert.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="kostenarten-stamm-table">
+        <thead>
+          <tr><th>Bezeichnung</th><th>Standard-Ansatz (Fr./Std.)</th><th></th></tr>
+        </thead>
+        <tbody id="kostenarten-stamm-tbody"></tbody>
+      </table>
+    </div>
+    <form id="kostenarten-stamm-add-form" class="zm-add-form">
+      <input type="text" id="ks-bezeichnung" placeholder="Bezeichnung, z. B. Montage" required style="flex:1 1 220px;">
+      <input type="number" id="ks-ansatz" placeholder="Fr./Std." min="0" step="0.05" style="max-width:140px;">
+      <button type="submit" class="btn primary">+ Kostenart</button>
+    </form>
+  </div>
+
+  <div id="verwaltung-page" style="display:none;">
+    <div id="verwaltung-main"></div>
+
     <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Name ändern wirkt sich überall aus (Zeiterfassung, Personalplanung, PDFs). "Zugang zurücksetzen" legt ein neues Login für diesen Mitarbeiter an und verknüpft es — praktisch bei vergessenem Passwort, da ein bestehendes Passwort aus technischen Gründen nicht direkt überschrieben werden kann (altes Login wird dabei automatisch gesperrt). Der Feriensaldo dient zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel) — der Überstunden-Saldo läuft automatisch über die Zeiterfassung. Die laufende Gesamtübersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
     <div class="table-scroll">
@@ -1408,10 +1428,6 @@
         <tbody id="mitarbeiter-edit-tbody"></tbody>
       </table>
     </div>
-  </div>
-
-  <div id="verwaltung-page" style="display:none;">
-    <div id="verwaltung-main"></div>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Zeitmodell je Mitarbeiter</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Weist jedem Mitarbeiter sein Zeitmodell zu (Zeitmodelle selbst werden in Einstellungen verwaltet). Bestimmt die Soll-Stunden für Überstunden-Berechnung und Monatsrapport.</div>
@@ -1836,6 +1852,7 @@
         <label>Kostenarten (Plankalkulation)</label>
         <div class="materials-box">
           <div id="kostenarten-list"></div>
+          <datalist id="kostenarten-stamm-list"></datalist>
           <button type="button" class="add-material-btn" id="add-kostenart-btn">+ Kostenart hinzufügen</button>
         </div>
       </div>
@@ -1908,6 +1925,7 @@ const BETRIEBSFERIEN_COLLECTION = "betriebsferien";
 const FEIERTAGE_COLLECTION = "feiertage";
 const TERMINSERIEN_COLLECTION = "terminserien";
 const KUNDEN_COLLECTION = "kunden";
+const KOSTENARTEN_STAMM_COLLECTION = "kostenarten";
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -1955,6 +1973,7 @@ let unsubBetriebsferien = null;
 let unsubFeiertage = null;
 let unsubTerminserien = null;
 let unsubKunden = null;
+let unsubKostenartenStamm = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -1978,6 +1997,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubBetriebsferien) unsubBetriebsferien();
     if(unsubFeiertage) unsubFeiertage();
     if(unsubKunden) unsubKunden();
+    if(unsubKostenartenStamm) unsubKostenartenStamm();
     subscribeOrders();
     subscribeStaff();
     subscribeAssignments();
@@ -1988,6 +2008,7 @@ onAuthStateChanged(auth, async user => {
     subscribeFeiertage();
     subscribeTerminserien();
     subscribeKunden();
+    subscribeKostenartenStamm();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
@@ -2003,6 +2024,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubFeiertage) unsubFeiertage();
     if(unsubTerminserien) unsubTerminserien();
     if(unsubKunden) unsubKunden();
+    if(unsubKostenartenStamm) unsubKostenartenStamm();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -2046,6 +2068,13 @@ function subscribeKunden(){
   const q = query(collection(db, KUNDEN_COLLECTION), orderBy('firma'));
   unsubKunden = onSnapshot(q, snap => {
     state.kunden = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => { console.error(err); });
+}
+function subscribeKostenartenStamm(){
+  const q = query(collection(db, KOSTENARTEN_STAMM_COLLECTION), orderBy('bezeichnung'));
+  unsubKostenartenStamm = onSnapshot(q, snap => {
+    state.kostenartenStamm = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     render();
   }, err => { console.error(err); });
 }
@@ -2164,7 +2193,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2286,12 +2315,12 @@ function todoProgress(o){
 var HEADER_INFO = {
   zeit: ["Zeiterfassung", "Kommen, Pausen und Gehen erfassen"],
   ferien: ["Ferienplaner", "Abwesenheiten und Feriensaldo"],
-  einstellungen: ["Einstellungen", "Zeitmodelle verwalten"],
+  einstellungen: ["Einstellungen", "Zeitmodelle, Feiertage und Kostenarten verwalten"],
   table: ["Übersicht", "Übersicht für die Produktionsleitung"],
   kunden: ["Kunden", "Kundenstamm für Aufträge"],
   staff: ["Personalplanung", "Mitarbeiter den Aufträgen zuteilen"],
   lager: ["Artikelsammlung", "Lagerbestand und Artikel"],
-  verwaltung: ["Verwaltung", "Nutzerkonten verwalten"],
+  verwaltung: ["Verwaltung", "Nutzerkonten und Mitarbeiter verwalten"],
   buchhaltung: ["Buchhaltung", "Dieser Bereich kommt noch"]
 };
 var lastRenderedView = null;
@@ -2335,8 +2364,8 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderMitarbeiterEditPanel(); return; }
-  if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); return; }
+  if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
   if(isBuchhaltung){ return; }
 }
 function renderHeader(){
@@ -3435,6 +3464,49 @@ function feiertagForDay(iso){
   return state.feiertage.find(ft=> ft.date === iso) || null;
 }
 
+/* ---- Kostenarten-Stamm: wiederverwendbare Kostenarten mit Standard-Ansatz, als Vorschlag beim
+   Erfassen eines Auftrags (siehe Datalist "kostenarten-stamm-list" im Auftrags-Formular). ---- */
+function renderKostenartenStammPanel(){
+  var tbody = $("#kostenarten-stamm-tbody");
+  if(!tbody) return;
+  var sorted = state.kostenartenStamm.slice().sort((a,b)=> (a.bezeichnung||"").localeCompare(b.bezeichnung||""));
+  var dl = $("#kostenarten-stamm-list");
+  if(dl) dl.innerHTML = sorted.map(k=>'<option value="' + escapeHtml(k.bezeichnung) + '">').join("");
+  if(sorted.length===0){
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:12.5px;">Noch keine Kostenarten erfasst.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(k=>
+    '<tr data-ks-id="' + k.id + '">' +
+    '<td>' + escapeHtml(k.bezeichnung) + '</td>' +
+    '<td>' + (k.ansatz!=null ? fmtChf(k.ansatz) : '–') + '</td>' +
+    '<td><button type="button" class="ks-delete" data-ks-id="' + k.id + '" title="Kostenart löschen">✕</button></td>' +
+    '</tr>'
+  ).join("");
+}
+$("#kostenarten-stamm-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var bezeichnung = $("#ks-bezeichnung").value.trim();
+  var ansatzVal = $("#ks-ansatz").value;
+  if(!bezeichnung){ toast("Bitte eine Bezeichnung angeben."); return; }
+  try{
+    await addDoc(collection(db, KOSTENARTEN_STAMM_COLLECTION), { bezeichnung: bezeichnung, ansatz: ansatzVal===""?null:parseFloat(ansatzVal), createdAt: Date.now() });
+    $("#ks-bezeichnung").value = ""; $("#ks-ansatz").value = "";
+    toast("Kostenart gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+});
+$("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
+  var delBtn = e.target.closest(".ks-delete");
+  if(!delBtn) return;
+  var k = state.kostenartenStamm.find(x=>x.id===delBtn.dataset.ksId);
+  if(!k) return;
+  if(!confirm('Kostenart "' + k.bezeichnung + '" wirklich löschen?')) return;
+  try{
+    await deleteDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, k.id));
+    toast("Kostenart gelöscht.");
+  }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+});
+
 /* ---- Terminserien: wiederkehrende Termine je Mitarbeiter (z.B. "jeden Montag Schule" für
    Lehrlinge) — werden wie eine normale Abwesenheit behandelt (Soll bleibt wie üblich, kein
    automatischer Saldo-Abzug, analog zu "Krank"). Nur Admin verwaltet die Serien; einzelne Tage
@@ -4362,7 +4434,7 @@ function renderKostenartenRows(){
   state.modalKostenarten.forEach((k,i)=>{
     html += '<div class="material-row" data-idx="' + i + '">' +
       '<div class="mat-row1">' +
-      '<input class="ka-bez" placeholder="z. B. 4003 WS Brandschutz Stahl" value="' + escapeHtml(k.bezeichnung||"") + '">' +
+      '<input class="ka-bez" list="kostenarten-stamm-list" placeholder="z. B. 4003 WS Brandschutz Stahl" value="' + escapeHtml(k.bezeichnung||"") + '">' +
       '<button type="button" class="mat-remove" aria-label="Kostenart entfernen">✕</button>' +
       '</div><div class="mat-row2">' +
       '<input type="number" min="0" step="0.01" class="ka-std" placeholder="Std." value="' + (k.stunden!=null&&k.stunden!==""?k.stunden:"") + '">' +
@@ -4381,7 +4453,16 @@ $("#kostenarten-list").addEventListener("click", e=>{
 $("#kostenarten-list").addEventListener("input", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
   var idx = Number(row.dataset.idx); if(!state.modalKostenarten[idx]) return;
-  if(e.target.classList.contains("ka-bez")) state.modalKostenarten[idx].bezeichnung = e.target.value;
+  if(e.target.classList.contains("ka-bez")){
+    state.modalKostenarten[idx].bezeichnung = e.target.value;
+    // Beim Auswählen einer Stamm-Kostenart aus der Vorschlagsliste den Standard-Ansatz übernehmen,
+    // sofern noch kein Ansatz für diese Zeile erfasst wurde.
+    var stammMatch = (state.kostenartenStamm||[]).find(function(s){ return (s.bezeichnung||"").toLowerCase() === e.target.value.trim().toLowerCase(); });
+    if(stammMatch && stammMatch.ansatz!=null && !state.modalKostenarten[idx].ansatz){
+      state.modalKostenarten[idx].ansatz = stammMatch.ansatz;
+      renderKostenartenRows();
+    }
+  }
   if(e.target.classList.contains("ka-std")) state.modalKostenarten[idx].stunden = e.target.value;
   if(e.target.classList.contains("ka-ansatz")) state.modalKostenarten[idx].ansatz = e.target.value;
   if(e.target.classList.contains("ka-std") || e.target.classList.contains("ka-ansatz")){
@@ -5469,23 +5550,9 @@ function renderUserAdmin(){
     <h2 class="section-title">Nutzer (${profiles.length})</h2>
     ${userRows}
 
-    <h2 class="section-title" style="margin-top:22px;">Neuen Nutzer anlegen</h2>
-    <label>Name</label>
-    <input type="text" id="nu-name" placeholder="z. B. Anna Muster">
-    <div style="font-size:11px;color:var(--text-muted);margin-top:-2px;margin-bottom:10px;">Erscheint so in "Personal" und in der Zeiterfassung.</div>
-    <label>Benutzername</label>
-    <input type="text" id="nu-username" placeholder="z. B. anna">
-    <label>Passwort</label>
-    <input type="text" id="nu-password" placeholder="Passwort (mind. 6 Zeichen)">
-    <label>Rolle</label>
-    <select id="nu-role">
-      <option value="user">Mitarbeiter</option>
-      <option value="admin">Admin</option>
-    </select>
-    <div class="btn-row">
-      <button class="btn btn-primary btn-block" id="nu-create">Nutzer anlegen</button>
+    <div class="btn-row" style="margin-top:22px;">
+      <button class="btn btn-primary btn-block" id="nu-open-add">+ Neuen Nutzer anlegen</button>
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Der Nutzer taucht oben erst nach dem ersten Login auf, ist aber ab sofort anmeldefähig.</div>
   `;
 
   container.querySelectorAll('[data-remove]').forEach(btn=>{
@@ -5503,12 +5570,37 @@ function renderUserAdmin(){
     };
   });
 
-  container.querySelector('#nu-create').onclick = async ()=>{
-    const btn = container.querySelector('#nu-create');
-    const fullName = container.querySelector('#nu-name').value.trim();
-    const username = container.querySelector('#nu-username').value.trim();
-    const password = container.querySelector('#nu-password').value;
-    const role = container.querySelector('#nu-role').value;
+  container.querySelector('#nu-open-add').onclick = openAddUserSheet;
+}
+
+// Eigenes Fenster (Sheet) zum Anlegen eines neuen Nutzers, statt eines dauerhaft sichtbaren
+// Formulars in der Nutzerliste.
+function openAddUserSheet(){
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Neuen Nutzer anlegen</h3><button class="x" data-close>×</button></div>
+    <label>Name</label>
+    <input type="text" id="nu-name" placeholder="z. B. Anna Muster">
+    <div style="font-size:11px;color:var(--text-muted);margin-top:-2px;margin-bottom:10px;">Erscheint so in "Personal" und in der Zeiterfassung.</div>
+    <label>Benutzername</label>
+    <input type="text" id="nu-username" placeholder="z. B. anna">
+    <label>Passwort</label>
+    <input type="text" id="nu-password" placeholder="Passwort (mind. 6 Zeichen)">
+    <label>Rolle</label>
+    <select id="nu-role">
+      <option value="user">Mitarbeiter</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div class="btn-row">
+      <button class="btn btn-primary btn-block" id="nu-create">Nutzer anlegen</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Der Nutzer taucht in der Liste erst nach dem ersten Login auf, ist aber ab sofort anmeldefähig.</div>
+  `);
+  sheet.querySelector('#nu-create').onclick = async ()=>{
+    const btn = sheet.querySelector('#nu-create');
+    const fullName = sheet.querySelector('#nu-name').value.trim();
+    const username = sheet.querySelector('#nu-username').value.trim();
+    const password = sheet.querySelector('#nu-password').value;
+    const role = sheet.querySelector('#nu-role').value;
     if(!fullName){ toast('Bitte einen Namen eingeben.'); return; }
     if(!username || !/^[a-zA-Z0-9_-]+$/.test(username)){ toast('Benutzername: nur Buchstaben, Zahlen, - und _'); return; }
     if(!password || password.length < 6){ toast('Passwort braucht mindestens 6 Zeichen'); return; }
@@ -5523,8 +5615,8 @@ function renderUserAdmin(){
       }
       await addDoc(collection(db, 'mitarbeiter'), { name: fullName, uid: newUid, createdAt: Date.now() });
       await signOut(authSecondary);
+      closeSheet();
       toast('Nutzer "' + username + '" angelegt und mit "' + fullName + '" in Personal verknüpft.');
-      container.querySelector('#nu-name').value = ''; container.querySelector('#nu-username').value = ''; container.querySelector('#nu-password').value = ''; container.querySelector('#nu-role').value = 'user';
     }catch(e){
       console.error(e);
       const map = { 'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.', 'auth/weak-password': 'Passwort zu schwach (mind. 6 Zeichen).' };
