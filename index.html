@@ -432,7 +432,7 @@
   .staff-row:last-child{border-bottom:none;}
   .staff-row-name{padding:10px;font-size:12.5px;font-weight:600;display:flex;flex-direction:column;gap:5px;background:var(--panel-alt);cursor:grab;}
   .staff-name-line{display:flex;align-items:center;justify-content:space-between;gap:6px;}
-  .staff-link-select{font-size:10px;font-weight:500;padding:3px 4px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);width:100%;cursor:pointer;}
+  .me-account-select,.vw-model-select{font-size:10px;font-weight:500;padding:3px 4px;border-radius:4px;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);width:100%;cursor:pointer;}
   .absence-banner{font-size:10.5px;font-weight:700;text-align:center;padding:5px 4px;border-radius:5px;margin-bottom:4px;}
   .absence-ferien{background:#e3ebf3;color:var(--accent);}
   .absence-krank{background:var(--warn-soft);color:var(--warn);}
@@ -495,15 +495,13 @@
      Breite — damit die Tabelle immer in die verfügbare Breite passt, ohne seitlich zu scrollen. */
   #zeit-admin-table{min-width:0;table-layout:fixed;}
   #zeit-admin-table th, #zeit-admin-table td{padding:8px 6px;overflow:hidden;text-overflow:ellipsis;}
-  #zeit-admin-table th:nth-child(1), #zeit-admin-table td:nth-child(1){width:19%;white-space:normal;}
-  #zeit-admin-table th:nth-child(2), #zeit-admin-table td:nth-child(2){width:14%;}
-  #zeit-admin-table th:nth-child(3), #zeit-admin-table td:nth-child(3){width:10%;}
-  #zeit-admin-table th:nth-child(4), #zeit-admin-table td:nth-child(4){width:13%;white-space:normal;}
-  #zeit-admin-table th:nth-child(5), #zeit-admin-table td:nth-child(5){width:11%;}
-  #zeit-admin-table th:nth-child(6), #zeit-admin-table td:nth-child(6){width:11%;}
-  #zeit-admin-table th:nth-child(7), #zeit-admin-table td:nth-child(7){width:11%;}
-  #zeit-admin-table th:nth-child(8), #zeit-admin-table td:nth-child(8){width:11%;}
-  #zeit-admin-table .staff-link-select{font-size:9.5px;padding:3px 2px;}
+  #zeit-admin-table th:nth-child(1), #zeit-admin-table td:nth-child(1){width:21%;white-space:normal;}
+  #zeit-admin-table th:nth-child(2), #zeit-admin-table td:nth-child(2){width:13%;}
+  #zeit-admin-table th:nth-child(3), #zeit-admin-table td:nth-child(3){width:15%;white-space:normal;}
+  #zeit-admin-table th:nth-child(4), #zeit-admin-table td:nth-child(4){width:13%;}
+  #zeit-admin-table th:nth-child(5), #zeit-admin-table td:nth-child(5){width:13%;}
+  #zeit-admin-table th:nth-child(6), #zeit-admin-table td:nth-child(6){width:12%;}
+  #zeit-admin-table th:nth-child(7), #zeit-admin-table td:nth-child(7){width:13%;}
   #zeit-admin-table .zeit-status-pill{white-space:nowrap;}
   .ov-mat-line{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;white-space:nowrap;}
   .ov-mat-line .mdot{width:6px;height:6px;border-radius:50%;flex:none;}
@@ -1237,7 +1235,7 @@
       <div class="table-scroll">
         <table class="overview-table" id="zeit-admin-table">
           <thead>
-            <tr><th>Mitarbeiter</th><th>Konto</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Haben</th><th>Soll</th><th>Saldo</th></tr>
+            <tr><th>Mitarbeiter</th><th>Status</th><th>Kommen</th><th>Gehen</th><th>Haben</th><th>Soll</th><th>Saldo</th></tr>
           </thead>
           <tbody id="zeit-admin-tbody"></tbody>
         </table>
@@ -1276,7 +1274,7 @@
     <div class="table-scroll">
       <table class="overview-table" id="ferien-saldo-table">
         <thead>
-          <tr><th><input type="checkbox" id="ferien-saldo-select-all" title="Alle auswählen"></th><th>Mitarbeiter</th><th>Zeitmodell</th><th>Stundensaldo (Überstunden)</th><th>Feriensaldo</th><th>Saldo Total</th><th>Export</th></tr>
+          <tr><th><input type="checkbox" id="ferien-saldo-select-all" title="Alle auswählen"></th><th>Mitarbeiter</th><th>Stundensaldo (Überstunden)</th><th>Feriensaldo</th><th>Saldo Total</th><th>Export</th></tr>
         </thead>
         <tbody id="ferien-saldo-tbody"></tbody>
       </table>
@@ -1370,6 +1368,32 @@
       <button type="submit" class="btn primary">+ Feiertag</button>
     </form>
 
+    <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Name ändern wirkt sich überall aus (Zeiterfassung, Personalplanung, PDFs). "Zugang zurücksetzen" legt ein neues Login für diesen Mitarbeiter an und verknüpft es — praktisch bei vergessenem Passwort, da ein bestehendes Passwort aus technischen Gründen nicht direkt überschrieben werden kann (altes Login wird dabei automatisch gesperrt). Der Feriensaldo dient zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel) — der Überstunden-Saldo läuft automatisch über die Zeiterfassung. Die laufende Gesamtübersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="mitarbeiter-edit-table">
+        <thead>
+          <tr><th>Name</th><th></th><th>Konto</th><th>Login</th><th></th><th>Feriensaldo</th><th>Anpassen</th></tr>
+        </thead>
+        <tbody id="mitarbeiter-edit-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="verwaltung-page" style="display:none;">
+    <div id="verwaltung-main"></div>
+
+    <h2 class="zeit-h2" style="margin-top:22px;">Zeitmodell je Mitarbeiter</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Weist jedem Mitarbeiter sein Zeitmodell zu (Zeitmodelle selbst werden in Einstellungen verwaltet). Bestimmt die Soll-Stunden für Überstunden-Berechnung und Monatsrapport.</div>
+    <div class="table-scroll">
+      <table class="overview-table" id="verwaltung-zeitmodell-table">
+        <thead>
+          <tr><th>Mitarbeiter</th><th>Zeitmodell</th></tr>
+        </thead>
+        <tbody id="verwaltung-zeitmodell-tbody"></tbody>
+      </table>
+    </div>
+
     <h2 class="zeit-h2" style="margin-top:22px;">Terminserien (z. B. Berufsschule für Lehrlinge)</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Trägt für einen Mitarbeiter automatisch wiederkehrend eine Abwesenheit ein (z. B. "jeden Montag Schule"). Wird wie eine normale Abwesenheit behandelt — das Soll bleibt an diesen Tagen bestehen, es wird aber kein Saldo belastet und keine Überzeit erwartet (wie bei "Krank"). Einzelne Tage lassen sich weiterhin über den Ferienplaner manuell überschreiben.</div>
     <div class="table-scroll">
@@ -1411,21 +1435,6 @@
       </span>
       <button type="submit" class="btn primary">+ Terminserie</button>
     </form>
-
-    <h2 class="zeit-h2" style="margin-top:22px;">Mitarbeiter</h2>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Name ändern wirkt sich überall aus (Zeiterfassung, Personalplanung, PDFs). "Zugang zurücksetzen" legt ein neues Login für diesen Mitarbeiter an und verknüpft es — praktisch bei vergessenem Passwort, da ein bestehendes Passwort aus technischen Gründen nicht direkt überschrieben werden kann (altes Login wird dabei automatisch gesperrt). Der Feriensaldo dient zum Erfassen der Startwerte (z. B. bei Eintritt oder Jahreswechsel) — der Überstunden-Saldo läuft automatisch über die Zeiterfassung. Die laufende Gesamtübersicht mit Export findest du unter "Stunden- &amp; Feriensaldo".</div>
-    <div class="table-scroll">
-      <table class="overview-table" id="mitarbeiter-edit-table">
-        <thead>
-          <tr><th>Name</th><th></th><th>Login</th><th></th><th>Feriensaldo</th><th>Anpassen</th></tr>
-        </thead>
-        <tbody id="mitarbeiter-edit-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div id="verwaltung-page" style="display:none;">
-    <div id="verwaltung-main"></div>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Mein Zugang</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Gilt nur für dein eigenes, aktuell angemeldetes Konto.</div>
@@ -1890,7 +1899,8 @@ function subscribeStaff(){
     if(state.view === "zeit") renderZeitPage();
     if(state.view === "ferien") renderFerienPage();
     if(state.view === "saldo") renderFerienSaldoPanel();
-    if(state.view === "einstellungen"){ renderTerminserienPanel(); renderMitarbeiterEditPanel(); }
+    if(state.view === "einstellungen"){ renderMitarbeiterEditPanel(); }
+    if(state.view === "verwaltung"){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); }
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
@@ -1898,6 +1908,7 @@ function subscribeProfiles(){
   const q = query(collection(db, "profiles"));
   unsubProfiles2 = onSnapshot(q, snap => {
     state.profiles = snap.docs.map(d => Object.assign({ uid: d.id }, d.data()));
+    if(state.view === "einstellungen") renderMitarbeiterEditPanel();
   }, err => { console.error(err); });
 }
 function subscribeAssignments(){
@@ -1944,6 +1955,7 @@ function subscribeZeitmodelle(){
     if(state.view === "zeit") renderZeitOverview();
     if(state.view === "einstellungen") renderZeitmodellePanel();
     if(state.view === "saldo") renderFerienSaldoPanel();
+    if(state.view === "verwaltung") renderVerwaltungZeitmodellPanel();
     scheduleAutoBookUeberstunden();
   }, err => { console.error(err); });
 }
@@ -1973,7 +1985,7 @@ function subscribeTerminserien(){
   const q = query(collection(db, TERMINSERIEN_COLLECTION));
   unsubTerminserien = onSnapshot(q, snap => {
     state.terminserien = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-    if(state.view === "einstellungen") renderTerminserienPanel();
+    if(state.view === "verwaltung") renderTerminserienPanel();
     if(state.view === "ferien") renderFerienPage();
     if(state.view === "staff") renderStaffPage();
     if(state.view === "zeit") renderZeitPage();
@@ -2339,8 +2351,8 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
-  if(isVerwaltung){ return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderMitarbeiterEditPanel(); return; }
+  if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); return; }
   if(isBuchhaltung){ return; }
 }
 function renderHeader(){
@@ -2710,7 +2722,7 @@ $("#zeit-admin-date-hidden").addEventListener("input", renderZeitOverview);
 function renderZeitOverview(){
   var dateIso = $("#zeit-admin-date-hidden").value || todayISO();
   var tbody = $("#zeit-admin-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="8">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Noch keine Mitarbeiter in "Personal" erfasst.</td></tr>'; return; }
   var rows = state.staff.map(emp=>{
     var absence = absenceForDay(emp.id, dateIso);
     var entries = emp.uid ? state.allTime.filter(t=>t.uid===emp.uid && t.date===dateIso).sort((a,b)=>a.timestamp-b.timestamp) : [];
@@ -2732,9 +2744,6 @@ function renderZeitOverview(){
   });
   tbody.innerHTML = rows.map(r=>
     '<tr class="zeit-row' + (r.linked?"":" zeit-row-unlinked") + '" data-uid="' + r.uid + '" data-name="' + escapeHtml(r.name) + '"><td data-label="Mitarbeiter">' + escapeHtml(r.name) + '</td>' +
-    '<td data-label="Konto"><select class="staff-link-select" data-staff-id="' + r.empId + '"><option value="">— kein Konto —</option>' +
-      state.profiles.map(p=>'<option value="'+p.uid+'"'+(r.uid===p.uid?' selected':'')+'>'+escapeHtml(p.username||p.uid)+'</option>').join('') +
-      '</select></td>' +
     '<td data-label="Status"><span class="zeit-status-pill ' + r.statusClass + '">' + r.status + '</span></td>' +
     '<td data-label="Kommen">' + (r.kommen?fmtTime(r.kommen):"–") + (r.orderNumbers.length?('<br><span style="font-size:9.5px;color:var(--accent);">Auftr. ' + r.orderNumbers.map(escapeHtml).join(", ") + '</span>'):"") + '</td>' +
     '<td data-label="Gehen">' + (r.gehen?fmtTime(r.gehen):"–") + '</td>' +
@@ -2744,9 +2753,8 @@ function renderZeitOverview(){
   ).join("");
 }
 $("#zeit-admin-tbody").addEventListener("click", e=>{
-  if(e.target.closest(".staff-link-select")) return;
   var tr = e.target.closest("tr.zeit-row"); if(!tr) return;
-  if(!tr.dataset.uid){ toast("Für " + tr.dataset.name + " zuerst links ein Konto verknüpfen."); return; }
+  if(!tr.dataset.uid){ toast("Für " + tr.dataset.name + " zuerst in Einstellungen > Mitarbeiter ein Konto verknüpfen."); return; }
   openZeitEditModal(tr.dataset.uid, tr.dataset.name, $("#zeit-admin-date-hidden").value || todayISO());
 });
 $("#zeit-own-edit-btn").addEventListener("click", ()=>{
@@ -3473,14 +3481,17 @@ function terminserieForDay(employeeId, iso){
 function renderMitarbeiterEditPanel(){
   var tbody = $("#mitarbeiter-edit-tbody");
   if(!tbody) return;
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
     var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
     return '<tr data-staff-id="' + emp.id + '">' +
       '<td><input type="text" class="me-name-input" id="me-name-' + emp.id + '" value="' + escapeHtml(emp.name) + '" style="width:100%;min-width:140px;font:inherit;font-size:13px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></td>' +
       '<td><button type="button" class="btn me-name-save" data-staff-id="' + emp.id + '">Speichern</button></td>' +
+      '<td><select class="me-account-select" data-staff-id="' + emp.id + '"><option value="">— kein Konto —</option>' +
+        state.profiles.map(p=>'<option value="'+p.uid+'"'+(emp.uid===p.uid?' selected':'')+'>'+escapeHtml(p.username||p.uid)+'</option>').join('') +
+        '</select></td>' +
       '<td>' + (emp.uid ? '<span style="color:var(--success);font-weight:600;">verknüpft</span>' : '<span style="color:var(--text-muted);">kein Login</span>') + '</td>' +
-      '<td>' + (emp.uid ? ('<button type="button" class="btn me-reset-btn" data-staff-id="' + emp.id + '">Zugang zurücksetzen</button>') : '<span style="color:var(--text-muted);font-size:11px;">— Konto in Zeiterfassung &gt; Alle Mitarbeiter verknüpfen —</span>') + '</td>' +
+      '<td>' + (emp.uid ? ('<button type="button" class="btn me-reset-btn" data-staff-id="' + emp.id + '">Zugang zurücksetzen</button>') : '<span style="color:var(--text-muted);font-size:11px;">—</span>') + '</td>' +
       '<td>' + saldo.toFixed(1) + 'h</td>' +
       '<td><div class="saldo-adjust-stack">' +
         '<div class="saldo-adjust-row"><input type="number" class="saldo-input" step="0.5" placeholder="Neuer Wert" id="set-saldo-set-' + emp.id + '"><button type="button" class="btn set-fs-saldo-set" data-staff-id="' + emp.id + '" title="Feriensaldo direkt auf diesen Wert setzen — z.B. am Jahresanfang">Setzen</button></div>' +
@@ -3519,6 +3530,15 @@ $("#mitarbeiter-edit-tbody").addEventListener("click", async e=>{
     catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
     return;
   }
+});
+$("#mitarbeiter-edit-tbody").addEventListener("change", async e=>{
+  if(!e.target.classList.contains("me-account-select")) return;
+  var staffId3 = e.target.dataset.staffId;
+  var uid2 = e.target.value;
+  try{
+    await updateDoc(doc(db, STAFF_COLLECTION, staffId3), { uid: uid2 || null });
+    toast(uid2 ? "Konto verknüpft." : "Verknüpfung entfernt.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
 });
 // Legt für einen Mitarbeiter ein neues Login-Konto an und verknüpft es (uid) — das bisherige
 // Konto wird gesperrt. Nötig, weil ein bestehendes Passwort aus einer reinen Client-App heraus
@@ -3628,7 +3648,7 @@ var ferienSaldoSelected = new Set();
 function renderFerienSaldoPanel(){
   renderMonatsrapport();
   var tbody = $("#ferien-saldo-tbody");
-  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
   tbody.innerHTML = state.staff.map(emp=>{
     var saldo = typeof emp.ferienSaldo === "number" ? emp.ferienSaldo : 0;
     var ueberstd = typeof emp.ueberstundenSaldo === "number" ? emp.ueberstundenSaldo : 0;
@@ -3636,9 +3656,6 @@ function renderFerienSaldoPanel(){
     return '<tr data-staff-id="' + emp.id + '">' +
       '<td><input type="checkbox" class="fs-row-select" data-staff-id="' + emp.id + '"' + (ferienSaldoSelected.has(emp.id)?' checked':'') + '></td>' +
       '<td style="display:flex;align-items:center;gap:7px;">' + staffAvatarHtml(emp, "staff-avatar-sm") + escapeHtml(emp.name) + '</td>' +
-      '<td><select class="fs-model-select" data-staff-id="' + emp.id + '"><option value="">— keines —</option>' +
-        state.zeitmodelle.map(m=>'<option value="'+m.id+'"'+(emp.zeitmodellId===m.id?' selected':'')+'>'+escapeHtml(m.name)+'</option>').join('') +
-      '</select></td>' +
       '<td><span style="font-weight:600;color:' + (ueberstd<-0.05?"var(--danger)":ueberstd>0.05?"var(--success)":"inherit") + ';">' + (ueberstd>0?"+":"") + ueberstd.toFixed(1) + 'h</span></td>' +
       '<td>' + saldo.toFixed(1) + 'h</td>' +
       '<td><span style="font-weight:700;color:' + (total<-0.05?"var(--danger)":total>0.05?"var(--success)":"inherit") + ';">' + (total>0?"+":"") + total.toFixed(1) + 'h</span></td>' +
@@ -3647,16 +3664,10 @@ function renderFerienSaldoPanel(){
   }).join("");
 }
 $("#ferien-saldo-tbody").addEventListener("change", async e=>{
-  if(e.target.classList.contains("fs-row-select")){
-    var sid = e.target.dataset.staffId;
-    if(e.target.checked) ferienSaldoSelected.add(sid); else ferienSaldoSelected.delete(sid);
-    $("#ferien-saldo-select-all").checked = state.staff.length>0 && state.staff.every(s=>ferienSaldoSelected.has(s.id));
-    return;
-  }
-  if(!e.target.classList.contains("fs-model-select")) return;
-  var staffId = e.target.dataset.staffId, val = e.target.value;
-  try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId), { zeitmodellId: val || null }); toast("Zeitmodell zugewiesen."); }
-  catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
+  if(!e.target.classList.contains("fs-row-select")) return;
+  var sid = e.target.dataset.staffId;
+  if(e.target.checked) ferienSaldoSelected.add(sid); else ferienSaldoSelected.delete(sid);
+  $("#ferien-saldo-select-all").checked = state.staff.length>0 && state.staff.every(s=>ferienSaldoSelected.has(s.id));
 });
 $("#ferien-saldo-tbody").addEventListener("click", async e=>{
   var exportBtn = e.target.closest(".fs-export");
@@ -3666,6 +3677,27 @@ $("#ferien-saldo-select-all").addEventListener("change", e=>{
   ferienSaldoSelected.clear();
   if(e.target.checked) state.staff.forEach(s=>ferienSaldoSelected.add(s.id));
   renderFerienSaldoPanel();
+});
+
+/* ---- Zeitmodell je Mitarbeiter zuweisen (Verwaltung, nur Admin) ---- */
+function renderVerwaltungZeitmodellPanel(){
+  var tbody = $("#verwaltung-zeitmodell-tbody");
+  if(!tbody) return;
+  if(state.staff.length===0){ tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);font-size:12.5px;">Noch keine Mitarbeiter erfasst.</td></tr>'; return; }
+  tbody.innerHTML = state.staff.map(emp=>
+    '<tr data-staff-id="' + emp.id + '">' +
+    '<td style="display:flex;align-items:center;gap:7px;">' + staffAvatarHtml(emp, "staff-avatar-sm") + escapeHtml(emp.name) + '</td>' +
+    '<td><select class="vw-model-select" data-staff-id="' + emp.id + '"><option value="">— keines —</option>' +
+      state.zeitmodelle.map(m=>'<option value="'+m.id+'"'+(emp.zeitmodellId===m.id?' selected':'')+'>'+escapeHtml(m.name)+'</option>').join('') +
+    '</select></td>' +
+    '</tr>'
+  ).join("");
+}
+$("#verwaltung-zeitmodell-tbody").addEventListener("change", async e=>{
+  if(!e.target.classList.contains("vw-model-select")) return;
+  var staffId4 = e.target.dataset.staffId, val3 = e.target.value;
+  try{ await updateDoc(doc(db, STAFF_COLLECTION, staffId4), { zeitmodellId: val3 || null }); toast("Zeitmodell zugewiesen."); }
+  catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 
 /* ---- Monatsrapport: Soll (aus Zeitmodell/Arbeitstagen berechnet) vs. effektiv geleistet ---- */
@@ -3943,16 +3975,6 @@ $("#staff-grid").addEventListener("click", async e=>{
     return;
   }
 });
-$("#zeit-admin-tbody").addEventListener("change", async e=>{
-  if(!e.target.classList.contains("staff-link-select")) return;
-  var staffId = e.target.dataset.staffId;
-  var uid = e.target.value;
-  try{
-    await updateDoc(doc(db, STAFF_COLLECTION, staffId), { uid: uid || null });
-    toast(uid ? "Konto verknüpft." : "Verknüpfung entfernt.");
-  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
-});
-
 /* Drag & Drop: Auftragskarte aus dem Pool auf eine Mitarbeiter-/Tageszelle ziehen */
 $("#staff-grid").addEventListener("dragstart", e=>{
   if(!state.isAdmin) return;
