@@ -727,6 +727,39 @@
     border-color:var(--accent);
     color:var(--on-accent);
   }
+
+  /* Gruppen/Untergruppen-Filter: untereinander (vertikal) statt als Chip-Reihe, Untergruppen
+     eingerückt unter ihrer Hauptgruppe. */
+  #lager-page .group-filter-list{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    margin-bottom:14px;
+  }
+  #lager-page .group-filter-item{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text-muted);
+    font-family:var(--body);
+    font-size:12.5px;
+    font-weight:600;
+    padding:7px 13px;
+    border-radius:7px;
+    cursor:pointer;
+  }
+  #lager-page .group-filter-item.sub{
+    margin-left:20px;
+    font-weight:500;
+    font-size:12px;
+  }
+  #lager-page .group-filter-item.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--on-accent);
+  }
   #lager-page .search-bar{
     width:100%;
     background:var(--panel);
@@ -5574,7 +5607,7 @@ function bindTagCards(){
 }
 
 function renderArticles(){
-  const categories = allCategoryNames();
+  const options = categoryOptionsList();
   let html = '';
   if(isAdmin){
     html += `<div class="btn-row" style="margin-bottom:14px;">
@@ -5583,10 +5616,10 @@ function renderArticles(){
     </div>`;
   }
   html += `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name oder Art. Nr. …">`;
-  html += `<div class="filter-row" id="catFilterRow">
-      <button class="chip-filter active" data-cat="__all">Alle</button>
-      ${categories.map(c => `<button class="chip-filter" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}
-      ${isAdmin ? `<button class="chip-filter" id="manageGroupsBtn" style="border-style:dashed;" title="Artikelgruppen verwalten">+ Gruppe</button>` : ''}
+  html += `<div class="group-filter-list" id="catFilterRow">
+      <button class="group-filter-item active" data-cat="__all">Alle</button>
+      ${options.map(o => `<button class="group-filter-item ${o.indent?'sub':''}" data-cat="${escapeHtml(o.name)}">${escapeHtml(o.name)}</button>`).join('')}
+      ${isAdmin ? `<button class="group-filter-item" id="manageGroupsBtn" style="border-style:dashed;" title="Artikelgruppen verwalten">+ Gruppe / Untergruppe verwalten</button>` : ''}
     </div>`;
   html += `<div id="articleList"></div>`;
   main.innerHTML = html;
@@ -5609,9 +5642,9 @@ function renderArticles(){
     bindTagCards();
   };
   $('#searchInput').addEventListener('input', list);
-  $('#catFilterRow').querySelectorAll('.chip-filter[data-cat]').forEach(btn=>{
+  $('#catFilterRow').querySelectorAll('.group-filter-item[data-cat]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      $('#catFilterRow').querySelectorAll('.chip-filter[data-cat]').forEach(b=>b.classList.remove('active'));
+      $('#catFilterRow').querySelectorAll('.group-filter-item[data-cat]').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       activeCat = btn.dataset.cat;
       list();
@@ -5619,44 +5652,73 @@ function renderArticles(){
   });
   list();
 }
-// Eigene, direkt im Artikel-Reiter erreichbare Verwaltung der Artikelgruppen: anlegen
-// (auch ohne gleich einen Artikel zu erfassen) und löschen. Artikel, die bereits einer
-// gelöschten Gruppe zugeordnet sind, behalten ihre Kategorie-Bezeichnung einfach weiter
-// (sie taucht dann wieder als abgeleitete Gruppe auf, bis sie umbenannt werden).
+// Eigene, direkt im Artikel-Reiter erreichbare Verwaltung der Artikelgruppen: Haupt- und
+// Untergruppen anlegen (auch ohne gleich einen Artikel zu erfassen), untereinander als Baum
+// dargestellt, und löschen. Artikel, die bereits einer gelöschten Gruppe zugeordnet sind,
+// behalten ihre Kategorie-Bezeichnung einfach weiter (taucht dann wieder als abgeleitete,
+// nicht verwaltete Gruppe auf). Wird eine Hauptgruppe mit Untergruppen gelöscht, werden die
+// Untergruppen automatisch zu eigenständigen Hauptgruppen.
 function openManageGroupsSheet(){
   const render = () => {
-    const names = allCategoryNames();
-    sheet.querySelector('#groupsList').innerHTML = names.length
-      ? names.map(n => `<div class="material-row" style="display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;">${escapeHtml(n)}</div>
-          <button type="button" class="mat-remove" data-group="${escapeHtml(n)}" title="Gruppe löschen">✕</button>
-        </div>`).join('')
+    const tree = artikelgruppenTree();
+    sheet.querySelector('#groupsList').innerHTML = tree.length
+      ? tree.map(node => `
+          <div class="material-row" style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;font-weight:600;">${escapeHtml(node.group.name)}</div>
+            <button type="button" class="mat-remove" data-group-id="${node.group.id}" data-group-name="${escapeHtml(node.group.name)}" title="Gruppe löschen">✕</button>
+          </div>
+          ${node.children.map(c => `
+          <div class="material-row" style="display:flex;align-items:center;gap:8px;margin-left:20px;">
+            <div style="flex:1;font-size:12.5px;">— ${escapeHtml(c.name)}</div>
+            <button type="button" class="mat-remove" data-group-id="${c.id}" data-group-name="${escapeHtml(c.name)}" title="Untergruppe löschen">✕</button>
+          </div>`).join('')}
+        `).join('')
       : `<div style="font-size:12.5px;color:var(--text-muted);">Noch keine Artikelgruppen.</div>`;
-    sheet.querySelectorAll('[data-group]').forEach(btn=>{
+    sheet.querySelectorAll('[data-group-id]').forEach(btn=>{
       btn.onclick = async ()=>{
-        const name = btn.dataset.group;
+        const name = btn.dataset.groupName;
+        const gid = btn.dataset.groupId;
         const inUse = articles.filter(a=>(a.category||'Sonstiges')===name).length;
-        if(inUse>0 && !confirm('"' + name + '" wird noch bei ' + inUse + ' Artikel(n) verwendet. Gruppe trotzdem aus der Liste entfernen? Die Artikel behalten die Bezeichnung.')) return;
-        const g = artikelgruppen.find(x=>(x.name||'').toLowerCase()===name.toLowerCase());
-        if(g){ try{ await deleteDoc(doc(db,'artikelgruppen',g.id)); }catch(e){ console.error(e); } }
+        const hasChildren = artikelgruppen.some(g=>g.parentId===gid);
+        let msg = '';
+        if(inUse>0) msg += '"' + name + '" wird noch bei ' + inUse + ' Artikel(n) verwendet. ';
+        if(hasChildren) msg += 'Untergruppen von "' + name + '" werden dabei zu eigenständigen Hauptgruppen. ';
+        if(msg && !confirm(msg + 'Gruppe trotzdem löschen?')) return;
+        try{
+          if(hasChildren){
+            const children = artikelgruppen.filter(g=>g.parentId===gid);
+            await Promise.all(children.map(c => updateDoc(doc(db,'artikelgruppen',c.id), { parentId: null })));
+          }
+          await deleteDoc(doc(db,'artikelgruppen',gid));
+        }catch(e){ console.error(e); }
         render();
       };
     });
+    // Übergeordnete-Gruppe-Auswahl im Anlegen-Formular: nur Hauptgruppen zur Auswahl (keine
+    // Untergruppe einer Untergruppe).
+    const parentSel = sheet.querySelector('#f-new-group-parent');
+    if(parentSel){
+      const tops = artikelgruppen.filter(g=>!g.parentId).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      parentSel.innerHTML = '<option value="">– Hauptgruppe –</option>' + tops.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+    }
   };
   const sheet = buildSheet(`
     <div class="sheet-head"><h3>Artikelgruppen</h3><button class="x" data-close>×</button></div>
     <div id="groupsList" style="margin-bottom:14px;"></div>
-    <label>Neue Gruppe</label>
+    <label>Neue Gruppe / Untergruppe</label>
     <input type="text" id="f-new-group" placeholder="z. B. Dichtungen">
+    <label>Übergeordnete Gruppe <span style="text-transform:none;letter-spacing:0;">(optional – leer lassen für eine Hauptgruppe)</span></label>
+    <select id="f-new-group-parent"></select>
     <div class="btn-row">
       <button class="btn btn-secondary btn-block" data-close>Schliessen</button>
-      <button class="btn btn-primary btn-block" id="addGroupBtn">+ Gruppe anlegen</button>
+      <button class="btn btn-primary btn-block" id="addGroupBtn">+ Anlegen</button>
     </div>
   `);
   sheet.querySelector('#addGroupBtn').onclick = async ()=>{
     const name = sheet.querySelector('#f-new-group').value.trim();
+    const parentId = sheet.querySelector('#f-new-group-parent').value || null;
     if(!name){ toast('Bitte einen Namen eingeben'); return; }
-    await ensureArtikelgruppe(name);
+    await ensureArtikelgruppe(name, parentId);
     sheet.querySelector('#f-new-group').value = '';
     render();
   };
@@ -6586,23 +6648,52 @@ function getSelectedImageFile(sheet){
   return sheet._selectedImageFile || null;
 }
 
-// Artikelgruppen = eigenständig gepflegte Liste (artikelgruppen-Collection), ergänzt um
-// Kategorien, die nur noch auf alten Artikeln stehen (z.B. aus der Zeit vor dieser Liste).
+// Artikelgruppen = eigenständig gepflegte Liste (artikelgruppen-Collection, mit optionalem
+// parentId für Untergruppen), ergänzt um Kategorien, die nur noch auf alten Artikeln stehen
+// (z.B. aus der Zeit vor dieser Liste).
 function allCategoryNames(){
   const fromGroups = artikelgruppen.map(g => g.name);
   const fromArticles = articles.map(a => a.category || 'Sonstiges');
   return [...new Set([...fromGroups, ...fromArticles])].sort((a,b)=>a.localeCompare(b));
 }
+// Baut die Gruppen als Baum: Hauptgruppen (kein parentId) jeweils mit ihren sortierten
+// Untergruppen (parentId zeigt auf die Hauptgruppe).
+function artikelgruppenTree(){
+  const sorted = artikelgruppen.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const tops = sorted.filter(g=>!g.parentId);
+  const byParent = {};
+  sorted.filter(g=>g.parentId).forEach(g=>{ (byParent[g.parentId]=byParent[g.parentId]||[]).push(g); });
+  return tops.map(t => ({ group: t, children: byParent[t.id] || [] }));
+}
+// Flache, geordnete Liste aller Gruppen/Untergruppen (für Dropdown und Filter), mit indent-Flag
+// für Untergruppen; Kategorien, die nur auf Artikeln stehen und noch keine gepflegte Gruppe
+// haben, werden unindentiert angehängt.
+function categoryOptionsList(){
+  const out = [];
+  const seen = new Set();
+  artikelgruppenTree().forEach(node=>{
+    out.push({ id: node.group.id, name: node.group.name, indent: false });
+    seen.add((node.group.name||'').toLowerCase());
+    node.children.forEach(c=>{
+      out.push({ id: c.id, name: c.name, indent: true });
+      seen.add((c.name||'').toLowerCase());
+    });
+  });
+  const extra = [...new Set(articles.map(a=>a.category||'Sonstiges'))]
+    .filter(c=>!seen.has(c.toLowerCase())).sort((a,b)=>a.localeCompare(b));
+  extra.forEach(c=> out.push({ id: null, name: c, indent: false }));
+  return out;
+}
 function categorySelectHtml(selectedValue){
-  const categories = allCategoryNames();
-  const isKnown = selectedValue && categories.includes(selectedValue);
+  const options = categoryOptionsList();
+  const isKnown = selectedValue && options.some(o=>o.name===selectedValue);
   return `
     <select id="f-cat">
       <option value="" ${!selectedValue ? 'selected' : ''} disabled>Kategorie wählen…</option>
-      ${categories.map(c => `<option value="${escapeHtml(c)}" ${selectedValue===c ? 'selected':''}>${escapeHtml(c)}</option>`).join('')}
-      <option value="__new__" ${selectedValue && !isKnown ? 'selected' : ''}>+ Neue Kategorie…</option>
+      ${options.map(o => `<option value="${escapeHtml(o.name)}" ${selectedValue===o.name ? 'selected':''}>${o.indent?'— ':''}${escapeHtml(o.name)}</option>`).join('')}
+      <option value="__new__" ${selectedValue && !isKnown ? 'selected' : ''}>+ Neue Hauptgruppe…</option>
     </select>
-    <input type="text" id="f-cat-new" placeholder="Neue Kategorie eingeben" style="margin-top:8px;display:${selectedValue && !isKnown ? 'block' : 'none'};" value="${selectedValue && !isKnown ? escapeHtml(selectedValue) : ''}">
+    <input type="text" id="f-cat-new" placeholder="Neue Hauptgruppe eingeben" style="margin-top:8px;display:${selectedValue && !isKnown ? 'block' : 'none'};" value="${selectedValue && !isKnown ? escapeHtml(selectedValue) : ''}">
   `;
 }
 function bindCategorySelect(sheet){
@@ -6623,12 +6714,12 @@ function getCategoryValue(sheet){
 // Legt eine Artikelgruppe im Stamm an, falls sie (unabhängig von Gross-/Kleinschreibung)
 // dort noch nicht existiert – damit auch über "+ Neue Kategorie…" im Artikel-Formular
 // erfasste Gruppen künftig in der Gruppen-Verwaltung auftauchen.
-async function ensureArtikelgruppe(name){
+async function ensureArtikelgruppe(name, parentId){
   const n = (name||'').trim();
   if(!n) return;
   const exists = artikelgruppen.some(g => (g.name||'').toLowerCase() === n.toLowerCase());
   if(exists) return;
-  try{ await addDoc(collection(db, 'artikelgruppen'), { name: n, createdAt: Date.now() }); }
+  try{ await addDoc(collection(db, 'artikelgruppen'), { name: n, parentId: parentId || null, createdAt: Date.now() }); }
   catch(e){ console.error(e); }
 }
 
