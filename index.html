@@ -2929,13 +2929,15 @@ $("#zeit-kommen").addEventListener("click", async ()=>{ if(await showConfirm("Je
 $("#zeit-gehen").addEventListener("click", async ()=>{ if(await showConfirm("Jetzt ausstempeln?")) zeitPunch("gehen"); });
 
 // Ein- bzw. Ausstempeln direkt über den eigenen Einsatz-Chip in der Personalplanung
-// (nur für den eigenen, heutigen Eintrag — siehe data-punchable in renderStaffGrid).
+// (für jeden eigenen Eintrag, unabhängig vom Wochentag — siehe data-punchable in
+// renderStaffGrid). Gebucht wird dabei immer mit dem aktuellen Zeitstempel/heutigen Datum,
+// unabhängig davon, für welchen Tag der Einsatz im Plan eingetragen ist.
 async function punchFromAssignment(assignId){
   if(!state.currentUid) return;
   var a = state.assignments.find(x=>x.id===assignId);
   if(!a) return;
   var meEmp = state.staff.find(s=>s.uid === state.currentUid);
-  if(!meEmp || a.employeeId !== meEmp.id || a.date !== todayISO()){ return; }
+  if(!meEmp || a.employeeId !== meEmp.id){ return; }
   var order = state.orders.find(x=>x.id===a.orderId);
   var todayEntries = zeitTodayEntries(state.myTime);
   var status = zeitCurrentStatus(todayEntries);
@@ -4467,7 +4469,9 @@ function renderStaffGrid(){
         var o = state.orders.find(x=>x.id===a.orderId);
         var typ = a.type || "werkstatt";
         var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
-        var isMinePunchable = meEmp && emp.id===meEmp.id && iso===todayIso;
+        // Anstempeln geht auf jeden eigenen Einsatz, unabhängig vom Wochentag der Spalte (nicht
+        // nur auf den heutigen) — gebucht wird dabei ohnehin immer mit dem aktuellen Zeitstempel.
+        var isMinePunchable = meEmp && emp.id===meEmp.id;
         var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
         var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
         html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
