@@ -1399,7 +1399,7 @@
     <div class="table-scroll">
       <table class="overview-table" id="terminserien-table">
         <thead>
-          <tr><th>Mitarbeiter</th><th>Art</th><th>Wochentag</th><th>Intervall</th><th>Von</th><th>Bis</th><th></th></tr>
+          <tr><th>Mitarbeiter</th><th>Art</th><th>Wochentag</th><th>Intervall</th><th>Std.</th><th>Von</th><th>Bis</th><th></th></tr>
         </thead>
         <tbody id="terminserien-tbody"></tbody>
       </table>
@@ -1425,6 +1425,7 @@
         <option value="0">Sonntag</option>
       </select>
       <input type="number" id="ts-interval" placeholder="Intervall (Wochen)" min="1" value="1" style="max-width:150px;" title="Alle wie viele Wochen (1 = jede Woche, 2 = alle 2 Wochen, ...)">
+      <input type="number" id="ts-hours" placeholder="Std. (leer = ganzer Tag)" min="0.5" step="0.5" style="max-width:160px;" title="Nur ausfüllen für einen halben Tag o.ä. — leer lassen für einen ganzen Tag. Bei Stundenangabe wird das Tages-Soll um diese Stunden reduziert, den Rest muss normal gestempelt werden.">
       <span class="date-field">
         <input type="text" id="ts-start-display" class="date-input" readonly placeholder="Von (TT.MM.JJJJ)" autocomplete="off">
         <input type="hidden" id="ts-start">
@@ -3405,7 +3406,7 @@ function renderTerminserienPanel(){
       state.staff.map(s=>'<option value="'+s.id+'"'+(s.id===keepSel?' selected':'')+'>'+escapeHtml(s.name)+'</option>').join("");
   }
   if(state.terminserien.length===0){
-    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-size:12.5px;">Noch keine Terminserien erfasst.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);font-size:12.5px;">Noch keine Terminserien erfasst.</td></tr>';
     return;
   }
   var sorted = state.terminserien.slice().sort((a,b)=> (a.startDate||"").localeCompare(b.startDate||""));
@@ -3416,6 +3417,7 @@ function renderTerminserienPanel(){
       '<td>' + escapeHtml(absenceLabel(ts.type)) + '</td>' +
       '<td>' + escapeHtml(WEEKDAY_LABELS[ts.weekday]) + '</td>' +
       '<td>' + (ts.intervalWeeks===1 ? "jede Woche" : "alle " + ts.intervalWeeks + " Wochen") + '</td>' +
+      '<td>' + (typeof ts.hours==="number" ? ts.hours.toFixed(1)+"h" : "ganzer Tag") + '</td>' +
       '<td>' + isoToDisplay(ts.startDate) + '</td>' +
       '<td>' + (ts.endDate ? isoToDisplay(ts.endDate) : "unbegrenzt") + '</td>' +
       '<td><button type="button" class="ts-delete" data-ts-id="' + ts.id + '" title="Terminserie löschen">✕</button></td>' +
@@ -3428,6 +3430,8 @@ $("#terminserien-add-form").addEventListener("submit", async e=>{
   var type = $("#ts-type").value;
   var weekday = parseInt($("#ts-weekday").value, 10);
   var intervalWeeks = parseInt($("#ts-interval").value, 10);
+  var hoursVal = parseFloat($("#ts-hours").value);
+  var hours = (!isNaN(hoursVal) && hoursVal > 0) ? hoursVal : null;
   var startDate = $("#ts-start").value;
   var endDate = $("#ts-end").value || null;
   if(!employeeId || !startDate){ toast("Bitte Mitarbeiter und Startdatum angeben."); return; }
@@ -3435,11 +3439,11 @@ $("#terminserien-add-form").addEventListener("submit", async e=>{
   if(endDate && endDate < startDate){ toast('"Bis" darf nicht vor "Von" liegen.'); return; }
   try{
     await addDoc(collection(db, TERMINSERIEN_COLLECTION), {
-      employeeId: employeeId, type: type, weekday: weekday, intervalWeeks: intervalWeeks,
+      employeeId: employeeId, type: type, weekday: weekday, intervalWeeks: intervalWeeks, hours: hours,
       startDate: startDate, endDate: endDate, createdAt: Date.now()
     });
     $("#ts-start").value = ""; $("#ts-start-display").value = "";
-    $("#ts-end").value = ""; $("#ts-end-display").value = ""; $("#ts-interval").value = "1";
+    $("#ts-end").value = ""; $("#ts-end-display").value = ""; $("#ts-interval").value = "1"; $("#ts-hours").value = "";
     toast("Terminserie gespeichert.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
@@ -3472,7 +3476,8 @@ function terminserieForDay(employeeId, iso){
     return (diffDays % intervalDays) === 0;
   });
   if(!match) return null;
-  return { id: "ts_"+match.id+"_"+iso, employeeId: employeeId, type: match.type, startDate: iso, endDate: iso, hours: null, partial: false, isTerminserie: true, name: absenceLabel(match.type) + " (Serie)" };
+  var hasHours = typeof match.hours === "number" && match.hours > 0;
+  return { id: "ts_"+match.id+"_"+iso, employeeId: employeeId, type: match.type, startDate: iso, endDate: iso, hours: hasHours ? match.hours : null, partial: hasHours, isTerminserie: true, name: absenceLabel(match.type) + " (Serie)" };
 }
 
 /* ---- Feriensaldo/Überstunden-Saldo auch in den Einstellungen setzbar (eigene IDs, damit sie
