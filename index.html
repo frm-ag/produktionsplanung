@@ -460,8 +460,10 @@
   .staff-cell.drag-over{background:var(--steel-soft, #e3ebf3);}
   .assign-chip{
     background:var(--accent-dim);border-left:3px solid var(--accent);border-radius:5px;
-    padding:4px 6px;font-size:10.5px;cursor:pointer;line-height:1.3;
+    padding:4px 6px;font-size:10.5px;cursor:pointer;line-height:1.3;position:relative;
   }
+  .assign-chip .a-edit-btn{position:absolute;top:2px;right:2px;border:none;background:rgba(255,255,255,.6);color:var(--text-muted);font-size:10px;width:17px;height:17px;border-radius:4px;cursor:pointer;line-height:1;}
+  .assign-chip .a-edit-btn:hover{background:#fff;color:var(--text);}
   .assign-chip.type-werkstatt{background:#e3ebf3;border-left-color:var(--accent);}
   .assign-chip.type-montage{background:#efe6f5;border-left-color:#7b4fa0;}
   .assign-chip.type-reparatur{background:#f4e9d3;border-left-color:#8e6b1f;}
@@ -1182,8 +1184,6 @@
             <th data-sort="orderNumber">Auftrag</th>
             <th data-sort="customer">Kunde</th>
             <th data-sort="workshop">Werkstatt</th>
-            <th data-sort="productionStart">Start</th>
-            <th data-sort="assemblyDate">Montage</th>
             <th data-sort="auftragswert">Auftragswert</th>
             <th data-sort="status">Status</th>
           </tr>
@@ -1756,20 +1756,6 @@
         <div class="field"><label for="f-auftragswert">Auftragswert (CHF)</label><input type="number" id="f-auftragswert" min="0" step="0.05" placeholder="0.00"></div>
         <div class="field"><label for="f-materialplan">Material Plan (CHF)</label><input type="number" id="f-materialplan" min="0" step="0.05" placeholder="0.00"></div>
       </div>
-      <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
-        <span class="date-field">
-          <input type="text" id="f-productionStart-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
-          <input type="hidden" id="f-productionStart">
-        </span>
-        <small class="week-hint" id="f-productionStart-week"></small>
-      </div>
-      <div class="field"><label for="f-assemblyDate-display">Montage-Termin</label>
-        <span class="date-field">
-          <input type="text" id="f-assemblyDate-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
-          <input type="hidden" id="f-assemblyDate">
-        </span>
-        <small class="week-hint" id="f-assemblyDate-week"></small>
-      </div>
       <div class="field">
         <label>Kostenarten (Plankalkulation)</label>
         <div class="materials-box">
@@ -2297,15 +2283,13 @@ function renderTable(){
     th.classList.toggle("desc", th.dataset.sort === state.tableSort.field && state.tableSort.dir === "desc");
   });
   var tbody = $("#overview-tbody");
-  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Keine Aufträge in dieser Ansicht.</td></tr>'; return; }
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="5">Keine Aufträge in dieser Ansicht.</td></tr>'; return; }
   var html = "";
   rows.forEach(o=>{
     html += '<tr class="' + (o.completed?"row-completed":"") + '" data-id="' + o.id + '">';
     html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
     html += '<td data-label="Kunde"><div class="ov-customer">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(o.description) + '</div>':'') + '</td>';
     html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
-    html += '<td data-label="Start">' + (o.productionStart ? fmtShort(o.productionStart) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
-    html += '<td data-label="Montage">' + (o.assemblyDate ? fmtShort(o.assemblyDate) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
     html += '<td data-label="Auftragswert">' + fmtChf(o.auftragswert) + '</td>';
     html += '<td data-label="Status"><span class="tag status-' + (o.status||"fabrikation") + '">' + statusLabel(o.status) + '</span></td>';
     html += '</tr>';
@@ -3810,11 +3794,11 @@ function renderStaffGrid(){
   days.forEach(d=> html += '<div>' + fmtDay(d) + ' ' + fmtShort(toISO(d)) + '</div>');
   html += '</div>';
   var canEdit = !!state.isAdmin;
-  var meEmp = !canEdit ? state.staff.find(s=>s.uid === state.currentUid) : null;
+  var meEmp = state.staff.find(s=>s.uid === state.currentUid) || null;
   var todayIso = todayISO();
-  var myTodayEntries = !canEdit ? zeitTodayEntries(state.myTime) : [];
-  var myStatus = !canEdit ? zeitCurrentStatus(myTodayEntries) : "off";
-  var myLastKommen = !canEdit ? myTodayEntries.slice().reverse().find(e=>e.type==="kommen") : null;
+  var myTodayEntries = meEmp ? zeitTodayEntries(state.myTime) : [];
+  var myStatus = meEmp ? zeitCurrentStatus(myTodayEntries) : "off";
+  var myLastKommen = meEmp ? myTodayEntries.slice().reverse().find(e=>e.type==="kommen") : null;
   state.staff.forEach(emp=>{
     html += '<div class="staff-row">';
     html += '<div class="staff-row-name"' + (canEdit?' draggable="true"':'') + ' data-staff-id="' + emp.id + '">';
@@ -3832,10 +3816,10 @@ function renderStaffGrid(){
         var o = state.orders.find(x=>x.id===a.orderId);
         var typ = a.type || "werkstatt";
         var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
-        var isMinePunchable = !canEdit && meEmp && emp.id===meEmp.id && iso===todayIso;
+        var isMinePunchable = meEmp && emp.id===meEmp.id && iso===todayIso;
         var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
         var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
-        html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
+        html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
       });
       if(canEdit) html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
       html += '</div>';
@@ -3953,6 +3937,8 @@ $("#staff-seed-btn").addEventListener("click", async ()=>{
 });
 
 $("#staff-grid").addEventListener("click", async e=>{
+  var editBtn = e.target.closest(".a-edit-btn");
+  if(editBtn && state.isAdmin){ openAssignModal(null, null, editBtn.dataset.assignId); return; }
   var punchChip = e.target.closest(".assign-chip[data-punchable='1']");
   if(punchChip){ await punchFromAssignment(punchChip.dataset.assignId); return; }
   if(!state.isAdmin) return;
@@ -4074,9 +4060,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-order-field").style.display = "none";
     $("#assign-modal-title").textContent = "Einsatz eintragen";
     $("#assign-info").textContent = (o2?o2.orderNumber + " · " + o2.customer:"?") + " — " + (emp2?emp2.name:"?") + " · " + fmtShort(cellInfo.date);
-    var defaultType = "werkstatt";
-    if(o2 && o2.workshop === "reparaturen") defaultType = "reparatur";
-    else if(o2 && cellInfo.date === o2.assemblyDate) defaultType = "montage";
+    var defaultType = (o2 && o2.workshop === "reparaturen") ? "reparatur" : "werkstatt";
     $("#assign-type").value = defaultType;
     populateAssignKostenartSelect(o2, "");
     $("#assign-hours").value = 8;
@@ -4113,10 +4097,7 @@ $("#assign-order-search").addEventListener("input", e=>{
   if(match){
     state.pendingOrderId = match.id;
     $("#assign-info").textContent = match.orderNumber + " · " + match.customer + " — " + (emp?emp.name:"?") + " · " + fmtShort(state.assignDate);
-    var defaultType = "werkstatt";
-    if(match.workshop === "reparaturen") defaultType = "reparatur";
-    else if(state.assignDate === match.assemblyDate) defaultType = "montage";
-    $("#assign-type").value = defaultType;
+    $("#assign-type").value = match.workshop === "reparaturen" ? "reparatur" : "werkstatt";
     populateAssignKostenartSelect(match, "");
   }else{
     state.pendingOrderId = null;
@@ -4375,12 +4356,6 @@ function openModal(order, prefillDate){
   $("#f-materialplan").value = (order && order.materialPlan) ? order.materialPlan : "";
   $("#voka-import-status").textContent = "";
   $("#voka-import-input").value = "";
-  $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
-  $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
-  $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
-  $("#f-assemblyDate-display").value = isoToDisplay($("#f-assemblyDate").value);
-  updateWeekHint("#f-productionStart", "#f-productionStart-week");
-  updateWeekHint("#f-assemblyDate", "#f-assemblyDate-week");
   state.modalKostenarten = order ? JSON.parse(JSON.stringify(Array.isArray(order.kostenarten)?order.kostenarten:[])) : [];
   renderKostenartenRows();
   state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
@@ -4392,8 +4367,6 @@ function openModal(order, prefillDate){
 function closeModal(){ backdrop.classList.remove("open"); state.editingId = null; }
 
 $("#add-btn").addEventListener("click", ()=>openModal(null,null));
-$("#f-productionStart").addEventListener("input", ()=>updateWeekHint("#f-productionStart","#f-productionStart-week"));
-$("#f-assemblyDate").addEventListener("input", ()=>updateWeekHint("#f-assemblyDate","#f-assemblyDate-week"));
 $("#cancel-btn").addEventListener("click", closeModal);
 backdrop.addEventListener("click", e=>{ if(e.target===backdrop) closeModal(); });
 
@@ -4441,8 +4414,6 @@ form.addEventListener("submit", async e=>{
       completed: status !== "fabrikation",
       auftragswert: parseFloat($("#f-auftragswert").value) || 0,
       materialPlan: parseFloat($("#f-materialplan").value) || 0,
-      productionStart: $("#f-productionStart").value,
-      assemblyDate: $("#f-assemblyDate").value,
       kostenarten: kostenarten,
       todos: todos,
       updatedAt: Date.now()
