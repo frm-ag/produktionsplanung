@@ -4847,8 +4847,8 @@ function renderArtikelRows(){
       '<input class="art-bez" list="artikel-stamm-list" placeholder="Artikel suchen (Name oder Art. Nr.)" value="' + escapeHtml(a.bezeichnung||"") + '">' +
       '<button type="button" class="mat-remove" aria-label="Artikel entfernen">✕</button>' +
       '</div><div class="mat-row2">' +
-      '<input type="number" min="0" step="1" class="art-menge" placeholder="Menge" value="' + (a.menge!=null&&a.menge!==""?a.menge:"") + '">' +
-      '<input type="number" min="0" step="0.01" class="art-vk" placeholder="VK Fr./Stk" value="' + (a.verkaufspreis!=null&&a.verkaufspreis!==""?a.verkaufspreis:"") + '">' +
+      '<input type="number" min="0" step="0.01" class="art-menge" placeholder="Menge (z. B. Meter)" value="' + (a.menge!=null&&a.menge!==""?a.menge:"") + '">' +
+      '<input type="number" min="0" step="0.01" class="art-vk" placeholder="VK Fr./Einheit" value="' + (a.verkaufspreis!=null&&a.verkaufspreis!==""?a.verkaufspreis:"") + '">' +
       '<span style="font-size:12px;color:var(--text-muted);align-self:center;white-space:nowrap;">' + fmtChf(artikelBetrag(a)) + '</span>' +
       '</div></div>';
   });
@@ -5658,6 +5658,9 @@ function renderArticles(){
     html += `<div class="btn-row" style="margin-bottom:14px;">
       <button class="btn btn-primary btn-block" id="addArticleBtn">+ Artikel</button>
       <button class="btn btn-secondary btn-block" id="importExcelBtn">Aus Excel importieren</button>
+    </div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-secondary btn-block" id="manageImportsBtn" style="border-style:dashed;">Excel-Importe verwalten (ersetzen/entfernen)</button>
     </div>`;
   }
   html += `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name oder Art. Nr. …">`;
@@ -5689,6 +5692,7 @@ function renderArticles(){
     $('#addArticleBtn').onclick = openAddArticleSheet;
     $('#importExcelBtn').onclick = openImportExcelSheet;
     $('#manageGroupsBtn').onclick = openManageGroupsSheet;
+    $('#manageImportsBtn').onclick = openManageImportsSheet;
   }
   let activeCat = '__all';
   const list = () => {
@@ -5828,6 +5832,61 @@ function openManageGroupsSheet(){
     await ensureArtikelgruppe(name, parentId);
     sheet.querySelector('#f-new-group').value = '';
     render();
+  };
+  render();
+}
+
+// Excel-Importe verwalten: direkt im Artikel-Reiter erreichbar (statt nur im ausgeblendeten
+// Lager-Tools-Reiter), damit z.B. bei Preisanpassungen oder einem neuen Lieferanten ein alter
+// Katalog-Import entfernt und danach die aktualisierte Excel-Datei neu hochgeladen werden kann.
+function openManageImportsSheet(){
+  const render = () => {
+    sheet.querySelector('#importsListBox').innerHTML = imports.length
+      ? imports.map(imp => `
+        <div class="movement-row">
+          <div class="m-icon in">${imp.count}</div>
+          <div class="m-info">
+            <div class="m-name">${escapeHtml(imp.fileName || 'Import')}</div>
+            <div class="m-meta">${fmtDate(imp.importedAt)} · von ${escapeHtml(imp.importedBy || '—')} · ${imp.count} Artikel</div>
+          </div>
+          <div><button class="btn btn-secondary" data-delimport="${imp.id}" style="padding:4px 10px;font-size:10.5px;color:var(--danger);">Löschen</button></div>
+        </div>`).join('')
+      : `<div style="font-size:12.5px;color:var(--text-muted);padding:10px 0;">Noch keine Excel-Importe durchgeführt.</div>`;
+    sheet.querySelectorAll('[data-delimport]').forEach(btn=>{
+      btn.onclick = ()=> openDeleteImportSheet(btn.dataset.delimport);
+    });
+    const catSel = sheet.querySelector('#bulk-cat-select');
+    if(catSel){
+      catSel.innerHTML = '<option value="">Kategorie wählen…</option>' +
+        [...new Set(articles.map(a=>a.category||'Sonstiges'))].sort().map(c=>{
+          const count = articles.filter(a=>(a.category||'Sonstiges')===c).length;
+          return `<option value="${escapeHtml(c)}">${escapeHtml(c)} (${count} Artikel)</option>`;
+        }).join('');
+    }
+  };
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Excel-Importe verwalten</h3><button class="x" data-close>×</button></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+      Beim Ersetzen eines Katalogs (z. B. neue Preise oder ein neuer Lieferant): alten Import hier
+      löschen – entfernt alle dabei angelegten Artikel – und danach die aktualisierte Excel-Datei
+      über "Aus Excel importieren" neu hochladen.
+    </div>
+    <div id="importsListBox" style="margin-bottom:18px;"></div>
+    <h2 class="section-title">Ganze Kategorie löschen</h2>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+      Praktisch für Artikel, die ohne Import-Historie angelegt oder erfasst wurden.
+    </div>
+    <label>Kategorie</label>
+    <select id="bulk-cat-select"></select>
+    <div class="btn-row">
+      <button class="btn btn-danger btn-block" id="bulk-cat-delete">Kategorie löschen</button>
+      <button class="btn btn-secondary btn-block" data-close>Schliessen</button>
+    </div>
+  `);
+  sheet.querySelector('#bulk-cat-delete').onclick = ()=>{
+    const cat = sheet.querySelector('#bulk-cat-select').value;
+    if(!cat){ toast('Bitte eine Kategorie wählen'); return; }
+    openDeleteCategorySheet(cat);
   };
   render();
 }
