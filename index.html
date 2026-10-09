@@ -5667,11 +5667,16 @@ function renderArticles(){
   // Hauptgruppen sind standardmässig eingeklappt (Pfeil zum Öffnen), damit die Liste bei vielen
   // Untergruppen nicht endlos wird.
   let filterHtml = `<button class="group-filter-item active" data-cat="__all">Alle</button>`;
+  // Für Hauptgruppen mit Untergruppen: Klick zeigt Artikel der Hauptgruppe UND aller
+  // Untergruppen zusammen (und klappt die Untergruppen gleich auf), damit man nach einem
+  // Import nicht erst "Keine Treffer" sieht, nur weil die Artikel in einer Untergruppe liegen.
+  const catMatchSets = {};
   tree.forEach(node=>{
     const hasKids = node.children.length > 0;
+    if(hasKids) catMatchSets[node.group.name] = [node.group.name, ...node.children.map(c=>c.name)];
     filterHtml += `<div class="group-filter-group">
         <div class="group-filter-row">
-          <button class="group-filter-item" data-cat="${escapeHtml(node.group.name)}">${escapeHtml(node.group.name)}</button>
+          <button class="group-filter-item" data-cat="${escapeHtml(node.group.name)}" ${hasKids?`data-group-id="${node.group.id}"`:''}>${escapeHtml(node.group.name)}</button>
           ${hasKids ? `<button type="button" class="group-filter-toggle" data-toggle-id="${node.group.id}" title="Untergruppen anzeigen">▸</button>` : ''}
         </div>
         ${hasKids ? `<div class="group-filter-children" id="grp-children-${node.group.id}" hidden>
@@ -5699,7 +5704,8 @@ function renderArticles(){
     const q = ($('#searchInput').value||'').toLowerCase();
     const filtered = articles.filter(a => {
       const matchesQuery = (a.name||'').toLowerCase().includes(q) || (a.vendorArticleNumber||'').toLowerCase().includes(q);
-      const matchesCat = activeCat === '__all' || (a.category || 'Sonstiges') === activeCat;
+      const cat = a.category || 'Sonstiges';
+      const matchesCat = activeCat === '__all' || cat === activeCat || (catMatchSets[activeCat] && catMatchSets[activeCat].includes(cat));
       return matchesQuery && matchesCat;
     });
     $('#articleList').innerHTML = filtered.length
@@ -5722,6 +5728,12 @@ function renderArticles(){
       $('#catFilterRow').querySelectorAll('.group-filter-item[data-cat]').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       activeCat = btn.dataset.cat;
+      if(btn.dataset.groupId){
+        const box = $('#grp-children-'+btn.dataset.groupId);
+        const toggle = $('#catFilterRow').querySelector('.group-filter-toggle[data-toggle-id="'+btn.dataset.groupId+'"]');
+        if(box){ box.removeAttribute('hidden'); }
+        if(toggle){ toggle.classList.add('open'); toggle.textContent='▾'; }
+      }
       list();
     });
   });
@@ -6598,9 +6610,28 @@ function openImportExcelSheet(){
     <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
       Unterstützt CSV sowie Excel-Formate (.xlsx, .xls, .xlsm, .ods). Erste Zeile muss Spaltenüberschriften enthalten. Erkannte Spalten (Gross-/Kleinschreibung egal): <strong>Name</strong> (Pflicht), Kategorie, Art. Nr., Einkaufspreis, Verkaufspreis.
     </div>
+    <label>Zielgruppe für diesen Import <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <select id="import-target-cat">
+      <option value="">Kategorie-Spalte aus der Datei verwenden</option>
+      ${categoryOptionsList().map(o => `<option value="${escapeHtml(o.name)}">${o.indent?'— ':''}${escapeHtml(o.name)}</option>`).join('')}
+      <option value="__new__">+ Neue Gruppe/Untergruppe…</option>
+    </select>
+    <input type="text" id="import-target-cat-new" placeholder="Neue Gruppe eingeben" style="margin-top:8px;display:none;">
+    <div style="font-size:12px;color:var(--text-muted);margin:6px 0 14px;">
+      Wenn hier eine Gruppe gewählt wird, bekommen <strong>alle</strong> Artikel dieses Imports diese Gruppe/Untergruppe – unabhängig davon, was in der Datei bei "Kategorie" steht.
+    </div>
     <input type="file" id="importFile" accept=".xlsx,.xls,.xlsm,.csv,.ods">
     <div id="importPreview"></div>
   `);
+  sheet.querySelector('#import-target-cat').addEventListener('change', (e)=>{
+    sheet.querySelector('#import-target-cat-new').style.display = e.target.value === '__new__' ? 'block' : 'none';
+    if(e.target.value === '__new__') sheet.querySelector('#import-target-cat-new').focus();
+  });
+  const getImportTargetCat = () => {
+    const sel = sheet.querySelector('#import-target-cat').value;
+    if(sel === '__new__') return sheet.querySelector('#import-target-cat-new').value.trim();
+    return sel;
+  };
   sheet.querySelector('#importFile').addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if(!file) return;
@@ -6616,23 +6647,30 @@ function openImportExcelSheet(){
         preview.innerHTML = `<div style="font-size:12.5px;color:var(--danger);margin-top:10px;">Keine gültigen Zeilen gefunden. Ist eine Spalte "Name" vorhanden?</div>`;
         return;
       }
-      preview.innerHTML = `
-        <div style="font-size:12.5px;color:var(--text);margin:12px 0 6px;"><strong>${mapped.length} Artikel gefunden:</strong></div>
-        <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;">
-          ${mapped.map(r => `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">${escapeHtml(String(r.name))} ${r.category ? '· '+escapeHtml(String(r.category)) : ''}</div>`).join('')}
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary btn-block" id="doImportBtn">${mapped.length} Artikel jetzt importieren</button>
-        </div>
-      `;
-      sheet.querySelector('#doImportBtn').onclick = async ()=>{
+      const renderPreview = () => {
+        const targetCat = getImportTargetCat();
+        preview.innerHTML = `
+          <div style="font-size:12.5px;color:var(--text);margin:12px 0 6px;"><strong>${mapped.length} Artikel gefunden:</strong></div>
+          <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;">
+            ${mapped.map(r => `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);">${escapeHtml(String(r.name))} · ${escapeHtml(targetCat || String(r.category||'Sonstiges'))}</div>`).join('')}
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-block" id="doImportBtn">${mapped.length} Artikel jetzt importieren</button>
+          </div>
+        `;
+        sheet.querySelector('#doImportBtn').onclick = doImport;
+      };
+      sheet.querySelector('#import-target-cat').addEventListener('change', renderPreview);
+      sheet.querySelector('#import-target-cat-new').addEventListener('input', renderPreview);
+      const doImport = async ()=>{
         const btn = sheet.querySelector('#doImportBtn');
         btn.disabled = true; btn.textContent = 'Importiere…';
         try{
+          const targetCat = getImportTargetCat();
           const usedIds = new Set();
           const batchId = 'import_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
           const toCreate = mapped.map(r => {
-            const category = String(r.category || 'Sonstiges').trim() || 'Sonstiges';
+            const category = (targetCat && targetCat.trim()) || String(r.category || 'Sonstiges').trim() || 'Sonstiges';
             const id = genArticleIdBulk(category, usedIds);
             return {
               id,
@@ -6665,6 +6703,7 @@ function openImportExcelSheet(){
           btn.disabled = false; btn.textContent = mapped.length + ' Artikel jetzt importieren';
         }
       };
+      renderPreview();
     }catch(e){
       preview.innerHTML = `<div style="font-size:12.5px;color:var(--danger);margin-top:10px;">Datei konnte nicht gelesen werden: ${escapeHtml(e.message)}</div>`;
       console.error(e);
