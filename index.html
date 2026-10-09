@@ -4168,8 +4168,8 @@ function renderKostenartenRows(){
       '<input class="ka-bez" placeholder="z. B. 4003 WS Brandschutz Stahl" value="' + escapeHtml(k.bezeichnung||"") + '">' +
       '<button type="button" class="mat-remove" aria-label="Kostenart entfernen">✕</button>' +
       '</div><div class="mat-row2">' +
-      '<input type="number" min="0" step="0.1" class="ka-std" placeholder="Std." value="' + (k.stunden!=null&&k.stunden!==""?k.stunden:"") + '">' +
-      '<input type="number" min="0" step="0.05" class="ka-ansatz" placeholder="Fr./Std" value="' + (k.ansatz!=null&&k.ansatz!==""?k.ansatz:"") + '">' +
+      '<input type="number" min="0" step="0.01" class="ka-std" placeholder="Std." value="' + (k.stunden!=null&&k.stunden!==""?k.stunden:"") + '">' +
+      '<input type="number" min="0" step="0.01" class="ka-ansatz" placeholder="Fr./Std" value="' + (k.ansatz!=null&&k.ansatz!==""?k.ansatz:"") + '">' +
       '<span style="font-size:12px;color:var(--text-muted);align-self:center;white-space:nowrap;">' + fmtChf(kostenartBetrag(k)) + '</span>' +
       '</div></div>';
   });
