@@ -1777,8 +1777,12 @@
 </div>
 
 <div class="modal-backdrop" id="modal-backdrop">
-  <div class="modal">
+  <div class="modal" style="max-width:760px;">
     <h3 id="modal-title">Neuer Auftrag</h3>
+    <div id="order-ist-stunden-box" class="materials-box" style="display:none;margin-bottom:14px;">
+      <label style="margin-bottom:6px;display:block;">Ist-Stunden (gestempelt)</label>
+      <div id="order-ist-stunden-content" style="font-size:12.5px;"></div>
+    </div>
     <form id="order-form">
       <div class="field materials-box" style="margin-bottom:14px;">
         <label for="voka-import-input">VOKA-Kalkulation importieren (optional)</label>
@@ -4502,8 +4506,63 @@ function openModal(order, prefillDate){
   state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
   renderTodoRows();
   $("#delete-btn").style.display = order ? "inline-block" : "none";
+  renderOrderIstStunden(order);
   backdrop.classList.add("open");
   setTimeout(()=>$("#f-orderNumber").focus(), 30);
+}
+// Summiert alle gestempelten Zeiten (Kommen/Gehen-Paare, alle Mitarbeiter) für einen Auftrag,
+// aufgeschlüsselt nach Kostenart (anhand kostenartIdx auf dem Kommen-Eintrag) und gesamt.
+function computeOrderIstStunden(orderId){
+  var byKa = {}, totalMs = 0;
+  var byUid = {};
+  (state.allTime||[]).forEach(function(t){ (byUid[t.uid] = byUid[t.uid] || []).push(t); });
+  Object.keys(byUid).forEach(function(uid){
+    var entries = byUid[uid].slice().sort(function(a,b){ return a.timestamp - b.timestamp; });
+    var openKommen = null;
+    entries.forEach(function(e){
+      if(e.type === "kommen"){ openKommen = e; }
+      else if(e.type === "gehen"){
+        if(openKommen && openKommen.orderId === orderId){
+          var ms = e.timestamp - openKommen.timestamp;
+          if(ms > 0){
+            var key = (openKommen.kostenartIdx != null) ? openKommen.kostenartIdx : "none";
+            byKa[key] = (byKa[key] || 0) + ms;
+            totalMs += ms;
+          }
+        }
+        openKommen = null;
+      }
+    });
+  });
+  return { totalMs: totalMs, byKa: byKa };
+}
+function renderOrderIstStunden(order){
+  var box = $("#order-ist-stunden-box"), content = $("#order-ist-stunden-content");
+  if(!order){ box.style.display = "none"; return; }
+  var result = computeOrderIstStunden(order.id);
+  var kostenarten = Array.isArray(order.kostenarten) ? order.kostenarten : [];
+  var rows = kostenarten.map(function(k, idx){
+    var istMs = result.byKa[idx] || 0;
+    var istH = istMs / 3600000;
+    var planH = parseFloat(k.stunden) || 0;
+    return '<tr><td>' + escapeHtml(k.bezeichnung||"") + '</td><td style="text-align:right;">' + planH.toFixed(2) + 'h</td>' +
+      '<td style="text-align:right;font-weight:600;' + (istH > planH ? 'color:var(--danger,#c0392b);' : '') + '">' + istH.toFixed(2) + 'h</td></tr>';
+  });
+  var ohneKaMs = result.byKa["none"] || 0;
+  if(ohneKaMs > 0){
+    rows.push('<tr><td style="color:var(--text-muted);">Ohne Kostenart</td><td></td><td style="text-align:right;font-weight:600;">' + (ohneKaMs/3600000).toFixed(2) + 'h</td></tr>');
+  }
+  var totalH = result.totalMs / 3600000;
+  if(rows.length===0){
+    content.innerHTML = '<span style="color:var(--text-muted);">Noch keine Stunden auf diesen Auftrag gestempelt.</span>';
+  } else {
+    content.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+      '<tr style="color:var(--text-muted);font-size:11px;"><th style="text-align:left;">Kostenart</th><th style="text-align:right;">Plan</th><th style="text-align:right;">Ist</th></tr>' +
+      rows.join("") +
+      '<tr style="border-top:1px solid var(--border);"><td style="font-weight:600;">Total</td><td></td><td style="text-align:right;font-weight:700;">' + totalH.toFixed(2) + 'h</td></tr>' +
+      '</table>';
+  }
+  box.style.display = "block";
 }
 function closeModal(){ backdrop.classList.remove("open"); state.editingId = null; }
 
