@@ -1403,7 +1403,7 @@
     <div class="table-scroll">
       <table class="overview-table" id="kostenarten-stamm-table">
         <thead>
-          <tr><th>Bezeichnung</th><th>Standard-Ansatz (Fr./Std.)</th><th></th></tr>
+          <tr><th>Bezeichnung</th><th>Standard-Ansatz (Fr./Std.)</th><th></th><th></th></tr>
         </thead>
         <tbody id="kostenarten-stamm-tbody"></tbody>
       </table>
@@ -3559,13 +3559,14 @@ function renderKostenartenStammPanel(){
   var dl = $("#kostenarten-stamm-list");
   if(dl) dl.innerHTML = sorted.map(k=>'<option value="' + escapeHtml(k.bezeichnung) + '">').join("");
   if(sorted.length===0){
-    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:12.5px;">Noch keine Kostenarten erfasst.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);font-size:12.5px;">Noch keine Kostenarten erfasst.</td></tr>';
     return;
   }
   tbody.innerHTML = sorted.map(k=>
     '<tr data-ks-id="' + k.id + '" class="ks-row" style="cursor:pointer;">' +
     '<td>' + escapeHtml(k.bezeichnung) + '</td>' +
     '<td>' + (k.ansatz!=null ? fmtChf(k.ansatz) : '–') + '</td>' +
+    '<td><button type="button" class="ks-to-kostenstelle" data-ks-id="' + k.id + '" title="Als Kostenstelle statt Kostenart führen">→ Kostenstelle</button></td>' +
     '<td><button type="button" class="ks-delete" data-ks-id="' + k.id + '" title="Kostenart löschen">✕</button></td>' +
     '</tr>'
   ).join("");
@@ -3615,6 +3616,23 @@ $("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
       if(editingKostenartStammId === k.id) cancelEditKostenartStamm();
       toast("Kostenart gelöscht.");
     }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var moveBtn = e.target.closest(".ks-to-kostenstelle");
+  if(moveBtn){
+    var km = state.kostenartenStamm.find(x=>x.id===moveBtn.dataset.ksId);
+    if(!km) return;
+    if(!(await showConfirm('"' + km.bezeichnung + '" als Kostenstelle statt Kostenart führen? Wird dort neu angelegt und hier entfernt.'))) return;
+    try{
+      var bez = (km.bezeichnung||"").trim();
+      var m = bez.match(/^(\S+)\s+(.+)$/);
+      var nummer = m ? m[1] : "";
+      var rest = m ? m[2] : bez;
+      await addDoc(collection(db, KOSTENSTELLEN_COLLECTION), { nummer: nummer, bezeichnung: rest, createdAt: Date.now() });
+      await deleteDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, km.id));
+      if(editingKostenartStammId === km.id) cancelEditKostenartStamm();
+      toast("Als Kostenstelle verschoben.");
+    }catch(err){ console.error(err); toast("Verschieben fehlgeschlagen: " + (err.code || err.message)); }
     return;
   }
   var row = e.target.closest(".ks-row");
