@@ -1851,6 +1851,18 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="confirm-modal-backdrop">
+  <div class="modal" style="max-width:320px;text-align:center;">
+    <p id="confirm-modal-text" style="font-size:15px;margin:6px 0 20px;"></p>
+    <div class="modal-actions" style="justify-content:center;">
+      <div style="display:flex;gap:8px;margin:0 auto;">
+        <button type="button" class="btn" id="confirm-modal-cancel">Abbrechen</button>
+        <button type="button" class="btn primary" id="confirm-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -2146,7 +2158,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2522,9 +2534,12 @@ function renderZeitPage(){
     populateOrderDatalist("#zeit-punch-order-list");
     if(status === "off"){
       punchOrderInput.disabled = false;
+      // Letzten gewählten Auftrag stehen lassen, bis bewusst ein anderer eingegeben wird.
+      punchOrderInput.value = state.zeitLastOrderText || "";
       updateZeitPunchKostenartField(resolveOrderFromText(punchOrderInput.value), false);
     } else {
       punchOrderInput.value = lastKommen && lastKommen.orderNumber ? lastKommen.orderNumber : "";
+      state.zeitLastOrderText = punchOrderInput.value;
       punchOrderInput.disabled = true;
       var lockedOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
       updateZeitPunchKostenartField(lockedOrder, true);
@@ -2550,10 +2565,14 @@ function renderZeitPage(){
     punchOrderSelect.innerHTML = optsHtml;
     if(status === "off"){
       punchOrderSelect.disabled = false;
+      // Letzte Auswahl wiederherstellen (das Neuaufbauen der Options oben verliert sie sonst
+      // bei jedem Re-Render) — bis bewusst ein anderer Auftrag gewählt wird.
+      if(state.zeitLastOrderId && punchOrderSelect.querySelector('option[value="' + state.zeitLastOrderId + '"]')) punchOrderSelect.value = state.zeitLastOrderId;
       updateZeitPunchKostenartField(state.orders.find(x=>x.id===punchOrderSelect.value), false);
     } else {
       var lastOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
       punchOrderSelect.value = lastOrder ? lastOrder.id : "";
+      state.zeitLastOrderId = punchOrderSelect.value;
       punchOrderSelect.disabled = true;
       updateZeitPunchKostenartField(lastOrder, true);
       if(lastKommen && lastKommen.kostenartIdx!=null) $("#zeit-punch-kostenart").value = String(lastKommen.kostenartIdx);
@@ -2664,13 +2683,15 @@ async function zeitPunch(type){
   }
   try{
     await addDoc(collection(db, TIME_COLLECTION), data);
-    if(type === "kommen"){ $("#zeit-punch-order").value = ""; $("#zeit-punch-order-select").value = ""; updateZeitPunchKostenartField(null, false); }
+    // Der gewählte Auftrag bleibt im Feld stehen (für die nächste Kommen-Buchung) — erst beim
+    // bewussten Wählen eines anderen Auftrags wird er ersetzt (siehe input/change-Listener unten).
+    if(type === "kommen"){ updateZeitPunchKostenartField(matchedOrder || null, false); }
   }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
 }
-$("#zeit-punch-order").addEventListener("input", e=>{ if(!e.target.disabled) updateZeitPunchKostenartField(resolveOrderFromText(e.target.value), false); });
-$("#zeit-punch-order-select").addEventListener("change", e=>{ if(!e.target.disabled) updateZeitPunchKostenartField(state.orders.find(x=>x.id===e.target.value), false); });
-$("#zeit-kommen").addEventListener("click", ()=>{ if(confirm("Jetzt einstempeln?")) zeitPunch("kommen"); });
-$("#zeit-gehen").addEventListener("click", ()=>{ if(confirm("Jetzt ausstempeln?")) zeitPunch("gehen"); });
+$("#zeit-punch-order").addEventListener("input", e=>{ if(!e.target.disabled){ state.zeitLastOrderText = e.target.value; updateZeitPunchKostenartField(resolveOrderFromText(e.target.value), false); } });
+$("#zeit-punch-order-select").addEventListener("change", e=>{ if(!e.target.disabled){ state.zeitLastOrderId = e.target.value; updateZeitPunchKostenartField(state.orders.find(x=>x.id===e.target.value), false); } });
+$("#zeit-kommen").addEventListener("click", async ()=>{ if(await showConfirm("Jetzt einstempeln?")) zeitPunch("kommen"); });
+$("#zeit-gehen").addEventListener("click", async ()=>{ if(await showConfirm("Jetzt ausstempeln?")) zeitPunch("gehen"); });
 
 // Ein- bzw. Ausstempeln direkt über den eigenen Einsatz-Chip in der Personalplanung
 // (nur für den eigenen, heutigen Eintrag — siehe data-punchable in renderStaffGrid).
@@ -2686,14 +2707,14 @@ async function punchFromAssignment(assignId){
   var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
   try{
     if(status === "off"){
-      if(!confirm("Auf Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " einstempeln?")) return;
+      if(!(await showConfirm("Auf Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " einstempeln?"))) return;
       var data = { uid: state.currentUid, name: state.currentName, type: "kommen", timestamp: Date.now(), date: todayISO() };
       if(order){ data.orderId = order.id; data.orderNumber = order.orderNumber; }
       if(a.kostenartIdx!=null){ data.kostenartIdx = a.kostenartIdx; data.kostenartBezeichnung = a.kostenartBezeichnung || null; }
       await addDoc(collection(db, TIME_COLLECTION), data);
       toast("Eingestempelt auf Auftrag " + (order?order.orderNumber:"?") + ".");
     } else if(lastKommen && lastKommen.orderId === a.orderId){
-      if(!confirm("Von Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " ausstempeln?")) return;
+      if(!(await showConfirm("Von Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " ausstempeln?"))) return;
       await addDoc(collection(db, TIME_COLLECTION), { uid: state.currentUid, name: state.currentName, type: "gehen", timestamp: Date.now(), date: todayISO() });
       toast("Ausgestempelt.");
     } else {
@@ -4696,6 +4717,23 @@ function toast(msg){
   var el = $("#toast"); el.textContent = msg; el.classList.add("show");
   setTimeout(()=>el.classList.remove("show"), 1800);
 }
+
+// Eigenes Bestätigungs-Dialog statt window.confirm() — als installierte PWA (z.B. auf dem
+// Homescreen, "standalone") ist das native confirm()/alert() auf manchen Geräten unzuverlässig
+// oder blockiert die Bedienung. Gibt ein Promise<boolean> zurück, analog zu confirm().
+var confirmModalResolve = null;
+function showConfirm(message){
+  $("#confirm-modal-text").textContent = message;
+  $("#confirm-modal-backdrop").classList.add("open");
+  return new Promise(function(resolve){ confirmModalResolve = resolve; });
+}
+function closeConfirmModal(result){
+  $("#confirm-modal-backdrop").classList.remove("open");
+  if(confirmModalResolve){ var r = confirmModalResolve; confirmModalResolve = null; r(result); }
+}
+$("#confirm-modal-ok").addEventListener("click", ()=>closeConfirmModal(true));
+$("#confirm-modal-cancel").addEventListener("click", ()=>closeConfirmModal(false));
+$("#confirm-modal-backdrop").addEventListener("click", e=>{ if(e.target===e.currentTarget) closeConfirmModal(false); });
 
 /* ---------- Custom-Datumsauswahl mit Kalenderwochen ---------- */
 
