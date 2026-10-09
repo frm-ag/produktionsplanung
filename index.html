@@ -1399,7 +1399,7 @@
     </form>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Kostenarten</h2>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Stamm-Kostenarten mit Standard-Ansatz (Fr./Std.) — stehen beim Erfassen eines Auftrags als Vorschlag zur Verfügung. Löschen hier entfernt nur den Stammeintrag, bereits erfasste Kostenarten auf Aufträgen bleiben unverändert.</div>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Stamm aller Kostenarten mit Standard-Ansatz (Fr./Std.). Wird beim Speichern eines Auftrags automatisch ergänzt — jede dort neu erfasste Kostenart (auch per VOKA-Import) landet hier als Standard. Löschen hier entfernt nur den Stammeintrag, bereits erfasste Kostenarten auf Aufträgen bleiben unverändert.</div>
     <div class="table-scroll">
       <table class="overview-table" id="kostenarten-stamm-table">
         <thead>
@@ -1412,6 +1412,7 @@
       <input type="text" id="ks-bezeichnung" placeholder="Bezeichnung, z. B. Montage" required style="flex:1 1 220px;">
       <input type="number" id="ks-ansatz" placeholder="Fr./Std." min="0" step="0.05" style="max-width:140px;">
       <button type="submit" class="btn primary">+ Kostenart</button>
+      <button type="button" class="btn" id="kostenarten-stamm-backfill-btn" title="Trägt alle Kostenarten, die bereits auf bestehenden Aufträgen erfasst sind, hier als Standard nach">Aus bestehenden Aufträgen übernehmen</button>
     </form>
   </div>
 
@@ -3522,6 +3523,41 @@ $("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
     toast("Kostenart gelöscht.");
   }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
 });
+// Nimmt eine Liste von Kostenarten (z.B. von einem gerade gespeicherten Auftrag) und legt jede
+// Bezeichnung, die im Stamm (Einstellungen) noch fehlt, dort automatisch neu an — so bleibt der
+// Stamm immer mit den tatsächlich verwendeten Kostenarten synchron, ohne dass man sie doppelt
+// pflegen muss. Bestehende Stamm-Einträge werden dabei nie überschrieben.
+async function syncKostenartenStamm(kostenartenListe){
+  if(!Array.isArray(kostenartenListe) || kostenartenListe.length===0) return;
+  var existingNames = state.kostenartenStamm.map(k=>(k.bezeichnung||"").trim().toLowerCase());
+  var seenThisRun = [];
+  for(var i=0;i<kostenartenListe.length;i++){
+    var k = kostenartenListe[i];
+    var bez = (k.bezeichnung||"").trim();
+    if(!bez) continue;
+    var key = bez.toLowerCase();
+    if(existingNames.indexOf(key)!==-1 || seenThisRun.indexOf(key)!==-1) continue;
+    seenThisRun.push(key);
+    try{
+      await addDoc(collection(db, KOSTENARTEN_STAMM_COLLECTION), { bezeichnung: bez, ansatz: (k.ansatz!=null && k.ansatz!=="") ? parseFloat(k.ansatz) : null, createdAt: Date.now() });
+    }catch(err){ console.error(err); }
+  }
+}
+// Einmaliger Nachtrag: alle Kostenarten, die bereits auf bestehenden Aufträgen erfasst sind,
+// in den Stamm übernehmen (z.B. nach Einführung dieser Funktion für schon importierte Aufträge).
+$("#kostenarten-stamm-backfill-btn").addEventListener("click", async ()=>{
+  var alle = [];
+  state.orders.forEach(o=>{ if(Array.isArray(o.kostenarten)) alle = alle.concat(o.kostenarten); });
+  if(alle.length===0){ toast("Keine Kostenarten auf bestehenden Aufträgen gefunden."); return; }
+  var btn = $("#kostenarten-stamm-backfill-btn");
+  btn.disabled = true; btn.textContent = "Übernehme…";
+  try{
+    await syncKostenartenStamm(alle);
+    toast("Kostenarten aus Aufträgen übernommen.");
+  } finally {
+    btn.disabled = false; btn.textContent = "Aus bestehenden Aufträgen übernehmen";
+  }
+});
 
 /* ---- Terminserien: wiederkehrende Termine je Mitarbeiter (z.B. "jeden Montag Schule" für
    Lehrlinge) — werden wie eine normale Abwesenheit behandelt (Soll bleibt wie üblich, kein
@@ -4809,6 +4845,7 @@ form.addEventListener("submit", async e=>{
       payload.createdAt = Date.now();
       await addDoc(collection(db, COLLECTION), payload);
     }
+    await syncKostenartenStamm(kostenarten);
     closeModal();
     toast("Gespeichert.");
   }catch(err){
