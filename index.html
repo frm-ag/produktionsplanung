@@ -760,6 +760,43 @@
     border-color:var(--accent);
     color:var(--on-accent);
   }
+  /* Hauptgruppe + Auf-/Zuklapp-Pfeil für die Untergruppen, damit die Liste bei vielen
+     Untergruppen nicht endlos wird – Untergruppen sind standardmässig eingeklappt. */
+  #lager-page .group-filter-row{
+    display:flex;
+    align-items:center;
+    gap:3px;
+  }
+  #lager-page .group-filter-row .group-filter-item{
+    flex:1;
+  }
+  #lager-page .group-filter-toggle{
+    flex:0 0 auto;
+    width:26px;
+    height:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text-muted);
+    border-radius:7px;
+    cursor:pointer;
+    font-size:11px;
+    transition:transform .12s ease;
+  }
+  #lager-page .group-filter-toggle.open{
+    transform:rotate(90deg);
+  }
+  #lager-page .group-filter-children{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    margin-top:3px;
+  }
+  #lager-page .group-filter-children[hidden]{
+    display:none;
+  }
   #lager-page .search-bar{
     width:100%;
     background:var(--panel);
@@ -5607,7 +5644,15 @@ function bindTagCards(){
 }
 
 function renderArticles(){
-  const options = categoryOptionsList();
+  const tree = artikelgruppenTree();
+  const treeNames = new Set();
+  tree.forEach(node=>{
+    treeNames.add((node.group.name||'').toLowerCase());
+    node.children.forEach(c=>treeNames.add((c.name||'').toLowerCase()));
+  });
+  const extraCats = [...new Set(articles.map(a=>a.category||'Sonstiges'))]
+    .filter(c=>!treeNames.has(c.toLowerCase()))
+    .sort((a,b)=>a.localeCompare(b));
   let html = '';
   if(isAdmin){
     html += `<div class="btn-row" style="margin-bottom:14px;">
@@ -5616,9 +5661,26 @@ function renderArticles(){
     </div>`;
   }
   html += `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name oder Art. Nr. …">`;
+  // Hauptgruppen sind standardmässig eingeklappt (Pfeil zum Öffnen), damit die Liste bei vielen
+  // Untergruppen nicht endlos wird.
+  let filterHtml = `<button class="group-filter-item active" data-cat="__all">Alle</button>`;
+  tree.forEach(node=>{
+    const hasKids = node.children.length > 0;
+    filterHtml += `<div class="group-filter-group">
+        <div class="group-filter-row">
+          <button class="group-filter-item" data-cat="${escapeHtml(node.group.name)}">${escapeHtml(node.group.name)}</button>
+          ${hasKids ? `<button type="button" class="group-filter-toggle" data-toggle-id="${node.group.id}" title="Untergruppen anzeigen">▸</button>` : ''}
+        </div>
+        ${hasKids ? `<div class="group-filter-children" id="grp-children-${node.group.id}" hidden>
+          ${node.children.map(c => `<button class="group-filter-item sub" data-cat="${escapeHtml(c.name)}">${escapeHtml(c.name)}</button>`).join('')}
+        </div>` : ''}
+      </div>`;
+  });
+  extraCats.forEach(c=>{
+    filterHtml += `<button class="group-filter-item" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+  });
   html += `<div class="group-filter-list" id="catFilterRow">
-      <button class="group-filter-item active" data-cat="__all">Alle</button>
-      ${options.map(o => `<button class="group-filter-item ${o.indent?'sub':''}" data-cat="${escapeHtml(o.name)}">${escapeHtml(o.name)}</button>`).join('')}
+      ${filterHtml}
       ${isAdmin ? `<button class="group-filter-item" id="manageGroupsBtn" style="border-style:dashed;" title="Artikelgruppen verwalten">+ Gruppe / Untergruppe verwalten</button>` : ''}
     </div>`;
   html += `<div id="articleList"></div>`;
@@ -5642,6 +5704,15 @@ function renderArticles(){
     bindTagCards();
   };
   $('#searchInput').addEventListener('input', list);
+  $('#catFilterRow').querySelectorAll('.group-filter-toggle').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const box = $('#grp-children-'+btn.dataset.toggleId);
+      const open = box.hasAttribute('hidden');
+      if(open){ box.removeAttribute('hidden'); btn.classList.add('open'); btn.textContent='▾'; }
+      else{ box.setAttribute('hidden',''); btn.classList.remove('open'); btn.textContent='▸'; }
+    });
+  });
   $('#catFilterRow').querySelectorAll('.group-filter-item[data-cat]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       $('#catFilterRow').querySelectorAll('.group-filter-item[data-cat]').forEach(b=>b.classList.remove('active'));
@@ -5659,21 +5730,57 @@ function renderArticles(){
 // nicht verwaltete Gruppe auf). Wird eine Hauptgruppe mit Untergruppen gelöscht, werden die
 // Untergruppen automatisch zu eigenständigen Hauptgruppen.
 function openManageGroupsSheet(){
+  let editingId = null;
+  const topParentOptionsHtml = (excludeId, selectedId) => {
+    const tops = artikelgruppen.filter(g=>!g.parentId && g.id!==excludeId).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    return '<option value="">– Hauptgruppe –</option>' + tops.map(t=>`<option value="${t.id}" ${t.id===selectedId?'selected':''}>${escapeHtml(t.name)}</option>`).join('');
+  };
+  const rowHtml = (g, isSub) => {
+    if(g.id === editingId){
+      return `
+        <div class="material-row" style="display:flex;flex-direction:column;gap:6px;${isSub?'margin-left:20px;':''}background:var(--panel-alt);border-radius:8px;padding:8px;">
+          <input type="text" class="edit-group-name" data-edit-name="${g.id}" value="${escapeHtml(g.name)}" placeholder="Name">
+          <select class="edit-group-parent" data-edit-parent="${g.id}">${topParentOptionsHtml(g.id, g.parentId||'')}</select>
+          <div class="btn-row">
+            <button type="button" class="btn btn-secondary btn-block" data-edit-cancel="${g.id}">Abbrechen</button>
+            <button type="button" class="btn btn-primary btn-block" data-edit-save="${g.id}">Speichern</button>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="material-row" style="display:flex;align-items:center;gap:8px;${isSub?'margin-left:20px;':''}">
+        <div style="flex:1;font-weight:${isSub?'500':'600'};font-size:${isSub?'12.5px':'inherit'};">${isSub?'— ':''}${escapeHtml(g.name)}</div>
+        <button type="button" class="mat-remove" data-group-edit="${g.id}" title="Umbenennen / verschieben" style="background:none;color:var(--text-muted);">✎</button>
+        <button type="button" class="mat-remove" data-group-id="${g.id}" data-group-name="${escapeHtml(g.name)}" title="${isSub?'Untergruppe':'Gruppe'} löschen">✕</button>
+      </div>`;
+  };
   const render = () => {
     const tree = artikelgruppenTree();
     sheet.querySelector('#groupsList').innerHTML = tree.length
-      ? tree.map(node => `
-          <div class="material-row" style="display:flex;align-items:center;gap:8px;">
-            <div style="flex:1;font-weight:600;">${escapeHtml(node.group.name)}</div>
-            <button type="button" class="mat-remove" data-group-id="${node.group.id}" data-group-name="${escapeHtml(node.group.name)}" title="Gruppe löschen">✕</button>
-          </div>
-          ${node.children.map(c => `
-          <div class="material-row" style="display:flex;align-items:center;gap:8px;margin-left:20px;">
-            <div style="flex:1;font-size:12.5px;">— ${escapeHtml(c.name)}</div>
-            <button type="button" class="mat-remove" data-group-id="${c.id}" data-group-name="${escapeHtml(c.name)}" title="Untergruppe löschen">✕</button>
-          </div>`).join('')}
-        `).join('')
+      ? tree.map(node => rowHtml(node.group, false) + node.children.map(c => rowHtml(c, true)).join('')).join('')
       : `<div style="font-size:12.5px;color:var(--text-muted);">Noch keine Artikelgruppen.</div>`;
+    sheet.querySelectorAll('[data-group-edit]').forEach(btn=>{
+      btn.onclick = ()=>{ editingId = btn.dataset.groupEdit; render(); };
+    });
+    sheet.querySelectorAll('[data-edit-cancel]').forEach(btn=>{
+      btn.onclick = ()=>{ editingId = null; render(); };
+    });
+    sheet.querySelectorAll('[data-edit-save]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const gid = btn.dataset.editSave;
+        const g = artikelgruppen.find(x=>x.id===gid);
+        if(!g) return;
+        const nameInput = sheet.querySelector(`[data-edit-name="${gid}"]`);
+        const parentSel = sheet.querySelector(`[data-edit-parent="${gid}"]`);
+        const newName = (nameInput.value||'').trim();
+        const newParentId = parentSel.value || null;
+        if(!newName){ toast('Bitte einen Namen eingeben'); return; }
+        btn.disabled = true; btn.textContent = 'Speichere…';
+        await renameOrMoveArtikelgruppe(g, newName, newParentId);
+        editingId = null;
+        render();
+      };
+    });
     sheet.querySelectorAll('[data-group-id]').forEach(btn=>{
       btn.onclick = async ()=>{
         const name = btn.dataset.groupName;
@@ -6721,6 +6828,34 @@ async function ensureArtikelgruppe(name, parentId){
   if(exists) return;
   try{ await addDoc(collection(db, 'artikelgruppen'), { name: n, parentId: parentId || null, createdAt: Date.now() }); }
   catch(e){ console.error(e); }
+}
+
+// Gruppe/Untergruppe umbenennen oder einer anderen Hauptgruppe zuordnen. Wird der neue Name
+// mit einer bereits bestehenden anderen Gruppe (gross/klein egal) zusammengeführt, werden die
+// eigenen Untergruppen dorthin verschoben, diese Gruppe gelöscht und alle betroffenen Artikel
+// auf die bestehende Gruppe umgehängt – so lassen sich z. B. versehentlich falsch/neu
+// importierte Artikel (eigene Gruppe statt vorhandener Untergruppe) in einem Schritt korrigieren.
+async function renameOrMoveArtikelgruppe(g, newName, newParentId){
+  const oldName = g.name;
+  try{
+    const dupe = artikelgruppen.find(x => x.id!==g.id && (x.name||'').toLowerCase()===newName.toLowerCase());
+    let finalName = newName;
+    if(dupe){
+      const children = artikelgruppen.filter(x=>x.parentId===g.id);
+      await Promise.all(children.map(c => updateDoc(doc(db,'artikelgruppen',c.id), { parentId: dupe.id })));
+      await deleteDoc(doc(db,'artikelgruppen',g.id));
+      finalName = dupe.name;
+    } else {
+      await updateDoc(doc(db,'artikelgruppen',g.id), { name: newName, parentId: newParentId });
+    }
+    if(finalName !== oldName){
+      const affected = articles.filter(a => (a.category||'Sonstiges') === oldName);
+      await Promise.all(affected.map(a => updateDoc(doc(db,'articles',a.id), { category: finalName })));
+      toast((dupe ? 'Mit "'+finalName+'" zusammengeführt' : 'Gruppe umbenannt') + (affected.length ? ', ' + affected.length + ' Artikel aktualisiert' : ''));
+    } else {
+      toast('Gruppe aktualisiert');
+    }
+  }catch(e){ console.error(e); toast('Fehler beim Aktualisieren'); }
 }
 
 function openAddArticleSheet(presetId){
