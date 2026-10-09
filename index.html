@@ -5491,7 +5491,7 @@ if('serviceWorker' in navigator){
 import { getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, query, orderBy, increment
+  onSnapshot, query, orderBy, increment, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged
@@ -5796,6 +5796,10 @@ function renderArticles(){
     $('#manageImportsBtn').onclick = openManageImportsSheet;
   }
   let activeCat = '__all';
+  // Bei grossen Katalogen (mehrere Tausend Artikel, z.B. nach einem Lieferanten-Import) werden
+  // ohne Eingrenzung nicht alle Treffer auf einmal ins DOM gerendert – das würde den Browser
+  // spürbar träge machen. Erst Suche/Kategorie eingrenzen zeigt die restlichen Treffer.
+  const RENDER_CAP = 300;
   const list = () => {
     const q = ($('#searchInput').value||'').toLowerCase();
     const filtered = articles.filter(a => {
@@ -5804,9 +5808,18 @@ function renderArticles(){
       const matchesCat = activeCat === '__all' || cat === activeCat || (catMatchSets[activeCat] && catMatchSets[activeCat].includes(cat));
       return matchesQuery && matchesCat;
     });
-    $('#articleList').innerHTML = filtered.length
-      ? filtered.map(tagCardHtml).join('')
-      : `<div class="empty-state"><div class="disp">Keine Treffer</div>Versuch eine andere Suche oder Kategorie.</div>`;
+    if(!filtered.length){
+      $('#articleList').innerHTML = `<div class="empty-state"><div class="disp">Keine Treffer</div>Versuch eine andere Suche oder Kategorie.</div>`;
+    }else{
+      const shown = filtered.slice(0, RENDER_CAP);
+      let html = shown.map(tagCardHtml).join('');
+      if(filtered.length > RENDER_CAP){
+        html += `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:14px 10px;">
+          ${shown.length} von ${filtered.length} Treffern angezeigt – weiter einschränken (Suche oder Untergruppe) für den Rest.
+        </div>`;
+      }
+      $('#articleList').innerHTML = html;
+    }
     bindTagCards();
   };
   $('#searchInput').addEventListener('input', list);
@@ -6781,7 +6794,19 @@ function openImportExcelSheet(){
               }
             };
           });
-          await Promise.all(toCreate.map(item => setDoc(doc(db, 'articles', item.id), item.data)));
+          // In Blöcken von je max. 450 Schreibvorgängen committen (Firestore-Limit pro
+          // writeBatch liegt bei 500) statt alles auf einmal per Promise.all abzusetzen – bei
+          // grossen Katalogen (mehrere Tausend Artikel) wäre das sonst ein einzelner Schwung
+          // von zigtausend gleichzeitigen Schreibvorgängen, was im Browser/Firestore leicht zu
+          // Timeouts oder einem unvollständigen Import führen kann. Mit Fortschrittsanzeige.
+          const CHUNK = 450;
+          for(let i=0; i<toCreate.length; i+=CHUNK){
+            const slice = toCreate.slice(i, i+CHUNK);
+            const b = writeBatch(db);
+            slice.forEach(item => b.set(doc(db, 'articles', item.id), item.data));
+            await b.commit();
+            btn.textContent = 'Importiere… ' + Math.min(i+CHUNK, toCreate.length) + ' / ' + toCreate.length;
+          }
           const newCats = [...new Set(toCreate.map(item => item.data.category))];
           await Promise.all(newCats.map(c => ensureArtikelgruppe(c)));
           await setDoc(doc(db, 'imports', batchId), {
