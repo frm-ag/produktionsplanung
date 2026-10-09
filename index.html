@@ -1410,8 +1410,9 @@
     </div>
     <form id="kostenarten-stamm-add-form" class="zm-add-form">
       <input type="text" id="ks-bezeichnung" placeholder="Bezeichnung, z. B. Montage" required style="flex:1 1 220px;">
-      <input type="number" id="ks-ansatz" placeholder="Fr./Std." min="0" step="0.05" style="max-width:140px;">
-      <button type="submit" class="btn primary">+ Kostenart</button>
+      <input type="number" id="ks-ansatz" placeholder="Fr./Std." min="0" step="0.01" style="max-width:140px;">
+      <button type="submit" class="btn primary" id="kostenarten-stamm-submit-btn">+ Kostenart</button>
+      <button type="button" class="btn" id="kostenarten-stamm-cancel-btn" style="display:none;">Abbrechen</button>
       <button type="button" class="btn" id="kostenarten-stamm-backfill-btn" title="Trägt alle Kostenarten, die bereits auf bestehenden Aufträgen erfasst sind, hier als Standard nach">Aus bestehenden Aufträgen übernehmen</button>
     </form>
   </div>
@@ -3489,34 +3490,65 @@ function renderKostenartenStammPanel(){
     return;
   }
   tbody.innerHTML = sorted.map(k=>
-    '<tr data-ks-id="' + k.id + '">' +
+    '<tr data-ks-id="' + k.id + '" class="ks-row" style="cursor:pointer;">' +
     '<td>' + escapeHtml(k.bezeichnung) + '</td>' +
     '<td>' + (k.ansatz!=null ? fmtChf(k.ansatz) : '–') + '</td>' +
     '<td><button type="button" class="ks-delete" data-ks-id="' + k.id + '" title="Kostenart löschen">✕</button></td>' +
     '</tr>'
   ).join("");
 }
+var editingKostenartStammId = null;
+function startEditKostenartStamm(k){
+  editingKostenartStammId = k.id;
+  $("#ks-bezeichnung").value = k.bezeichnung || "";
+  $("#ks-ansatz").value = (k.ansatz!=null) ? k.ansatz : "";
+  $("#kostenarten-stamm-submit-btn").textContent = "Speichern";
+  $("#kostenarten-stamm-cancel-btn").style.display = "inline-block";
+  $("#ks-bezeichnung").focus();
+}
+function cancelEditKostenartStamm(){
+  editingKostenartStammId = null;
+  $("#ks-bezeichnung").value = ""; $("#ks-ansatz").value = "";
+  $("#kostenarten-stamm-submit-btn").textContent = "+ Kostenart";
+  $("#kostenarten-stamm-cancel-btn").style.display = "none";
+}
+$("#kostenarten-stamm-cancel-btn").addEventListener("click", cancelEditKostenartStamm);
 $("#kostenarten-stamm-add-form").addEventListener("submit", async e=>{
   e.preventDefault();
   var bezeichnung = $("#ks-bezeichnung").value.trim();
   var ansatzVal = $("#ks-ansatz").value;
   if(!bezeichnung){ toast("Bitte eine Bezeichnung angeben."); return; }
   try{
-    await addDoc(collection(db, KOSTENARTEN_STAMM_COLLECTION), { bezeichnung: bezeichnung, ansatz: ansatzVal===""?null:parseFloat(ansatzVal), createdAt: Date.now() });
-    $("#ks-bezeichnung").value = ""; $("#ks-ansatz").value = "";
-    toast("Kostenart gespeichert.");
+    var payload = { bezeichnung: bezeichnung, ansatz: ansatzVal===""?null:parseFloat(ansatzVal) };
+    if(editingKostenartStammId){
+      await updateDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, editingKostenartStammId), payload);
+      toast("Kostenart aktualisiert.");
+    }else{
+      payload.createdAt = Date.now();
+      await addDoc(collection(db, KOSTENARTEN_STAMM_COLLECTION), payload);
+      toast("Kostenart gespeichert.");
+    }
+    cancelEditKostenartStamm();
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen: " + (err.code || err.message)); }
 });
 $("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
   var delBtn = e.target.closest(".ks-delete");
-  if(!delBtn) return;
-  var k = state.kostenartenStamm.find(x=>x.id===delBtn.dataset.ksId);
-  if(!k) return;
-  if(!confirm('Kostenart "' + k.bezeichnung + '" wirklich löschen?')) return;
-  try{
-    await deleteDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, k.id));
-    toast("Kostenart gelöscht.");
-  }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+  if(delBtn){
+    var k = state.kostenartenStamm.find(x=>x.id===delBtn.dataset.ksId);
+    if(!k) return;
+    if(!(await showConfirm('Kostenart "' + k.bezeichnung + '" wirklich löschen?'))) return;
+    try{
+      await deleteDoc(doc(db, KOSTENARTEN_STAMM_COLLECTION, k.id));
+      if(editingKostenartStammId === k.id) cancelEditKostenartStamm();
+      toast("Kostenart gelöscht.");
+    }catch(err){ console.error(err); toast("Löschen fehlgeschlagen: " + (err.code || err.message)); }
+    return;
+  }
+  var row = e.target.closest(".ks-row");
+  if(row){
+    var kRow = state.kostenartenStamm.find(x=>x.id===row.dataset.ksId);
+    if(kRow) startEditKostenartStamm(kRow);
+  }
 });
 // Nimmt eine Liste von Kostenarten (z.B. von einem gerade gespeicherten Auftrag) und legt jede
 // Bezeichnung, die im Stamm (Einstellungen) noch fehlt, dort automatisch neu an — so bleibt der
