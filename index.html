@@ -1709,6 +1709,15 @@
         <label for="assign-hours">Dauer (Stunden)</label>
         <input type="number" id="assign-hours" min="0.5" step="0.5" value="8" required>
       </div>
+      <div class="field" id="assign-artikel-field" style="display:none;">
+        <label>Material auf diesen Auftrag buchen (aus Artikel-Katalog)</label>
+        <div class="materials-box">
+          <div id="assign-artikel-list"></div>
+          <datalist id="assign-artikel-stamm-list"></datalist>
+          <button type="button" class="add-material-btn" id="assign-add-artikel-btn">+ Artikel hinzufügen</button>
+          <div id="assign-artikel-total" style="font-size:12px;color:var(--text-muted);text-align:right;margin-top:6px;"></div>
+        </div>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn danger" id="assign-delete-btn" style="display:none;">Entfernen</button>
         <div style="display:flex;gap:8px;margin-left:auto;">
@@ -2335,7 +2344,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -4679,6 +4688,7 @@ function populateAssignKostenartSelect(order, selectedValue){
   sel.innerHTML = '<option value="">— keine —</option>' + kas.map((k,i)=>'<option value="' + i + '"' + (String(i)===String(selectedValue)?' selected':'') + '>' + escapeHtml(k.bezeichnung) + '</option>').join("");
 }
 function openAssignModal(orderId, cellInfo, assignId){
+  state.modalAssignArtikel = [];
   if(assignId){
     var a = state.assignments.find(x=>x.id===assignId);
     if(!a) return;
@@ -4693,6 +4703,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     populateAssignKostenartSelect(o, a.kostenartIdx!=null?a.kostenartIdx:"");
     $("#assign-hours").value = a.hours || 8;
     $("#assign-delete-btn").style.display = "inline-block";
+    $("#assign-artikel-field").style.display = o ? "block" : "none";
   }else if(orderId){
     state.editingAssignId = null;
     state.assignEmployeeId = cellInfo.employeeId; state.assignDate = cellInfo.date;
@@ -4707,6 +4718,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     populateAssignKostenartSelect(o2, "");
     $("#assign-hours").value = 8;
     $("#assign-delete-btn").style.display = "none";
+    $("#assign-artikel-field").style.display = o2 ? "block" : "none";
   }else{
     // Neu, ohne vorausgewählten Auftrag: Auftragsnummer manuell eingeben/suchen.
     state.editingAssignId = null;
@@ -4722,7 +4734,9 @@ function openAssignModal(orderId, cellInfo, assignId){
     populateAssignKostenartSelect(null, "");
     $("#assign-hours").value = 8;
     $("#assign-delete-btn").style.display = "none";
+    $("#assign-artikel-field").style.display = "none";
   }
+  renderAssignArtikelRows();
   assignBackdrop.classList.add("open");
   setTimeout(()=>{ var f = orderId||assignId ? "#assign-hours" : "#assign-order-search"; $(f).focus(); },30);
 }
@@ -4741,10 +4755,12 @@ $("#assign-order-search").addEventListener("input", e=>{
     $("#assign-info").textContent = match.orderNumber + " · " + match.customer + " — " + (emp?emp.name:"?") + " · " + fmtShort(state.assignDate);
     $("#assign-type").value = match.workshop === "reparaturen" ? "reparatur" : "werkstatt";
     populateAssignKostenartSelect(match, "");
+    $("#assign-artikel-field").style.display = "block";
   }else{
     state.pendingOrderId = null;
     $("#assign-info").textContent = typed ? "Kein offener Auftrag mit dieser Nummer gefunden." : ((emp?emp.name:"?") + " · " + fmtShort(state.assignDate));
     populateAssignKostenartSelect(null, "");
+    $("#assign-artikel-field").style.display = "none";
   }
 });
 $("#assign-cancel-btn").addEventListener("click", closeAssignModal);
@@ -4761,6 +4777,12 @@ $("#assign-form").addEventListener("submit", async e=>{
   var kostenartIdx = kaVal === "" ? null : parseInt(kaVal, 10);
   var relevantOrder = state.editingAssignId ? state.orders.find(x=>x.id===state.assignments.find(a=>a.id===state.editingAssignId).orderId) : state.orders.find(x=>x.id===state.pendingOrderId);
   var kostenartBezeichnung = (kostenartIdx!=null && relevantOrder && relevantOrder.kostenarten && relevantOrder.kostenarten[kostenartIdx]) ? relevantOrder.kostenarten[kostenartIdx].bezeichnung : null;
+  var neueArtikelPositionen = state.modalAssignArtikel
+    .map(function(a){
+      var menge = parseFloat(a.menge)||0, vk = parseFloat(a.verkaufspreis)||0, ek = parseFloat(a.einkaufspreis)||0;
+      return { artikelId: a.artikelId||"", bezeichnung: (a.bezeichnung||"").trim(), menge: menge, verkaufspreis: vk, einkaufspreis: ek, betrag: Math.round(menge*vk*100)/100 };
+    })
+    .filter(function(a){ return a.bezeichnung.length>0; });
   try{
     if(state.editingAssignId){
       await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId), { hours: hours, type: typ, kostenartIdx: kostenartIdx, kostenartBezeichnung: kostenartBezeichnung });
@@ -4768,6 +4790,12 @@ $("#assign-form").addEventListener("submit", async e=>{
       await addDoc(collection(db, ASSIGNMENTS_COLLECTION), {
         orderId: state.pendingOrderId, employeeId: state.assignEmployeeId, date: state.assignDate, hours: hours, type: typ, kostenartIdx: kostenartIdx, kostenartBezeichnung: kostenartBezeichnung, createdAt: Date.now()
       });
+    }
+    // Im Einsatz-Modal erfasste Artikel werden auf den Auftrag angehängt (bestehende
+    // Artikel-Positionen bleiben erhalten), nicht als eigenes Feld auf dem Einsatz gespeichert.
+    if(neueArtikelPositionen.length && relevantOrder){
+      var bestehend = Array.isArray(relevantOrder.artikelPositionen) ? relevantOrder.artikelPositionen : [];
+      await updateDoc(doc(db, COLLECTION, relevantOrder.id), { artikelPositionen: bestehend.concat(neueArtikelPositionen) });
     }
     closeAssignModal();
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
@@ -4890,6 +4918,74 @@ $("#artikel-list").addEventListener("input", e=>{
     if(betragEl) betragEl.textContent = fmtChf(artikelBetrag(state.modalArtikel[idx]));
     var total = state.modalArtikel.reduce(function(sum,a){ return sum + artikelBetrag(a); }, 0);
     if($("#artikel-total")) $("#artikel-total").textContent = "Total Artikel: " + fmtChf(total);
+  }
+});
+
+/* ---------- Artikel mini-form im Einsatz-Modal: Material direkt beim Einteilen auf den
+   zugehörigen Auftrag buchen, ohne extra den Auftrag öffnen zu müssen. Wird beim Speichern
+   des Einsatzes zusätzlich auf artikelPositionen des Auftrags angehängt (nicht ersetzt). ---------- */
+function renderAssignArtikelRows(){
+  var list = $("#assign-artikel-list");
+  if(!list) return;
+  var dl = $("#assign-artikel-stamm-list");
+  if(dl){
+    dl.innerHTML = state.artikelStamm.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); })
+      .map(function(a){ return '<option value="' + escapeHtml((a.vendorArticleNumber?a.vendorArticleNumber+" – ":"")+a.name) + '">'; }).join("");
+  }
+  if(state.modalAssignArtikel.length===0){
+    list.innerHTML = '<div class="materials-empty">Noch kein Artikel erfasst.</div>';
+    if($("#assign-artikel-total")) $("#assign-artikel-total").textContent = "";
+    return;
+  }
+  var html = "";
+  state.modalAssignArtikel.forEach(function(a,i){
+    html += '<div class="material-row" data-idx="' + i + '">' +
+      '<div class="mat-row1">' +
+      '<input class="art-bez" list="assign-artikel-stamm-list" placeholder="Artikel suchen (Name oder Art. Nr.)" value="' + escapeHtml(a.bezeichnung||"") + '">' +
+      '<button type="button" class="mat-remove" aria-label="Artikel entfernen">✕</button>' +
+      '</div><div class="mat-row2">' +
+      '<input type="number" min="0" step="0.01" class="art-menge" placeholder="Menge (z. B. Meter)" value="' + (a.menge!=null&&a.menge!==""?a.menge:"") + '">' +
+      '<input type="number" min="0" step="0.01" class="art-vk" placeholder="VK Fr./Einheit" value="' + (a.verkaufspreis!=null&&a.verkaufspreis!==""?a.verkaufspreis:"") + '">' +
+      '<span style="font-size:12px;color:var(--text-muted);align-self:center;white-space:nowrap;">' + fmtChf(artikelBetrag(a)) + '</span>' +
+      '</div></div>';
+  });
+  list.innerHTML = html;
+  var total = state.modalAssignArtikel.reduce(function(sum,a){ return sum + artikelBetrag(a); }, 0);
+  if($("#assign-artikel-total")) $("#assign-artikel-total").textContent = "Total Artikel: " + fmtChf(total);
+}
+$("#assign-add-artikel-btn").addEventListener("click", ()=>{ state.modalAssignArtikel.push({artikelId:"",bezeichnung:"",menge:"",verkaufspreis:"",einkaufspreis:""}); renderAssignArtikelRows(); });
+$("#assign-artikel-list").addEventListener("click", e=>{
+  var btn = e.target.closest(".mat-remove"); if(!btn) return;
+  var idx = Number(btn.closest(".material-row").dataset.idx);
+  state.modalAssignArtikel.splice(idx,1); renderAssignArtikelRows();
+});
+$("#assign-artikel-list").addEventListener("input", e=>{
+  var row = e.target.closest(".material-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalAssignArtikel[idx]) return;
+  if(e.target.classList.contains("art-bez")){
+    state.modalAssignArtikel[idx].bezeichnung = e.target.value;
+    var val = e.target.value.trim().toLowerCase();
+    var match = state.artikelStamm.find(function(s){
+      var label = ((s.vendorArticleNumber?s.vendorArticleNumber+" – ":"")+s.name).trim().toLowerCase();
+      return label === val || (s.name||"").trim().toLowerCase() === val;
+    });
+    if(match){
+      state.modalAssignArtikel[idx].artikelId = match.id;
+      state.modalAssignArtikel[idx].bezeichnung = (match.vendorArticleNumber?match.vendorArticleNumber+" – ":"")+match.name;
+      var vk = (match.verkaufspreis!=null && match.verkaufspreis!=="") ? match.verkaufspreis : match.price;
+      if(vk!=null && !state.modalAssignArtikel[idx].verkaufspreis) state.modalAssignArtikel[idx].verkaufspreis = vk;
+      if(match.einkaufspreis!=null) state.modalAssignArtikel[idx].einkaufspreis = match.einkaufspreis;
+      renderAssignArtikelRows();
+      return;
+    }
+  }
+  if(e.target.classList.contains("art-menge")) state.modalAssignArtikel[idx].menge = e.target.value;
+  if(e.target.classList.contains("art-vk")) state.modalAssignArtikel[idx].verkaufspreis = e.target.value;
+  if(e.target.classList.contains("art-menge") || e.target.classList.contains("art-vk")){
+    var betragEl = row.querySelector(".mat-row2 span");
+    if(betragEl) betragEl.textContent = fmtChf(artikelBetrag(state.modalAssignArtikel[idx]));
+    var total = state.modalAssignArtikel.reduce(function(sum,a){ return sum + artikelBetrag(a); }, 0);
+    if($("#assign-artikel-total")) $("#assign-artikel-total").textContent = "Total Artikel: " + fmtChf(total);
   }
 });
 
