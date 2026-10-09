@@ -372,6 +372,11 @@
   .zeit-my-name{font-family:var(--disp);font-size:21px;font-weight:700;}
   .zeit-saldo-lines{font-size:13px;color:var(--text);margin-top:4px;line-height:1.5;}
   .zeit-started-info{font-size:13px;color:var(--text-muted);margin:-6px 0 14px;}
+  .zeit-punch-quick{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
+  .zeit-punch-quick-btn{border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer;font:inherit;}
+  .zeit-punch-quick-btn:hover{border-color:var(--accent);}
+  .zeit-punch-quick-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .zeit-punch-quick-btn.intern{border-style:dashed;}
   .zeit-today-pairs{display:flex;gap:28px;justify-content:center;font-size:13px;margin-bottom:4px;}
   .zeit-pairs-label{color:var(--text-muted);font-size:11px;margin-bottom:3px;}
   .zeit-status{font-family:var(--disp);font-size:20px;font-weight:700;margin-bottom:10px;}
@@ -1225,6 +1230,7 @@
       <div class="zeit-status" id="zeit-status">–</div>
       <div id="zeit-started-info" class="zeit-started-info" style="display:none;"></div>
       <div id="zeit-today-pairs" class="zeit-today-pairs"></div>
+      <div id="zeit-punch-quick" class="zeit-punch-quick" style="display:none;"></div>
       <div class="field" style="margin:12px 0 10px;">
         <label for="zeit-punch-order" style="font-size:11.5px;">Auftrag (optional) — gilt bis zum nächsten Stempeln</label>
         <input type="text" id="zeit-punch-order" list="zeit-punch-order-list" placeholder="Auftragsnummer eingeben…" autocomplete="off">
@@ -2506,6 +2512,35 @@ function updateZeitPunchKostenartField(order, locked){
   sel.innerHTML = '<option value="">— keine —</option>' + kas.map((k,i)=>'<option value="' + i + '">' + escapeHtml(k.bezeichnung) + '</option>').join("");
   sel.disabled = !!locked;
 }
+// Schnellauswahl-Chips für den Admin: heute im Personalplan zugeteilte Aufträge (eigene Einsätze)
+// plus alle internen Aufträge — damit auch der Admin ohne Tippen direkt anstempeln kann.
+function renderZeitPunchQuick(meEmp, status){
+  var box = $("#zeit-punch-quick");
+  var todayIso = todayISO();
+  var myAssignsToday = meEmp ? state.assignments.filter(a=>a.employeeId===meEmp.id && a.date===todayIso) : [];
+  var assignedOrders = myAssignsToday.map(a=>state.orders.find(x=>x.id===a.orderId)).filter(Boolean);
+  var assignedIds = assignedOrders.map(o=>o.id);
+  var internOrders = state.orders.filter(o=>o.intern && !o.completed && assignedIds.indexOf(o.id)===-1)
+    .slice().sort((a,b)=>(a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
+  var all = assignedOrders.concat(internOrders);
+  if(all.length===0){ box.style.display = "none"; box.innerHTML = ""; return; }
+  var currentVal = ($("#zeit-punch-order").value||"").split(" – ")[0].trim().toLowerCase();
+  box.innerHTML = all.map(o=>{
+    var isActive = currentVal && (o.orderNumber||"").toLowerCase() === currentVal;
+    return '<button type="button" class="zeit-punch-quick-btn' + (o.intern?' intern':'') + (isActive?' active':'') + '" data-order-id="' + o.id + '" data-order-number="' + escapeHtml(o.orderNumber) + '">' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(orderDisplayName(o)) + '</button>';
+  }).join("");
+  box.style.display = "flex";
+  box.querySelectorAll(".zeit-punch-quick-btn").forEach(btn=>{ btn.disabled = status !== "off"; });
+}
+$("#zeit-punch-quick").addEventListener("click", e=>{
+  var btn = e.target.closest(".zeit-punch-quick-btn");
+  if(!btn || btn.disabled) return;
+  var input = $("#zeit-punch-order");
+  input.value = btn.dataset.orderNumber;
+  state.zeitLastOrderText = input.value;
+  updateZeitPunchKostenartField(state.orders.find(x=>x.id===btn.dataset.orderId), false);
+  renderZeitPunchQuick(state.staff.find(s=>s.uid === state.currentUid), "off");
+});
 // Liefert für einen Mitarbeiter-Uid die Zeiteinträge, die lokal verfügbar sind: Admins sehen
 // alle (state.allTime), normale Mitarbeiter nur ihre eigenen (state.myTime).
 function timeEntriesForUid(uid){
@@ -2528,10 +2563,12 @@ function renderZeitPage(){
   var punchOrderSelect = $("#zeit-punch-order-select");
   var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
   if(state.isAdmin){
-    // Admin: freie Eingabe der Auftragsnummer (wie bisher).
+    // Admin: freie Eingabe der Auftragsnummer (wie bisher), zusätzlich Schnellauswahl-Chips mit
+    // den heute im Personalplan zugeteilten Aufträgen sowie den internen Aufträgen.
     punchOrderInput.style.display = "";
     punchOrderSelect.style.display = "none";
     populateOrderDatalist("#zeit-punch-order-list");
+    renderZeitPunchQuick(meEmp, status);
     if(status === "off"){
       punchOrderInput.disabled = false;
       // Letzten gewählten Auftrag stehen lassen, bis bewusst ein anderer eingegeben wird.
@@ -2548,6 +2585,8 @@ function renderZeitPage(){
   } else {
     // Mitarbeiter: Aufträge wählbar, die ihm für heute in der Personalplanung zugeteilt wurden,
     // plus immer alle internen Aufträge (Schulung, EDV, Büro usw. — keine Zuteilung nötig).
+    // (Schnellauswahl-Chips nur für Admin — Mitarbeiter haben die Aufträge bereits direkt im Auswahlfeld.)
+    $("#zeit-punch-quick").style.display = "none";
     punchOrderInput.style.display = "none";
     punchOrderSelect.style.display = "";
     var todayIso = todayISO();
