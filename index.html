@@ -2559,16 +2559,32 @@ function renderZeitPunchQuick(meEmp, status){
     return '<button type="button" class="zeit-punch-quick-btn' + (o.intern?' intern':'') + (isActive?' active':'') + '" data-order-id="' + o.id + '" data-order-number="' + escapeHtml(o.orderNumber) + '">' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(orderDisplayName(o)) + '</button>';
   }).join("");
   box.style.display = "flex";
-  box.querySelectorAll(".zeit-punch-quick-btn").forEach(btn=>{ btn.disabled = status !== "off"; });
 }
-$("#zeit-punch-quick").addEventListener("click", e=>{
+// Chip-Klick: solange noch nicht eingestempelt, füllt der Klick nur das Feld (vor dem Kommen).
+// Ist man bereits eingestempelt, wechselt ein Klick direkt den Auftrag — ohne manuell über die
+// Stempeluhr aus- und wieder einzustempeln (aus- und wiedereinstempeln passiert automatisch).
+$("#zeit-punch-quick").addEventListener("click", async e=>{
   var btn = e.target.closest(".zeit-punch-quick-btn");
-  if(!btn || btn.disabled) return;
-  var input = $("#zeit-punch-order");
-  input.value = btn.dataset.orderNumber;
-  state.zeitLastOrderText = input.value;
-  updateZeitPunchKostenartField(state.orders.find(x=>x.id===btn.dataset.orderId), false);
-  renderZeitPunchQuick(state.staff.find(s=>s.uid === state.currentUid), "off");
+  if(!btn) return;
+  var order = state.orders.find(x=>x.id===btn.dataset.orderId);
+  var todayEntries = zeitTodayEntries(state.myTime);
+  var status = zeitCurrentStatus(todayEntries);
+  if(status === "off"){
+    var input = $("#zeit-punch-order");
+    input.value = btn.dataset.orderNumber;
+    state.zeitLastOrderText = input.value;
+    updateZeitPunchKostenartField(order, false);
+    renderZeitPunchQuick(state.staff.find(s=>s.uid === state.currentUid), "off");
+  } else {
+    if(!(await showConfirm("Auf Auftrag " + btn.dataset.orderNumber + " – " + escapeHtml(orderDisplayName(order||{customer:btn.dataset.orderNumber})) + " wechseln?"))) return;
+    try{
+      await addDoc(collection(db, TIME_COLLECTION), { uid: state.currentUid, name: state.currentName, type: "gehen", timestamp: Date.now(), date: todayISO() });
+      var data2 = { uid: state.currentUid, name: state.currentName, type: "kommen", timestamp: Date.now()+1, date: todayISO() };
+      if(order){ data2.orderId = order.id; data2.orderNumber = order.orderNumber; }
+      await addDoc(collection(db, TIME_COLLECTION), data2);
+      toast("Auftrag gewechselt.");
+    }catch(err){ console.error(err); toast("Wechseln fehlgeschlagen."); }
+  }
 });
 // Liefert für einen Mitarbeiter-Uid die Zeiteinträge, die lokal verfügbar sind: Admins sehen
 // alle (state.allTime), normale Mitarbeiter nur ihre eigenen (state.myTime).
