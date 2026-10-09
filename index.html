@@ -205,6 +205,9 @@
   .tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--accent-dim);color:#1c3b52;}
   .tag.tag-aluminium{background:#e4e8ea;color:#4b5a63;}
   .tag.tag-reparaturen{background:#f4e9d3;color:#8e6b1f;}
+  .tag.status-fabrikation{background:var(--accent-dim);color:#1c3b52;}
+  .tag.status-abgeschlossen{background:#e3f2e9;color:#1e7d4a;}
+  .tag.status-fakturiert{background:#eee4f7;color:#6a3fa0;}
   .tag.tag-montage{background:#efe6f5;color:#7b4fa0;font-weight:700;}
   .tag.tag-werkstatt{background:#e3ebf3;color:var(--accent);font-weight:700;}
   .tag.tag-ready{background:#e3f2e9;color:var(--success);}
@@ -1128,6 +1131,7 @@
         <button type="button" class="side-section-head" data-toggle="projekt"><span class="side-arrow">▸</span>Projektmanagement</button>
         <div class="side-section-body">
           <button class="side-item sub" data-view="table">Übersicht</button>
+          <button class="side-item sub" data-view="kunden">Kunden</button>
           <button class="side-item sub" data-view="staff">Personalplanung</button>
           <button class="side-item sub" data-view="lager">Artikelsammlung</button>
         </div>
@@ -1170,8 +1174,6 @@
   <div id="table-page" style="display:none;">
     <div class="table-toolbar">
       <input type="text" id="table-search" placeholder="Auftragsnummer oder Kunde suchen…" autocomplete="off">
-      <button type="button" class="ready-filter-btn" id="rf-werkstatt" data-ready-filter="readyWerkstatt">Werkstatt bereit</button>
-      <button type="button" class="ready-filter-btn" id="rf-montage" data-ready-filter="readyMontage">Montage bereit</button>
     </div>
     <div class="table-scroll">
       <table class="overview-table" id="overview-table">
@@ -1180,15 +1182,33 @@
             <th data-sort="orderNumber">Auftrag</th>
             <th data-sort="customer">Kunde</th>
             <th data-sort="workshop">Werkstatt</th>
-            <th>Material</th>
             <th data-sort="productionStart">Start</th>
             <th data-sort="assemblyDate">Montage</th>
-            <th>Werkstatt bereit</th>
-            <th>Montage bereit</th>
-            <th>Status</th>
+            <th data-sort="auftragswert">Auftragswert</th>
+            <th data-sort="status">Status</th>
           </tr>
         </thead>
         <tbody id="overview-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="kunden-page" style="display:none;">
+    <div class="table-toolbar">
+      <input type="text" id="kunden-search" placeholder="Firma suchen…" autocomplete="off">
+      <button type="button" class="btn primary" id="kunde-add-btn">+ Kunde</button>
+    </div>
+    <div class="table-scroll">
+      <table class="overview-table" id="kunden-table">
+        <thead>
+          <tr>
+            <th>Firma</th>
+            <th>Adresse</th>
+            <th>Kontakt</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="kunden-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -1212,6 +1232,10 @@
         <select id="zeit-punch-order-select" style="display:none;">
           <option value="">— kein Auftrag —</option>
         </select>
+      </div>
+      <div class="field" id="zeit-punch-kostenart-field" style="display:none;margin:0 0 10px;">
+        <label for="zeit-punch-kostenart" style="font-size:11.5px;">Kostenart (optional)</label>
+        <select id="zeit-punch-kostenart"><option value="">— keine —</option></select>
       </div>
       <div class="zeit-icon-buttons">
         <button type="button" class="zeit-icon-btn zeit-icon-go" id="zeit-kommen" title="Kommen" aria-label="Kommen">▶</button>
@@ -1552,6 +1576,10 @@
           <option value="reparatur">Reparatur</option>
         </select>
       </div>
+      <div class="field" id="assign-kostenart-field" style="display:none;">
+        <label for="assign-kostenart">Kostenart (optional)</label>
+        <select id="assign-kostenart"><option value="">— keine —</option></select>
+      </div>
       <div class="field">
         <label for="assign-hours">Dauer (Stunden)</label>
         <input type="number" id="assign-hours" min="0.5" step="0.5" value="8" required>
@@ -1560,6 +1588,32 @@
         <button type="button" class="btn danger" id="assign-delete-btn" style="display:none;">Entfernen</button>
         <div style="display:flex;gap:8px;margin-left:auto;">
           <button type="button" class="btn" id="assign-cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Speichern</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="kunde-modal-backdrop">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="kunde-modal-title">Neuer Kunde</h3>
+    <form id="kunde-form">
+      <div class="field"><label for="k-firma">Firma / Name</label><input id="k-firma" required placeholder="z. B. Eng Portmann Partner"></div>
+      <div class="field"><label for="k-strasse">Strasse</label><input id="k-strasse" placeholder="z. B. Hauptgasse 4"></div>
+      <div class="field-row">
+        <div class="field" style="max-width:110px;"><label for="k-plz">PLZ</label><input id="k-plz" placeholder="4500"></div>
+        <div class="field"><label for="k-ort">Ort</label><input id="k-ort" placeholder="Solothurn"></div>
+      </div>
+      <div class="field"><label for="k-kontakt">Ansprechpartner (optional)</label><input id="k-kontakt" placeholder="z. B. Dominik Geiser"></div>
+      <div class="field-row">
+        <div class="field"><label for="k-telefon">Telefon (optional)</label><input id="k-telefon"></div>
+        <div class="field"><label for="k-email">E-Mail (optional)</label><input id="k-email" type="email"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="kunde-delete-btn" style="display:none;">Löschen</button>
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button type="button" class="btn" id="kunde-cancel-btn">Abbrechen</button>
           <button type="submit" class="btn primary">Speichern</button>
         </div>
       </div>
@@ -1663,15 +1717,37 @@
     <form id="order-form">
       <div class="field-row">
         <div class="field"><label for="f-orderNumber">Auftragsnummer</label><input id="f-orderNumber" required placeholder="z. B. 26246"></div>
-        <div class="field"><label for="f-customer">Kunde</label><input id="f-customer" required placeholder="Kundenname"></div>
+        <div class="field">
+          <label for="f-kunde">Kunde</label>
+          <select id="f-kunde" required></select>
+        </div>
       </div>
-      <div class="field"><label for="f-description">Beschreibung</label><input id="f-description" placeholder="z. B. Eingang Tunnel, ohne Schloss"></div>
+      <div id="f-kunde-new-box" class="materials-box" style="display:none;margin-bottom:10px;">
+        <div class="field"><label for="f-kunde-firma">Firma / Name</label><input id="f-kunde-firma" placeholder="z. B. Eng Portmann Partner"></div>
+        <div class="field"><label for="f-kunde-strasse">Strasse</label><input id="f-kunde-strasse"></div>
+        <div class="field-row">
+          <div class="field" style="max-width:110px;"><label for="f-kunde-plz">PLZ</label><input id="f-kunde-plz"></div>
+          <div class="field"><label for="f-kunde-ort">Ort</label><input id="f-kunde-ort"></div>
+        </div>
+        <div class="field"><label for="f-kunde-kontakt">Ansprechpartner (optional)</label><input id="f-kunde-kontakt"></div>
+      </div>
+      <div class="field"><label for="f-description">Objekt / Beschreibung</label><input id="f-description" placeholder="z. B. Eingang Tunnel, ohne Schloss"></div>
+      <div class="field"><label for="f-bkp">BKP (optional)</label><input id="f-bkp" placeholder="z. B. 221.8 Pfosten-Riegel Wintergarten"></div>
       <div class="field-row">
         <div class="field">
           <label for="f-workshop">Werkstatt</label>
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
         </div>
+        <div class="field">
+          <label for="f-status">Status</label>
+          <select id="f-status">
+            <option value="fabrikation">In Fabrikation</option>
+            <option value="abgeschlossen">Abgeschlossen</option>
+            <option value="fakturiert">Fakturiert</option>
+          </select>
+        </div>
       </div>
+      <div class="field"><label for="f-auftragswert">Auftragswert (CHF)</label><input type="number" id="f-auftragswert" min="0" step="0.05" placeholder="0.00"></div>
       <div class="field"><label for="f-productionStart-display">Frühester Produktionsstart</label>
         <span class="date-field">
           <input type="text" id="f-productionStart-display" class="date-input" readonly placeholder="TT.MM.JJJJ" autocomplete="off">
@@ -1687,10 +1763,10 @@
         <small class="week-hint" id="f-assemblyDate-week"></small>
       </div>
       <div class="field">
-        <label>Materialien</label>
+        <label>Kostenarten (Plankalkulation)</label>
         <div class="materials-box">
-          <div id="materials-list"></div>
-          <button type="button" class="add-material-btn" id="add-material-btn">+ Material hinzufügen</button>
+          <div id="kostenarten-list"></div>
+          <button type="button" class="add-material-btn" id="add-kostenart-btn">+ Kostenart hinzufügen</button>
         </div>
       </div>
       <div class="field">
@@ -1699,10 +1775,6 @@
           <div id="todos-list"></div>
           <button type="button" class="add-todo-btn" id="add-todo-btn">+ To-Do hinzufügen</button>
         </div>
-      </div>
-      <div class="field" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="f-completed" style="width:16px;height:16px;">
-        <label for="f-completed" style="margin:0;">Als erledigt markieren</label>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn danger" id="delete-btn" style="display:none;">Löschen</button>
@@ -1719,7 +1791,6 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
 import {
   getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1754,6 +1825,7 @@ const ZEITMODELLE_COLLECTION = "zeitmodelle";
 const BETRIEBSFERIEN_COLLECTION = "betriebsferien";
 const FEIERTAGE_COLLECTION = "feiertage";
 const TERMINSERIEN_COLLECTION = "terminserien";
+const KUNDEN_COLLECTION = "kunden";
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -1800,6 +1872,7 @@ let unsubZeitmodelle = null;
 let unsubBetriebsferien = null;
 let unsubFeiertage = null;
 let unsubTerminserien = null;
+let unsubKunden = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -1822,6 +1895,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubZeitmodelle) unsubZeitmodelle();
     if(unsubBetriebsferien) unsubBetriebsferien();
     if(unsubFeiertage) unsubFeiertage();
+    if(unsubKunden) unsubKunden();
     subscribeOrders();
     subscribeStaff();
     subscribeAssignments();
@@ -1831,6 +1905,7 @@ onAuthStateChanged(auth, async user => {
     subscribeBetriebsferien();
     subscribeFeiertage();
     subscribeTerminserien();
+    subscribeKunden();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
@@ -1845,6 +1920,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubBetriebsferien) unsubBetriebsferien();
     if(unsubFeiertage) unsubFeiertage();
     if(unsubTerminserien) unsubTerminserien();
+    if(unsubKunden) unsubKunden();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -1882,6 +1958,14 @@ function subscribeOrders(){
     console.error(err);
     setStatus('Verbindung zur Datenbank fehlgeschlagen.');
   });
+}
+
+function subscribeKunden(){
+  const q = query(collection(db, KUNDEN_COLLECTION), orderBy('firma'));
+  unsubKunden = onSnapshot(q, snap => {
+    state.kunden = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => { console.error(err); });
 }
 
 function subscribeStaff(){
@@ -1998,7 +2082,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalMaterials: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", readyFilter: { readyWerkstatt: false, readyMontage: false }, assignEmployeeId: null, assignDate: null, editingAssignId: null };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2095,186 +2179,6 @@ document.addEventListener("click", e=>{
   if(avatar && avatar.dataset.staffId) triggerStaffPhotoUpload(avatar.dataset.staffId);
 });
 
-/* ---------- PDF-Liefertermin-Erkennung (läuft komplett im Browser, via pdf.js) ---------- */
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
-
-var pdfWorkerReady = (async function(){
-  // Manche Browser blockieren das direkte Laden eines "Workers" von einer fremden Adresse (CDN).
-  // Als Absicherung wird das Worker-Skript stattdessen geladen und als lokale Kopie bereitgestellt.
-  try{
-    var resp = await fetch(pdfjsLib.GlobalWorkerOptions.workerSrc);
-    var code = await resp.text();
-    var blob = new Blob([code], { type: "text/javascript" });
-    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-  }catch(e){ /* Fallback: Original-CDN-Adresse bleibt bestehen */ }
-})();
-
-async function getPdfPagesData(file){
-  await pdfWorkerReady;
-  var buf = await file.arrayBuffer();
-  var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  var fullText = "";
-  var pagesLines = [];
-  for(var i=1; i<=pdf.numPages; i++){
-    var page = await pdf.getPage(i);
-    var content = await page.getTextContent();
-    var items = content.items.map(it=>({ str: it.str, x: it.transform[4], y: it.transform[5] }));
-    fullText += items.map(it=>it.str).join(" ") + "\n";
-    pagesLines.push(buildTextLines(items));
-  }
-  return { fullText: fullText, pagesLines: pagesLines };
-}
-
-// Gruppiert Textbausteine anhand ihrer Y-Position zu Zeilen (für Tabellen-Layouts).
-function buildTextLines(items){
-  var sorted = items.slice().sort((a,b)=> b.y - a.y);
-  var lines = [];
-  var current = null;
-  sorted.forEach(it=>{
-    if(current && Math.abs(it.y - current.y) < 3) current.items.push(it);
-    else { current = { y: it.y, items: [it] }; lines.push(current); }
-  });
-  lines.forEach(line=> line.items.sort((a,b)=> a.x - b.x));
-  return lines;
-}
-
-var GERMAN_MONTHS = {
-  "januar":"01","jan":"01",
-  "februar":"02","feb":"02",
-  "märz":"03","maerz":"03","mrz":"03","mär":"03",
-  "april":"04","apr":"04",
-  "mai":"05",
-  "juni":"06","jun":"06",
-  "juli":"07","jul":"07",
-  "august":"08","aug":"08",
-  "september":"09","sep":"09","sept":"09",
-  "oktober":"10","okt":"10",
-  "november":"11","nov":"11",
-  "dezember":"12","dez":"12"
-};
-
-// Erkennt Datumsangaben in vielen gängigen Schreibweisen:
-// 29.10.2026 / 29.10.26 / 29/10/2026 / 29-10-2026 / 2026-10-29 / 29. September 2026 / 29. Sep 2026
-function germanDateToIso(text){
-  var mIso = text.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
-  if(mIso) return mIso[1] + "-" + mIso[2].padStart(2,"0") + "-" + mIso[3].padStart(2,"0");
-  var m = text.match(/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);
-  if(m){
-    var day = m[1].padStart(2,"0"), month = m[2].padStart(2,"0");
-    var year = m[3].length === 2 ? "20" + m[3] : m[3];
-    return year + "-" + month + "-" + day;
-  }
-  var m2 = text.match(/(\d{1,2})\.?\s+([A-Za-zÄÖÜäöüß]+)\.?\s+(\d{4})/);
-  if(m2){
-    var monthNum = GERMAN_MONTHS[m2[2].toLowerCase().replace(/\.$/,"")];
-    if(monthNum) return m2[3] + "-" + monthNum + "-" + m2[1].padStart(2,"0");
-  }
-  return null;
-}
-
-function toIsoDate(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
-function isoWeekMonday(week, year){
-  var jan4 = new Date(year,0,4);
-  var jan4Day = (jan4.getDay()+6)%7;
-  var week1Monday = new Date(jan4); week1Monday.setDate(jan4.getDate()-jan4Day);
-  var target = new Date(week1Monday); target.setDate(week1Monday.getDate() + (week-1)*7);
-  return target;
-}
-// Erkennt Kalenderwochen-Angaben in verschiedensten Schreibweisen:
-// "KW 43", "KW43/2026", "36 / 2026", "Jahr: 2026 - Woche: 42", "Woche: 42, Jahr 2026" — liefert den Montag dieser Woche.
-function kwToIso(text){
-  var week=null, year=null, m;
-  if(m = text.match(/KW\.?\s*(\d{1,2})\s*[\/\.]\s*(\d{2,4})/i)){
-    week = parseInt(m[1],10); year = parseInt(m[2].length===2 ? "20"+m[2] : m[2], 10);
-  } else if(m = text.match(/Jahr:?\s*(\d{4})\D{0,20}?Woche:?\s*(\d{1,2})/i)){
-    year = parseInt(m[1],10); week = parseInt(m[2],10);
-  } else if(m = text.match(/Woche:?\s*(\d{1,2})\D{0,20}?Jahr:?\s*(\d{4})/i)){
-    week = parseInt(m[1],10); year = parseInt(m[2],10);
-  } else if(m = text.match(/(\d{1,2})\s*\/\s*(\d{4})/)){
-    week = parseInt(m[1],10); year = parseInt(m[2],10);
-  } else if(m = text.match(/KW\.?\s*(\d{1,2})\b/i)){
-    week = parseInt(m[1],10);
-  } else {
-    return null;
-  }
-  if(!week || week<1 || week>53) return null;
-  var hadYear = !!year;
-  if(!year) year = (new Date()).getFullYear();
-  var monday = isoWeekMonday(week, year);
-  if(!hadYear){
-    var cutoff = new Date(); cutoff.setHours(0,0,0,0); cutoff.setDate(cutoff.getDate()-21);
-    if(monday < cutoff) monday = isoWeekMonday(week, year+1);
-  }
-  return toIsoDate(monday);
-}
-// Erst exaktes Datum versuchen, sonst Kalenderwoche (als Montag-Näherung, mit Hinweis).
-function parseDeliveryDate(text){
-  var iso = germanDateToIso(text);
-  if(iso) return { iso: iso, approx: false };
-  var kw = kwToIso(text);
-  if(kw) return { iso: kw, approx: true };
-  return null;
-}
-
-var LIEFER_LABELS = [
-  "Liefertermin", "voraussichtlicher Liefertermin", "Lieferdatum", "Liefertag", "Lieferwoche",
-  "Versanddatum", "Versandtermin", "Versandtag",
-  "Abholdatum", "Abholtermin",
-  "Auslieferungstermin", "Auslieferungsdatum",
-  "Zustelldatum", "Zustelltermin",
-  "Ablieferungstermin", "Ablieferdatum", "Ablieferungsdatum",
-  "Bereitstellungstermin", "Bereitstellungsdatum",
-  "Wunschtermin", "Wunschlieferdatum",
-  "Anliefertermin", "Anlieferdatum",
-  "Fertigstellungstermin",
-  "Endtermin", "Bestätigter Endtermin", "Bestätigungstermin", "Bestätigter Termin", "Bestät. Termin", "Bestätigte Lieferung"
-];
-
-// Variante 1: Label und Datum stehen direkt nebeneinander im Fliesstext (z.B. "Liefertermin: 29.10.2026").
-function findLieferdatum(text){
-  for(var i=0; i<LIEFER_LABELS.length; i++){
-    var idx = text.toLowerCase().indexOf(LIEFER_LABELS[i].toLowerCase());
-    if(idx === -1) continue;
-    var result = parseDeliveryDate(text.slice(idx, idx + 120));
-    if(result) return result;
-  }
-  return null;
-}
-
-// Variante 2: Tabellen-Layout — Spaltenkopf "Lieferdatum" oben, Wert in derselben Spalte eine Zeile weiter unten.
-function findLieferdatumInTable(pagesLines){
-  var labelWordsNormalized = LIEFER_LABELS.map(l=>l.toLowerCase());
-  for(var p=0; p<pagesLines.length; p++){
-    var lines = pagesLines[p];
-    for(var li=0; li<lines.length; li++){
-      var line = lines[li];
-      for(var ii=0; ii<line.items.length; ii++){
-        var raw = line.items[ii].str.toLowerCase().replace(/[:.,]/g,"").trim();
-        if(labelWordsNormalized.indexOf(raw) === -1) continue;
-        var x0 = line.items[ii].x;
-        var x1 = null;
-        for(var jj=ii+1; jj<line.items.length; jj++){
-          if(line.items[jj].x > x0 + 5){ x1 = line.items[jj].x; break; }
-        }
-        var colLeft = x0 - 20, colRight = (x1!==null ? x1 : x0 + 160) + 40;
-        for(var vi=li+1; vi<Math.min(li+4, lines.length); vi++){
-          var snippetItems = lines[vi].items.filter(it=> it.x >= colLeft && it.x <= colRight);
-          if(snippetItems.length===0) continue;
-          var result = parseDeliveryDate(snippetItems.map(it=>it.str).join(" "));
-          if(result) return result;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-async function extractLieferdatumFromPdf(file){
-  var data = await getPdfPagesData(file);
-  return findLieferdatum(data.fullText) || findLieferdatumInTable(data.pagesLines);
-}
-
 function getWeekDays(refISO){
   var d=fromISO(refISO), day=d.getDay(), diff = day===0?-6:1-day;
   var monday=new Date(d); monday.setDate(d.getDate()+diff);
@@ -2289,19 +2193,12 @@ function getMonthGrid(refISO){
   return { days: days, month: month };
 }
 function filteredOrders(){ return state.filter==="alle" ? state.orders : state.orders.filter(o=>o.workshop===state.filter); }
-function orderMaterials(o){ return Array.isArray(o.materials) ? o.materials : []; }
 function orderTodos(o){ return Array.isArray(o.todos) ? o.todos : []; }
 function todoProgress(o){
   var todos = orderTodos(o);
   var done = todos.filter(t=>t.done).length;
   return { done: done, total: todos.length };
 }
-function hasPendingMaterial(o){ return orderMaterials(o).some(m=>m.status==="ausstehend"); }
-function materialBlocksPhase(m, phase){ return m.status==="ausstehend" && ((m.phase||"beide")===phase || (m.phase||"beide")==="beide"); }
-function hasPendingMaterialForPhase(o, phase){ return orderMaterials(o).some(m=>materialBlocksPhase(m, phase)); }
-function isWerkstattReady(o){ return !!o.productionStart && !hasPendingMaterialForPhase(o, "werkstatt"); }
-function isMontageReady(o){ return !!o.assemblyDate && !hasPendingMaterialForPhase(o, "montage"); }
-
 /* ---------- Rendering ---------- */
 
 var HEADER_INFO = {
@@ -2309,6 +2206,7 @@ var HEADER_INFO = {
   ferien: ["Ferienplaner", "Abwesenheiten und Feriensaldo"],
   einstellungen: ["Einstellungen", "Zeitmodelle verwalten"],
   table: ["Übersicht", "Übersicht für die Produktionsleitung"],
+  kunden: ["Kunden", "Kundenstamm für Aufträge"],
   staff: ["Personalplanung", "Mitarbeiter den Aufträgen zuteilen"],
   lager: ["Artikelsammlung", "Lagerbestand und Artikel"],
   verwaltung: ["Verwaltung", "Nutzerkonten verwalten"],
@@ -2318,6 +2216,7 @@ var lastRenderedView = null;
 function render(){
   renderHeader();
   var isTable = state.view === "table";
+  var isKunden = state.view === "kunden";
   var isStaff = state.view === "staff";
   var isLager = state.view === "lager";
   var isZeit = state.view === "zeit";
@@ -2327,6 +2226,7 @@ function render(){
   var isVerwaltung = state.view === "verwaltung";
   var isBuchhaltung = state.view === "buchhaltung";
   $("#table-page").style.display = isTable ? "block" : "none";
+  $("#kunden-page").style.display = isKunden ? "block" : "none";
   $("#staff-page").style.display = isStaff ? "block" : "none";
   $("#lager-tab-body").style.display = isLager ? "block" : "none";
   $("#zeit-page").style.display = isZeit ? "block" : "none";
@@ -2343,10 +2243,11 @@ function render(){
     document.querySelectorAll(".overlay").forEach(o=>o.remove());
   }
   lastRenderedView = state.view;
-  var hideToolbar = (isStaff || isLager || isZeit || isFerien || isSaldo || isEinstellungen || isVerwaltung || isBuchhaltung);
+  var hideToolbar = (isKunden || isStaff || isLager || isZeit || isFerien || isSaldo || isEinstellungen || isVerwaltung || isBuchhaltung);
   $("#filter-chips").style.display = hideToolbar ? "none" : "inline-flex";
   $("#add-btn").style.display = hideToolbar ? "none" : "inline-block";
   if(isTable){ renderTable(); return; }
+  if(isKunden){ renderKundenPage(); return; }
   if(isStaff){ renderStaffPage(); return; }
   if(isLager){ return; }
   if(isZeit){ renderZeitPage(); return; }
@@ -2365,13 +2266,14 @@ function renderHeader(){
   if(subEl) subEl.textContent = info[1];
 }
 function workshopLabel(w){ return w==="aluminium" ? "Aluminium" : (w==="reparaturen" ? "Reparaturen" : "Stahl"); }
+function statusLabel(s){ return s==="fakturiert" ? "Fakturiert" : (s==="abgeschlossen" ? "Abgeschlossen" : "In Fabrikation"); }
+function fmtChf(n){ var v = typeof n==="number" ? n : parseFloat(n)||0; return v.toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2}) + " Fr."; }
+function kundeName(kundeId, fallback){ var k = state.kunden.find(x=>x.id===kundeId); return k ? k.firma : (fallback||""); }
 
 function renderTable(){
   var rows = filteredOrders().slice();
   var search = state.tableSearch.trim().toLowerCase();
   if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search));
-  if(state.readyFilter.readyWerkstatt) rows = rows.filter(o=>isWerkstattReady(o));
-  if(state.readyFilter.readyMontage) rows = rows.filter(o=>isMontageReady(o));
   var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
   rows.sort((a,b)=>{
     var av = (a[f]||"").toString(), bv = (b[f]||"").toString();
@@ -2387,41 +2289,22 @@ function renderTable(){
     th.classList.toggle("desc", th.dataset.sort === state.tableSort.field && state.tableSort.dir === "desc");
   });
   var tbody = $("#overview-tbody");
-  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="9">Keine Aufträge in dieser Ansicht.</td></tr>'; return; }
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Keine Aufträge in dieser Ansicht.</td></tr>'; return; }
   var html = "";
   rows.forEach(o=>{
-    var mats = orderMaterials(o);
-    var matHtml = mats.length===0 ? '<span style="color:#c3ccd1;">–</span>' : mats.map(m=>{
-      var isOk = m.status==="geliefert";
-      var line = isOk ? "geliefert" : (m.expectedDate ? "ab " + fmtShort(m.expectedDate) : "ausstehend");
-      var forTag = m.phase==="werkstatt" ? " (W)" : (m.phase==="montage" ? " (M)" : "");
-      return '<div class="ov-mat-line' + (isOk?"":" warn-text") + '"><span class="mdot ' + (isOk?"ok":"warn") + '"></span>' + escapeHtml(m.name) + forTag + " · " + line + "</div>";
-    }).join("");
     html += '<tr class="' + (o.completed?"row-completed":"") + '" data-id="' + o.id + '">';
     html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
-    html += '<td data-label="Kunde"><div class="ov-customer">' + escapeHtml(o.customer) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(o.description) + '</div>':'') + '</td>';
+    html += '<td data-label="Kunde"><div class="ov-customer">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(o.description) + '</div>':'') + '</td>';
     html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
-    html += '<td data-label="Material">' + matHtml + '</td>';
     html += '<td data-label="Start">' + (o.productionStart ? fmtShort(o.productionStart) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
     html += '<td data-label="Montage">' + (o.assemblyDate ? fmtShort(o.assemblyDate) : '<span style="color:#c3ccd1;">–</span>') + '</td>';
-    var wReady = o.productionStart ? (isWerkstattReady(o)?"yes":"no") : "na";
-    var mReady = o.assemblyDate ? (isMontageReady(o)?"yes":"no") : "na";
-    html += '<td data-label="Werkstatt bereit"><span class="ov-ready-icon ' + wReady + '">' + (wReady==="yes"?"✓":(wReady==="no"?"✗":"–")) + '</span></td>';
-    html += '<td data-label="Montage bereit"><span class="ov-ready-icon ' + mReady + '">' + (mReady==="yes"?"✓":(mReady==="no"?"✗":"–")) + '</span></td>';
-    html += '<td data-label="Status">' + (o.completed ? "Erledigt" : "Offen") + '</td>';
+    html += '<td data-label="Auftragswert">' + fmtChf(o.auftragswert) + '</td>';
+    html += '<td data-label="Status"><span class="tag status-' + (o.status||"fabrikation") + '">' + statusLabel(o.status) + '</span></td>';
     html += '</tr>';
   });
   tbody.innerHTML = html;
 }
 $("#table-search").addEventListener("input", e=>{ state.tableSearch = e.target.value; renderTable(); });
-document.querySelectorAll(".ready-filter-btn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    var key = btn.dataset.readyFilter;
-    state.readyFilter[key] = !state.readyFilter[key];
-    btn.classList.toggle("active", state.readyFilter[key]);
-    renderTable();
-  });
-});
 $("#overview-table thead").addEventListener("click", e=>{
   var th = e.target.closest("th[data-sort]"); if(!th) return;
   var field = th.dataset.sort;
@@ -2537,6 +2420,15 @@ function populateOrderDatalist(selector){
   var el = $(selector);
   if(el) el.innerHTML = open.map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(o.customer) + '">').join("");
 }
+function updateZeitPunchKostenartField(order, locked){
+  var field = $("#zeit-punch-kostenart-field");
+  var sel = $("#zeit-punch-kostenart");
+  var kas = order && Array.isArray(order.kostenarten) ? order.kostenarten.filter(k=>k.bezeichnung) : [];
+  if(kas.length===0){ field.style.display = "none"; sel.innerHTML = '<option value="">— keine —</option>'; return; }
+  field.style.display = "block";
+  sel.innerHTML = '<option value="">— keine —</option>' + kas.map((k,i)=>'<option value="' + i + '">' + escapeHtml(k.bezeichnung) + '</option>').join("");
+  sel.disabled = !!locked;
+}
 // Liefert für einen Mitarbeiter-Uid die Zeiteinträge, die lokal verfügbar sind: Admins sehen
 // alle (state.allTime), normale Mitarbeiter nur ihre eigenen (state.myTime).
 function timeEntriesForUid(uid){
@@ -2565,9 +2457,13 @@ function renderZeitPage(){
     populateOrderDatalist("#zeit-punch-order-list");
     if(status === "off"){
       punchOrderInput.disabled = false;
+      updateZeitPunchKostenartField(resolveOrderFromText(punchOrderInput.value), false);
     } else {
       punchOrderInput.value = lastKommen && lastKommen.orderNumber ? lastKommen.orderNumber : "";
       punchOrderInput.disabled = true;
+      var lockedOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
+      updateZeitPunchKostenartField(lockedOrder, true);
+      if(lastKommen && lastKommen.kostenartIdx!=null) $("#zeit-punch-kostenart").value = String(lastKommen.kostenartIdx);
     }
   } else {
     // Mitarbeiter: nur Aufträge wählbar, die ihm für heute in der Personalplanung zugeteilt wurden.
@@ -2582,10 +2478,13 @@ function renderZeitPage(){
     punchOrderSelect.innerHTML = optsHtml;
     if(status === "off"){
       punchOrderSelect.disabled = false;
+      updateZeitPunchKostenartField(state.orders.find(x=>x.id===punchOrderSelect.value), false);
     } else {
       var lastOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
       punchOrderSelect.value = lastOrder ? lastOrder.id : "";
       punchOrderSelect.disabled = true;
+      updateZeitPunchKostenartField(lastOrder, true);
+      if(lastKommen && lastKommen.kostenartIdx!=null) $("#zeit-punch-kostenart").value = String(lastKommen.kostenartIdx);
     }
   }
 
@@ -2667,26 +2566,37 @@ async function zeitPunch(type){
   if(!state.currentUid) return;
   var data = { uid: state.currentUid, name: state.currentName, type: type, timestamp: Date.now(), date: todayISO() };
   if(type === "kommen"){
+    var matchedOrder = null;
     if(state.isAdmin){
       var typed = $("#zeit-punch-order").value.trim();
       if(typed){
         var match = resolveOrderFromText(typed);
-        if(match){ data.orderId = match.id; data.orderNumber = match.orderNumber; }
+        if(match){ data.orderId = match.id; data.orderNumber = match.orderNumber; matchedOrder = match; }
         else toast('Kein offener Auftrag mit der Nummer "' + typed + '" gefunden — ohne Auftrag gestempelt.');
       }
     } else {
       var selectedOrderId = $("#zeit-punch-order-select").value;
       if(selectedOrderId){
         var match2 = state.orders.find(x=>x.id===selectedOrderId);
-        if(match2){ data.orderId = match2.id; data.orderNumber = match2.orderNumber; }
+        if(match2){ data.orderId = match2.id; data.orderNumber = match2.orderNumber; matchedOrder = match2; }
+      }
+    }
+    if(matchedOrder){
+      var kaVal = $("#zeit-punch-kostenart").value;
+      if(kaVal !== ""){
+        var kaIdx = parseInt(kaVal, 10);
+        data.kostenartIdx = kaIdx;
+        data.kostenartBezeichnung = matchedOrder.kostenarten && matchedOrder.kostenarten[kaIdx] ? matchedOrder.kostenarten[kaIdx].bezeichnung : null;
       }
     }
   }
   try{
     await addDoc(collection(db, TIME_COLLECTION), data);
-    if(type === "kommen"){ $("#zeit-punch-order").value = ""; $("#zeit-punch-order-select").value = ""; }
+    if(type === "kommen"){ $("#zeit-punch-order").value = ""; $("#zeit-punch-order-select").value = ""; updateZeitPunchKostenartField(null, false); }
   }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
 }
+$("#zeit-punch-order").addEventListener("input", e=>{ if(!e.target.disabled) updateZeitPunchKostenartField(resolveOrderFromText(e.target.value), false); });
+$("#zeit-punch-order-select").addEventListener("change", e=>{ if(!e.target.disabled) updateZeitPunchKostenartField(state.orders.find(x=>x.id===e.target.value), false); });
 $("#zeit-kommen").addEventListener("click", ()=>zeitPunch("kommen"));
 $("#zeit-gehen").addEventListener("click", ()=>zeitPunch("gehen"));
 
@@ -2707,6 +2617,7 @@ async function punchFromAssignment(assignId){
       if(!confirm("Auf Auftrag " + (order?order.orderNumber + " – " + order.customer:"?") + " einstempeln?")) return;
       var data = { uid: state.currentUid, name: state.currentName, type: "kommen", timestamp: Date.now(), date: todayISO() };
       if(order){ data.orderId = order.id; data.orderNumber = order.orderNumber; }
+      if(a.kostenartIdx!=null){ data.kostenartIdx = a.kostenartIdx; data.kostenartBezeichnung = a.kostenartBezeichnung || null; }
       await addDoc(collection(db, TIME_COLLECTION), data);
       toast("Eingestempelt auf Auftrag " + (order?order.orderNumber:"?") + ".");
     } else if(lastKommen && lastKommen.orderId === a.orderId){
@@ -3916,7 +3827,7 @@ function renderStaffGrid(){
         var isMinePunchable = !canEdit && meEmp && emp.id===meEmp.id && iso===todayIso;
         var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
         var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
-        html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
+        html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '"><span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
       });
       if(canEdit) html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
       html += '</div>';
@@ -3931,6 +3842,83 @@ $("#staff-nav-next").addEventListener("click", ()=>{ var d=fromISO(state.staffRe
 $("#staff-nav-today").addEventListener("click", ()=>{ state.staffRefDate=todayISO(); renderStaffPage(); });
 
 /* Mitarbeiter hinzufügen / entfernen */
+/* ---------- Kunden ---------- */
+
+function renderKundenPage(){
+  var tbody = $("#kunden-tbody");
+  if(!tbody) return;
+  var search = ($("#kunden-search").value||"").trim().toLowerCase();
+  var rows = state.kunden.slice().sort((a,b)=>(a.firma||"").localeCompare(b.firma||""));
+  if(search) rows = rows.filter(k=>(k.firma||"").toLowerCase().includes(search));
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="4">Noch keine Kunden erfasst.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(k=>{
+    var adresse = [k.strasse, [k.plz,k.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    var kontakt = [k.kontakt, k.telefon, k.email].filter(Boolean).join(" · ");
+    return '<tr data-id="' + k.id + '">' +
+      '<td data-label="Firma"><strong>' + escapeHtml(k.firma||"") + '</strong></td>' +
+      '<td data-label="Adresse">' + escapeHtml(adresse) + '</td>' +
+      '<td data-label="Kontakt">' + escapeHtml(kontakt) + '</td>' +
+      '<td style="text-align:right;"><button type="button" class="btn" data-edit-kunde="' + k.id + '">Bearbeiten</button></td>' +
+      '</tr>';
+  }).join("");
+}
+$("#kunden-search").addEventListener("input", renderKundenPage);
+
+var kundeBackdrop = $("#kunde-modal-backdrop");
+function openKundeModal(kunde){
+  state.editingKundeId = kunde ? kunde.id : null;
+  $("#kunde-modal-title").textContent = kunde ? "Kunde bearbeiten" : "Neuer Kunde";
+  $("#k-firma").value = kunde ? (kunde.firma||"") : "";
+  $("#k-strasse").value = kunde ? (kunde.strasse||"") : "";
+  $("#k-plz").value = kunde ? (kunde.plz||"") : "";
+  $("#k-ort").value = kunde ? (kunde.ort||"") : "";
+  $("#k-kontakt").value = kunde ? (kunde.kontakt||"") : "";
+  $("#k-telefon").value = kunde ? (kunde.telefon||"") : "";
+  $("#k-email").value = kunde ? (kunde.email||"") : "";
+  $("#kunde-delete-btn").style.display = kunde ? "inline-block" : "none";
+  kundeBackdrop.classList.add("open");
+  setTimeout(()=>$("#k-firma").focus(),30);
+}
+function closeKundeModal(){ kundeBackdrop.classList.remove("open"); state.editingKundeId = null; }
+$("#kunde-add-btn").addEventListener("click", ()=>openKundeModal(null));
+$("#kunde-cancel-btn").addEventListener("click", closeKundeModal);
+kundeBackdrop.addEventListener("click", e=>{ if(e.target===kundeBackdrop) closeKundeModal(); });
+$("#kunden-tbody").addEventListener("click", e=>{
+  var btn = e.target.closest("[data-edit-kunde]"); if(!btn) return;
+  var k = state.kunden.find(x=>x.id===btn.dataset.editKunde);
+  if(k) openKundeModal(k);
+});
+$("#kunde-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var firma = $("#k-firma").value.trim();
+  if(!firma) return;
+  var payload = {
+    firma: firma,
+    strasse: $("#k-strasse").value.trim(),
+    plz: $("#k-plz").value.trim(),
+    ort: $("#k-ort").value.trim(),
+    kontakt: $("#k-kontakt").value.trim(),
+    telefon: $("#k-telefon").value.trim(),
+    email: $("#k-email").value.trim()
+  };
+  try{
+    if(state.editingKundeId){
+      await updateDoc(doc(db, KUNDEN_COLLECTION, state.editingKundeId), payload);
+    }else{
+      payload.createdAt = Date.now();
+      await addDoc(collection(db, KUNDEN_COLLECTION), payload);
+    }
+    closeKundeModal();
+    toast("Kunde gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+$("#kunde-delete-btn").addEventListener("click", async ()=>{
+  if(!state.editingKundeId) return;
+  if(!confirm("Diesen Kunden wirklich löschen? Bestehende Aufträge behalten den Namen, verlieren aber die Verknüpfung.")) return;
+  try{ await deleteDoc(doc(db, KUNDEN_COLLECTION, state.editingKundeId)); closeKundeModal(); toast("Kunde gelöscht."); }
+  catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+});
+
 var staffAddBackdrop = $("#staff-add-modal-backdrop");
 $("#staff-add-btn").addEventListener("click", ()=>{ $("#staff-add-name").value=""; staffAddBackdrop.classList.add("open"); setTimeout(()=>$("#staff-add-name").focus(),30); });
 $("#staff-add-cancel-btn").addEventListener("click", ()=> staffAddBackdrop.classList.remove("open"));
@@ -4046,6 +4034,14 @@ async function reorderStaff(draggedId, targetId){
 
 /* Einsatz-Modal (Stunden eintragen / bearbeiten / löschen) */
 var assignBackdrop = $("#assign-modal-backdrop");
+function populateAssignKostenartSelect(order, selectedValue){
+  var field = $("#assign-kostenart-field");
+  var sel = $("#assign-kostenart");
+  var kas = order && Array.isArray(order.kostenarten) ? order.kostenarten.filter(k=>k.bezeichnung) : [];
+  if(kas.length===0){ field.style.display = "none"; sel.innerHTML = '<option value="">— keine —</option>'; return; }
+  field.style.display = "block";
+  sel.innerHTML = '<option value="">— keine —</option>' + kas.map((k,i)=>'<option value="' + i + '"' + (String(i)===String(selectedValue)?' selected':'') + '>' + escapeHtml(k.bezeichnung) + '</option>').join("");
+}
 function openAssignModal(orderId, cellInfo, assignId){
   if(assignId){
     var a = state.assignments.find(x=>x.id===assignId);
@@ -4058,6 +4054,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-modal-title").textContent = "Einsatz bearbeiten";
     $("#assign-info").textContent = (o?o.orderNumber + " · " + o.customer:"?") + " — " + (emp?emp.name:"?") + " · " + fmtShort(a.date);
     $("#assign-type").value = a.type || "werkstatt";
+    populateAssignKostenartSelect(o, a.kostenartIdx!=null?a.kostenartIdx:"");
     $("#assign-hours").value = a.hours || 8;
     $("#assign-delete-btn").style.display = "inline-block";
   }else if(orderId){
@@ -4073,6 +4070,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     if(o2 && o2.workshop === "reparaturen") defaultType = "reparatur";
     else if(o2 && cellInfo.date === o2.assemblyDate) defaultType = "montage";
     $("#assign-type").value = defaultType;
+    populateAssignKostenartSelect(o2, "");
     $("#assign-hours").value = 8;
     $("#assign-delete-btn").style.display = "none";
   }else{
@@ -4087,6 +4085,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-modal-title").textContent = "Einsatz eintragen";
     $("#assign-info").textContent = (emp3?emp3.name:"?") + " · " + fmtShort(cellInfo.date);
     $("#assign-type").value = "werkstatt";
+    populateAssignKostenartSelect(null, "");
     $("#assign-hours").value = 8;
     $("#assign-delete-btn").style.display = "none";
   }
@@ -4110,9 +4109,11 @@ $("#assign-order-search").addEventListener("input", e=>{
     if(match.workshop === "reparaturen") defaultType = "reparatur";
     else if(state.assignDate === match.assemblyDate) defaultType = "montage";
     $("#assign-type").value = defaultType;
+    populateAssignKostenartSelect(match, "");
   }else{
     state.pendingOrderId = null;
     $("#assign-info").textContent = typed ? "Kein offener Auftrag mit dieser Nummer gefunden." : ((emp?emp.name:"?") + " · " + fmtShort(state.assignDate));
+    populateAssignKostenartSelect(null, "");
   }
 });
 $("#assign-cancel-btn").addEventListener("click", closeAssignModal);
@@ -4125,12 +4126,16 @@ $("#assign-form").addEventListener("submit", async e=>{
   }
   var hours = parseFloat($("#assign-hours").value) || 0;
   var typ = $("#assign-type").value;
+  var kaVal = $("#assign-kostenart").value;
+  var kostenartIdx = kaVal === "" ? null : parseInt(kaVal, 10);
+  var relevantOrder = state.editingAssignId ? state.orders.find(x=>x.id===state.assignments.find(a=>a.id===state.editingAssignId).orderId) : state.orders.find(x=>x.id===state.pendingOrderId);
+  var kostenartBezeichnung = (kostenartIdx!=null && relevantOrder && relevantOrder.kostenarten && relevantOrder.kostenarten[kostenartIdx]) ? relevantOrder.kostenarten[kostenartIdx].bezeichnung : null;
   try{
     if(state.editingAssignId){
-      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId), { hours: hours, type: typ });
+      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId), { hours: hours, type: typ, kostenartIdx: kostenartIdx, kostenartBezeichnung: kostenartBezeichnung });
     }else{
       await addDoc(collection(db, ASSIGNMENTS_COLLECTION), {
-        orderId: state.pendingOrderId, employeeId: state.assignEmployeeId, date: state.assignDate, hours: hours, type: typ, createdAt: Date.now()
+        orderId: state.pendingOrderId, employeeId: state.assignEmployeeId, date: state.assignDate, hours: hours, type: typ, kostenartIdx: kostenartIdx, kostenartBezeichnung: kostenartBezeichnung, createdAt: Date.now()
       });
     }
     closeAssignModal();
@@ -4142,73 +4147,42 @@ $("#assign-delete-btn").addEventListener("click", async ()=>{
   catch(err){ console.error(err); toast("Entfernen fehlgeschlagen."); }
 });
 
-/* ---------- Materials mini-form ---------- */
+/* ---------- Kostenarten mini-form ---------- */
 
-function renderMaterialRows(){
-  var list = $("#materials-list");
-  if(state.modalMaterials.length===0){ list.innerHTML = '<div class="materials-empty">Noch kein Material erfasst.</div>'; return; }
+function kostenartBetrag(k){ return (parseFloat(k.stunden)||0) * (parseFloat(k.ansatz)||0); }
+function renderKostenartenRows(){
+  var list = $("#kostenarten-list");
+  if(state.modalKostenarten.length===0){ list.innerHTML = '<div class="materials-empty">Noch keine Kostenart erfasst.</div>'; return; }
   var html = "";
-  state.modalMaterials.forEach((m,i)=>{
-    var phase = m.phase || "beide";
+  state.modalKostenarten.forEach((k,i)=>{
     html += '<div class="material-row" data-idx="' + i + '">' +
       '<div class="mat-row1">' +
-      '<input class="mat-name" placeholder="z. B. Glas, Stahl, Beschläge" value="' + escapeHtml(m.name) + '">' +
-      '<button type="button" class="mat-remove" aria-label="Material entfernen">✕</button>' +
+      '<input class="ka-bez" placeholder="z. B. 4003 WS Brandschutz Stahl" value="' + escapeHtml(k.bezeichnung||"") + '">' +
+      '<button type="button" class="mat-remove" aria-label="Kostenart entfernen">✕</button>' +
       '</div><div class="mat-row2">' +
-      '<select class="mat-phase" title="Benötigt für"><option value="werkstatt"' + (phase==="werkstatt"?" selected":"") + '>Werkstatt</option><option value="montage"' + (phase==="montage"?" selected":"") + '>Montage</option><option value="beide"' + (phase==="beide"?" selected":"") + '>Werkstatt + Montage</option></select>' +
-      '<select class="mat-status"><option value="geliefert"' + (m.status==="geliefert"?" selected":"") + '>Geliefert</option><option value="ausstehend"' + (m.status==="ausstehend"?" selected":"") + '>Ausstehend</option></select>' +
-      '<span class="mat-date-wrap"><input type="text" class="mat-date-display date-input" readonly placeholder="TT.MM.JJJJ" value="' + (m.expectedDate ? isoToDisplay(m.expectedDate) : "") + '"><input type="hidden" class="mat-date" value="' + (m.expectedDate||"") + '"></span>' +
-      '<button type="button" class="mat-pdf-btn" title="Auftragsbestätigung (PDF) einlesen">📄</button>' +
-      '<input type="file" accept="application/pdf" class="mat-pdf-input" style="display:none;">' +
+      '<input type="number" min="0" step="0.1" class="ka-std" placeholder="Std." value="' + (k.stunden!=null&&k.stunden!==""?k.stunden:"") + '">' +
+      '<input type="number" min="0" step="0.05" class="ka-ansatz" placeholder="Fr./Std" value="' + (k.ansatz!=null&&k.ansatz!==""?k.ansatz:"") + '">' +
+      '<span style="font-size:12px;color:var(--text-muted);align-self:center;white-space:nowrap;">' + fmtChf(kostenartBetrag(k)) + '</span>' +
       '</div></div>';
   });
   list.innerHTML = html;
 }
-$("#add-material-btn").addEventListener("click", ()=>{ state.modalMaterials.push({name:"",status:"ausstehend",expectedDate:"",phase:"beide"}); renderMaterialRows(); });
-$("#materials-list").addEventListener("click", e=>{
-  var pdfBtn = e.target.closest(".mat-pdf-btn");
-  if(pdfBtn){ pdfBtn.closest(".material-row").querySelector(".mat-pdf-input").click(); return; }
+$("#add-kostenart-btn").addEventListener("click", ()=>{ state.modalKostenarten.push({bezeichnung:"",stunden:"",ansatz:""}); renderKostenartenRows(); });
+$("#kostenarten-list").addEventListener("click", e=>{
   var btn = e.target.closest(".mat-remove"); if(!btn) return;
   var idx = Number(btn.closest(".material-row").dataset.idx);
-  state.modalMaterials.splice(idx,1); renderMaterialRows();
+  state.modalKostenarten.splice(idx,1); renderKostenartenRows();
 });
-$("#materials-list").addEventListener("change", async e=>{
-  if(!e.target.classList.contains("mat-pdf-input")) return;
-  var file = e.target.files[0]; if(!file) return;
-  var row = e.target.closest(".material-row");
-  var idx = Number(row.dataset.idx);
-  var btn = row.querySelector(".mat-pdf-btn");
-  btn.classList.add("busy"); btn.textContent = "…";
-  try{
-    var result = await extractLieferdatumFromPdf(file);
-    if(result){
-      state.modalMaterials[idx].expectedDate = result.iso;
-      state.modalMaterials[idx].status = "ausstehend";
-      renderMaterialRows();
-      toast((result.approx ? "Liefertermin (Woche) erkannt: " : "Liefertermin erkannt: ") + isoToDisplay(result.iso) + (result.approx ? " (Montag dieser Woche — bitte prüfen)" : ""));
-    }else{
-      toast("Kein Liefertermin im PDF gefunden — bitte manuell eintragen.");
-    }
-  }catch(err){
-    console.error(err);
-    toast("PDF-Lesefehler: " + (err && err.message ? err.message : err));
-  }finally{
-    e.target.value = "";
-  }
-});
-$("#materials-list").addEventListener("input", e=>{
+$("#kostenarten-list").addEventListener("input", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
-  var idx = Number(row.dataset.idx); if(!state.modalMaterials[idx]) return;
-  if(e.target.classList.contains("mat-name")) state.modalMaterials[idx].name = e.target.value;
-  if(e.target.classList.contains("mat-date")){
-    state.modalMaterials[idx].expectedDate = e.target.value;
+  var idx = Number(row.dataset.idx); if(!state.modalKostenarten[idx]) return;
+  if(e.target.classList.contains("ka-bez")) state.modalKostenarten[idx].bezeichnung = e.target.value;
+  if(e.target.classList.contains("ka-std")) state.modalKostenarten[idx].stunden = e.target.value;
+  if(e.target.classList.contains("ka-ansatz")) state.modalKostenarten[idx].ansatz = e.target.value;
+  if(e.target.classList.contains("ka-std") || e.target.classList.contains("ka-ansatz")){
+    var betragEl = row.querySelector(".mat-row2 span");
+    if(betragEl) betragEl.textContent = fmtChf(kostenartBetrag(state.modalKostenarten[idx]));
   }
-});
-$("#materials-list").addEventListener("change", e=>{
-  var row = e.target.closest(".material-row"); if(!row) return;
-  var idx = Number(row.dataset.idx); if(!state.modalMaterials[idx]) return;
-  if(e.target.classList.contains("mat-status")) state.modalMaterials[idx].status = e.target.value;
-  if(e.target.classList.contains("mat-phase")) state.modalMaterials[idx].phase = e.target.value;
 });
 
 function renderTodoRows(){
@@ -4250,22 +4224,39 @@ $("#todos-list").addEventListener("change", e=>{
 var backdrop = $("#modal-backdrop");
 var form = $("#order-form");
 
+function populateKundeSelect(selectedId){
+  var sel = $("#f-kunde");
+  var sorted = state.kunden.slice().sort((a,b)=>(a.firma||"").localeCompare(b.firma||""));
+  sel.innerHTML = '<option value="" disabled' + (selectedId?'':' selected') + '>Kunde wählen…</option>' +
+    sorted.map(k=>'<option value="' + k.id + '"' + (k.id===selectedId?' selected':'') + '>' + escapeHtml(k.firma) + '</option>').join("") +
+    '<option value="__new__">+ Neuer Kunde…</option>';
+}
+$("#f-kunde").addEventListener("change", e=>{
+  var isNew = e.target.value === "__new__";
+  $("#f-kunde-new-box").style.display = isNew ? "block" : "none";
+  if(isNew) setTimeout(()=>$("#f-kunde-firma").focus(),30);
+});
+
 function openModal(order, prefillDate){
   state.editingId = order ? order.id : null;
   $("#modal-title").textContent = order ? "Auftrag bearbeiten" : "Neuer Auftrag";
   $("#f-orderNumber").value = order ? order.orderNumber : "";
-  $("#f-customer").value = order ? order.customer : "";
+  populateKundeSelect(order ? order.kundeId : null);
+  $("#f-kunde-new-box").style.display = "none";
+  $("#f-kunde-firma").value = ""; $("#f-kunde-strasse").value = ""; $("#f-kunde-plz").value = ""; $("#f-kunde-ort").value = ""; $("#f-kunde-kontakt").value = "";
   $("#f-description").value = order ? (order.description||"") : "";
+  $("#f-bkp").value = order ? (order.bkp||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
-  $("#f-completed").checked = order ? !!order.completed : false;
+  $("#f-status").value = order ? (order.status || (order.completed ? "abgeschlossen" : "fabrikation")) : "fabrikation";
+  $("#f-auftragswert").value = (order && order.auftragswert) ? order.auftragswert : "";
   $("#f-productionStart").value = order ? (order.productionStart||"") : (prefillDate || "");
   $("#f-assemblyDate").value = order ? (order.assemblyDate||"") : "";
   $("#f-productionStart-display").value = isoToDisplay($("#f-productionStart").value);
   $("#f-assemblyDate-display").value = isoToDisplay($("#f-assemblyDate").value);
   updateWeekHint("#f-productionStart", "#f-productionStart-week");
   updateWeekHint("#f-assemblyDate", "#f-assemblyDate-week");
-  state.modalMaterials = order ? JSON.parse(JSON.stringify(orderMaterials(order))) : [{name:"",status:"ausstehend",expectedDate:"",phase:"beide"}];
-  renderMaterialRows();
+  state.modalKostenarten = order ? JSON.parse(JSON.stringify(Array.isArray(order.kostenarten)?order.kostenarten:[])) : [];
+  renderKostenartenRows();
   state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
   renderTodoRows();
   $("#delete-btn").style.display = order ? "inline-block" : "none";
@@ -4283,28 +4274,52 @@ backdrop.addEventListener("click", e=>{ if(e.target===backdrop) closeModal(); })
 form.addEventListener("submit", async e=>{
   e.preventDefault();
   var orderNumber = $("#f-orderNumber").value.trim();
-  var customer = $("#f-customer").value.trim();
-  if(!orderNumber || !customer) return;
-  var materials = state.modalMaterials
-    .map(m=>({ name:(m.name||"").trim(), status:m.status, expectedDate:m.expectedDate||"", phase: m.phase||"beide" }))
-    .filter(m=>m.name.length>0);
+  var kundeSelVal = $("#f-kunde").value;
+  if(!orderNumber || !kundeSelVal){ toast("Bitte Auftragsnummer und Kunde angeben."); return; }
+  var kostenarten = state.modalKostenarten
+    .map(k=>{ var stunden = parseFloat(k.stunden)||0, ansatz = parseFloat(k.ansatz)||0; return { bezeichnung:(k.bezeichnung||"").trim(), stunden: stunden, ansatz: ansatz, betrag: Math.round(stunden*ansatz*100)/100 }; })
+    .filter(k=>k.bezeichnung.length>0);
   var todos = state.modalTodos
     .map(t=>({ text:(t.text||"").trim(), done: !!t.done, dueDate: t.dueDate||"" }))
     .filter(t=>t.text.length>0);
-  var payload = {
-    orderNumber, customer,
-    description: $("#f-description").value.trim(),
-    workshop: $("#f-workshop").value,
-    completed: $("#f-completed").checked,
-    productionStart: $("#f-productionStart").value,
-    assemblyDate: $("#f-assemblyDate").value,
-    materials,
-    todos,
-    updatedAt: Date.now()
-  };
   var submitBtn = form.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   try{
+    var kundeId = kundeSelVal, customer;
+    if(kundeSelVal === "__new__"){
+      var firma = $("#f-kunde-firma").value.trim();
+      if(!firma){ toast("Bitte Firma des neuen Kunden angeben."); submitBtn.disabled = false; return; }
+      var kundePayload = {
+        firma: firma,
+        strasse: $("#f-kunde-strasse").value.trim(),
+        plz: $("#f-kunde-plz").value.trim(),
+        ort: $("#f-kunde-ort").value.trim(),
+        kontakt: $("#f-kunde-kontakt").value.trim(),
+        telefon: "", email: "",
+        createdAt: Date.now()
+      };
+      var newKundeRef = await addDoc(collection(db, KUNDEN_COLLECTION), kundePayload);
+      kundeId = newKundeRef.id;
+      customer = firma;
+    }else{
+      var kObj = state.kunden.find(x=>x.id===kundeSelVal);
+      customer = kObj ? kObj.firma : "";
+    }
+    var status = $("#f-status").value;
+    var payload = {
+      orderNumber: orderNumber, kundeId: kundeId, customer: customer,
+      description: $("#f-description").value.trim(),
+      bkp: $("#f-bkp").value.trim(),
+      workshop: $("#f-workshop").value,
+      status: status,
+      completed: status !== "fabrikation",
+      auftragswert: parseFloat($("#f-auftragswert").value) || 0,
+      productionStart: $("#f-productionStart").value,
+      assemblyDate: $("#f-assemblyDate").value,
+      kostenarten: kostenarten,
+      todos: todos,
+      updatedAt: Date.now()
+    };
     if(state.editingId){
       await updateDoc(doc(db, COLLECTION, state.editingId), payload);
     }else{
