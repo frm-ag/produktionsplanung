@@ -613,16 +613,12 @@
   #lager-page main{
     flex:1;
     overflow-y:auto;
-    padding:16px 16px 90px;
+    padding:16px 16px 24px;
   }
-  #lager-page nav.tabs{
-    position:sticky;
-    bottom:0;
-    display:flex;
-    background:var(--panel);
-    border-top:1px solid var(--border);
-    flex-shrink:0;
-  }
+  /* Nur noch der Artikel-Katalog wird gebraucht (kein Lagerbestand mehr) – die
+     restlichen Reiter (Übersicht/Scan/Verlauf/Bestellliste/Lager-Tools) bleiben im Code
+     bestehen, werden aber nicht mehr angezeigt/erreichbar. */
+  #lager-page nav.tabs{ display:none !important; }
   #lager-page nav.tabs button{
     flex:1;
     background:none;
@@ -690,6 +686,21 @@
   #lager-page .tag-card .stock small{display:block;font-size:9px;color:var(--text-muted);font-weight:400;}
   #lager-page .tag-card.low .stock{color:var(--danger);}
 
+  /* Desktop/PC: mehr Breite nutzen statt im schmalen Handy-Format zu bleiben, und die
+     Artikel als Raster statt als einspaltige Liste zeigen. */
+  @media (min-width: 820px){
+    #lager-page #lagerApp{ max-width:1180px; }
+    #lager-page main{ padding:24px 28px 32px; }
+    #lager-page #articleList{
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+      gap:10px;
+    }
+    #lager-page .tag-card{ margin-bottom:0; }
+    #lager-page .btn-row{ max-width:480px; }
+    #lager-page .search-bar{ max-width:480px; }
+  }
+
   #lager-page .filter-row{
     display:flex;
     gap:6px;
@@ -730,6 +741,7 @@
   #lager-page .search-bar::placeholder{color:var(--text-muted);}
 
   #lager-page .fab{
+    display:none !important;
     position:fixed;
     max-width:480px;
     margin:0 auto;
@@ -1139,7 +1151,7 @@
           <button class="side-item sub" data-view="table">Übersicht</button>
           <button class="side-item sub" data-view="kunden">Kunden</button>
           <button class="side-item sub" data-view="staff">Personalplanung</button>
-          <button class="side-item sub" data-view="lager">Artikelsammlung</button>
+          <button class="side-item sub" data-view="lager">Artikel</button>
         </div>
       </div>
 
@@ -1527,7 +1539,7 @@
     <div class="brand">
       <div style="display:flex;align-items:center;gap:10px;">
         <img src="logo-mark.png" alt="FR Metallbau AG" style="height:36px;width:auto;">
-        <h1>MAT<span>.</span>LAGER</h1>
+        <h1>ARTIKEL</h1>
       </div>
       <div class="count" id="itemCount"><span class="conn-dot" id="lagerConnDot"></span>0 Artikel</div>
     </div>
@@ -1874,6 +1886,15 @@
         </div>
       </div>
       <div class="field">
+        <label>Artikel (aus Artikel-Katalog)</label>
+        <div class="materials-box">
+          <div id="artikel-list"></div>
+          <datalist id="artikel-stamm-list"></datalist>
+          <button type="button" class="add-material-btn" id="add-artikel-btn">+ Artikel hinzufügen</button>
+          <div id="artikel-total" style="font-size:12px;color:var(--text-muted);text-align:right;margin-top:6px;"></div>
+        </div>
+      </div>
+      <div class="field">
         <label>To-Dos</label>
         <div class="todos-box">
           <div id="todos-list"></div>
@@ -1944,6 +1965,9 @@ const TERMINSERIEN_COLLECTION = "terminserien";
 const KUNDEN_COLLECTION = "kunden";
 const KOSTENARTEN_STAMM_COLLECTION = "kostenarten";
 const KOSTENSTELLEN_COLLECTION = "kostenstellen";
+// Artikel-Katalog: dieselbe Collection wie im Artikel-Reiter (Modul "mat-lager"), hier nur
+// lesend abonniert, um sie auf einen Auftrag buchen zu können.
+const ARTICLES_COLLECTION = "articles";
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -1993,6 +2017,7 @@ let unsubTerminserien = null;
 let unsubKunden = null;
 let unsubKostenartenStamm = null;
 let unsubKostenstellen = null;
+let unsubArtikelStamm = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -2018,6 +2043,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubKunden) unsubKunden();
     if(unsubKostenartenStamm) unsubKostenartenStamm();
     if(unsubKostenstellen) unsubKostenstellen();
+    if(unsubArtikelStamm) unsubArtikelStamm();
     subscribeOrders();
     subscribeStaff();
     subscribeAssignments();
@@ -2030,6 +2056,7 @@ onAuthStateChanged(auth, async user => {
     subscribeKunden();
     subscribeKostenartenStamm();
     subscribeKostenstellen();
+    subscribeArtikelStamm();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
   }else{
@@ -2047,6 +2074,7 @@ onAuthStateChanged(auth, async user => {
     if(unsubKunden) unsubKunden();
     if(unsubKostenartenStamm) unsubKostenartenStamm();
     if(unsubKostenstellen) unsubKostenstellen();
+    if(unsubArtikelStamm) unsubArtikelStamm();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
     $('#app').style.display = 'none';
@@ -2105,6 +2133,13 @@ function subscribeKostenstellen(){
   const q = query(collection(db, KOSTENSTELLEN_COLLECTION), orderBy('bezeichnung'));
   unsubKostenstellen = onSnapshot(q, snap => {
     state.kostenstellen = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => { console.error(err); });
+}
+
+function subscribeArtikelStamm(){
+  unsubArtikelStamm = onSnapshot(collection(db, ARTICLES_COLLECTION), snap => {
+    state.artikelStamm = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     render();
   }, err => { console.error(err); });
 }
@@ -2230,7 +2265,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -4720,6 +4755,74 @@ $("#kostenarten-list").addEventListener("input", e=>{
   }
 });
 
+/* ---------- Artikel mini-form: Positionen aus dem Artikel-Katalog auf den Auftrag buchen ---------- */
+
+function artikelBetrag(a){ return (parseFloat(a.menge)||0) * (parseFloat(a.verkaufspreis)||0); }
+function renderArtikelRows(){
+  var list = $("#artikel-list");
+  var dl = $("#artikel-stamm-list");
+  if(dl){
+    dl.innerHTML = state.artikelStamm.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); })
+      .map(function(a){ return '<option value="' + escapeHtml((a.vendorArticleNumber?a.vendorArticleNumber+" – ":"")+a.name) + '">'; }).join("");
+  }
+  if(state.modalArtikel.length===0){
+    list.innerHTML = '<div class="materials-empty">Noch kein Artikel erfasst.</div>';
+    if($("#artikel-total")) $("#artikel-total").textContent = "";
+    return;
+  }
+  var html = "";
+  state.modalArtikel.forEach(function(a,i){
+    html += '<div class="material-row" data-idx="' + i + '">' +
+      '<div class="mat-row1">' +
+      '<input class="art-bez" list="artikel-stamm-list" placeholder="Artikel suchen (Name oder Art. Nr.)" value="' + escapeHtml(a.bezeichnung||"") + '">' +
+      '<button type="button" class="mat-remove" aria-label="Artikel entfernen">✕</button>' +
+      '</div><div class="mat-row2">' +
+      '<input type="number" min="0" step="1" class="art-menge" placeholder="Menge" value="' + (a.menge!=null&&a.menge!==""?a.menge:"") + '">' +
+      '<input type="number" min="0" step="0.01" class="art-vk" placeholder="VK Fr./Stk" value="' + (a.verkaufspreis!=null&&a.verkaufspreis!==""?a.verkaufspreis:"") + '">' +
+      '<span style="font-size:12px;color:var(--text-muted);align-self:center;white-space:nowrap;">' + fmtChf(artikelBetrag(a)) + '</span>' +
+      '</div></div>';
+  });
+  list.innerHTML = html;
+  var total = state.modalArtikel.reduce(function(sum,a){ return sum + artikelBetrag(a); }, 0);
+  if($("#artikel-total")) $("#artikel-total").textContent = "Total Artikel: " + fmtChf(total);
+}
+$("#add-artikel-btn").addEventListener("click", ()=>{ state.modalArtikel.push({artikelId:"",bezeichnung:"",menge:"",verkaufspreis:"",einkaufspreis:""}); renderArtikelRows(); });
+$("#artikel-list").addEventListener("click", e=>{
+  var btn = e.target.closest(".mat-remove"); if(!btn) return;
+  var idx = Number(btn.closest(".material-row").dataset.idx);
+  state.modalArtikel.splice(idx,1); renderArtikelRows();
+});
+$("#artikel-list").addEventListener("input", e=>{
+  var row = e.target.closest(".material-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalArtikel[idx]) return;
+  if(e.target.classList.contains("art-bez")){
+    state.modalArtikel[idx].bezeichnung = e.target.value;
+    // Beim Auswählen eines Artikels aus dem Katalog Art.Nr/Preise + Artikel-ID übernehmen.
+    var val = e.target.value.trim().toLowerCase();
+    var match = state.artikelStamm.find(function(s){
+      var label = ((s.vendorArticleNumber?s.vendorArticleNumber+" – ":"")+s.name).trim().toLowerCase();
+      return label === val || (s.name||"").trim().toLowerCase() === val;
+    });
+    if(match){
+      state.modalArtikel[idx].artikelId = match.id;
+      state.modalArtikel[idx].bezeichnung = (match.vendorArticleNumber?match.vendorArticleNumber+" – ":"")+match.name;
+      var vk = (match.verkaufspreis!=null && match.verkaufspreis!=="") ? match.verkaufspreis : match.price;
+      if(vk!=null && !state.modalArtikel[idx].verkaufspreis) state.modalArtikel[idx].verkaufspreis = vk;
+      if(match.einkaufspreis!=null) state.modalArtikel[idx].einkaufspreis = match.einkaufspreis;
+      renderArtikelRows();
+      return;
+    }
+  }
+  if(e.target.classList.contains("art-menge")) state.modalArtikel[idx].menge = e.target.value;
+  if(e.target.classList.contains("art-vk")) state.modalArtikel[idx].verkaufspreis = e.target.value;
+  if(e.target.classList.contains("art-menge") || e.target.classList.contains("art-vk")){
+    var betragEl = row.querySelector(".mat-row2 span");
+    if(betragEl) betragEl.textContent = fmtChf(artikelBetrag(state.modalArtikel[idx]));
+    var total = state.modalArtikel.reduce(function(sum,a){ return sum + artikelBetrag(a); }, 0);
+    if($("#artikel-total")) $("#artikel-total").textContent = "Total Artikel: " + fmtChf(total);
+  }
+});
+
 function renderTodoRows(){
   var list = $("#todos-list");
   if(state.modalTodos.length===0){ list.innerHTML = '<div class="todos-empty">Noch kein To-Do erfasst.</div>'; return; }
@@ -4913,6 +5016,8 @@ function openModal(order, prefillDate){
   $("#voka-import-input").value = "";
   state.modalKostenarten = order ? JSON.parse(JSON.stringify(Array.isArray(order.kostenarten)?order.kostenarten:[])) : [];
   renderKostenartenRows();
+  state.modalArtikel = order ? JSON.parse(JSON.stringify(Array.isArray(order.artikelPositionen)?order.artikelPositionen:[])) : [];
+  renderArtikelRows();
   state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
   renderTodoRows();
   $("#delete-btn").style.display = order ? "inline-block" : "none";
@@ -4990,6 +5095,9 @@ form.addEventListener("submit", async e=>{
   var kostenarten = state.modalKostenarten
     .map(k=>{ var stunden = parseFloat(k.stunden)||0, ansatz = parseFloat(k.ansatz)||0; return { bezeichnung:(k.bezeichnung||"").trim(), stunden: stunden, ansatz: ansatz, betrag: Math.round(stunden*ansatz*100)/100 }; })
     .filter(k=>k.bezeichnung.length>0);
+  var artikelPositionen = state.modalArtikel
+    .map(a=>{ var menge = parseFloat(a.menge)||0, vk = parseFloat(a.verkaufspreis)||0, ek = parseFloat(a.einkaufspreis)||0; return { artikelId: a.artikelId||"", bezeichnung:(a.bezeichnung||"").trim(), menge: menge, verkaufspreis: vk, einkaufspreis: ek, betrag: Math.round(menge*vk*100)/100 }; })
+    .filter(a=>a.bezeichnung.length>0);
   var todos = state.modalTodos
     .map(t=>({ text:(t.text||"").trim(), done: !!t.done, dueDate: t.dueDate||"" }))
     .filter(t=>t.text.length>0);
@@ -5032,6 +5140,7 @@ form.addEventListener("submit", async e=>{
       auftragswert: parseFloat($("#f-auftragswert").value) || 0,
       materialPlan: parseFloat($("#f-materialplan").value) || 0,
       kostenarten: kostenarten,
+      artikelPositionen: artikelPositionen,
       todos: todos,
       updatedAt: Date.now()
     };
@@ -5243,16 +5352,18 @@ const fbAppSecondary = initializeApp(firebaseConfig, 'Secondary');
 const authSecondary = getAuth(fbAppSecondary);
 
 let articles = [];
+let artikelgruppen = [];
 let movements = [];
 let profiles = [];
 let rolesList = [];
 let wishlist = [];
 let imports = [];
 let notifSettings = null;
-let currentTab = 'dashboard';
+let currentTab = 'articles';
 let qrScanStream = null;
 let connected = false;
 let unsubArticles = null;
+let unsubArtikelgruppen = null;
 let unsubMovements = null;
 let unsubProfiles = null;
 let unsubRoles = null;
@@ -5286,6 +5397,7 @@ function authEmailToUsername(email){
 // Login läuft zentral über die Produktionsplanung (gemeinsamer Account/Login-Bildschirm).
 $('#logoutBtn').addEventListener('click', async ()=>{
   if(unsubArticles) unsubArticles();
+  if(unsubArtikelgruppen) unsubArtikelgruppen();
   if(unsubMovements) unsubMovements();
   await signOut(auth);
 });
@@ -5331,6 +5443,7 @@ onAuthStateChanged(auth, async user => {
     $('#navAdmin').style.display = 'none';
     $('#lagerApp').style.display = 'none';
     if(unsubArticles) unsubArticles();
+    if(unsubArtikelgruppen) unsubArtikelgruppen();
     if(unsubMovements) unsubMovements();
     if(unsubProfiles) unsubProfiles();
     if(unsubRoles) unsubRoles();
@@ -5347,6 +5460,11 @@ function startListeners(){
     setConn(true);
     render();
   }, err => { setConn(false); toast('Verbindung zur Datenbank fehlgeschlagen'); console.error(err); });
+
+  unsubArtikelgruppen = onSnapshot(query(collection(db, 'artikelgruppen'), orderBy('name')), snap => {
+    artikelgruppen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  }, err => { console.error(err); });
 
   unsubMovements = onSnapshot(query(collection(db, 'movements'), orderBy('timestamp', 'desc')), snap => {
     movements = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -5439,14 +5557,14 @@ function renderDashboard(){
 }
 
 function tagCardHtml(a){
+  const vk = (a.verkaufspreis!=null && a.verkaufspreis!=='') ? a.verkaufspreis : a.price;
   return `
-  <div class="tag-card ${isLow(a)?'low':''}" data-id="${a.id}">
-    ${a.imageUrl ? `<img src="${a.imageUrl}" style="width:42px;height:42px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ''}
+  <div class="tag-card" data-id="${a.id}">
     <div class="info">
       <div class="name">${escapeHtml(a.name)}</div>
-      <div class="meta">${a.id} · ${escapeHtml(a.location||'—')}</div>
+      <div class="meta">${escapeHtml(a.vendorArticleNumber||'—')} · ${escapeHtml(a.category||'Sonstiges')}</div>
     </div>
-    <div class="stock">${a.stock}<small>Min. ${a.minStock}</small></div>
+    <div class="stock">${vk ? 'CHF ' + Number(vk).toFixed(2) : '—'}</div>
   </div>`;
 }
 function bindTagCards(){
@@ -5456,7 +5574,7 @@ function bindTagCards(){
 }
 
 function renderArticles(){
-  const categories = [...new Set(articles.map(a => a.category || 'Sonstiges'))].sort();
+  const categories = allCategoryNames();
   let html = '';
   if(isAdmin){
     html += `<div class="btn-row" style="margin-bottom:14px;">
@@ -5464,24 +5582,24 @@ function renderArticles(){
       <button class="btn btn-secondary btn-block" id="importExcelBtn">Aus Excel importieren</button>
     </div>`;
   }
-  html += `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name, ID oder Art. Nr. …">`;
-  if(categories.length > 1){
-    html += `<div class="filter-row" id="catFilterRow">
+  html += `<input class="search-bar" id="searchInput" type="text" placeholder="Suche nach Name oder Art. Nr. …">`;
+  html += `<div class="filter-row" id="catFilterRow">
       <button class="chip-filter active" data-cat="__all">Alle</button>
       ${categories.map(c => `<button class="chip-filter" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}
+      ${isAdmin ? `<button class="chip-filter" id="manageGroupsBtn" style="border-style:dashed;" title="Artikelgruppen verwalten">+ Gruppe</button>` : ''}
     </div>`;
-  }
   html += `<div id="articleList"></div>`;
   main.innerHTML = html;
   if(isAdmin){
     $('#addArticleBtn').onclick = openAddArticleSheet;
     $('#importExcelBtn').onclick = openImportExcelSheet;
+    $('#manageGroupsBtn').onclick = openManageGroupsSheet;
   }
   let activeCat = '__all';
   const list = () => {
     const q = ($('#searchInput').value||'').toLowerCase();
     const filtered = articles.filter(a => {
-      const matchesQuery = a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.vendorArticleNumber||'').toLowerCase().includes(q);
+      const matchesQuery = (a.name||'').toLowerCase().includes(q) || (a.vendorArticleNumber||'').toLowerCase().includes(q);
       const matchesCat = activeCat === '__all' || (a.category || 'Sonstiges') === activeCat;
       return matchesQuery && matchesCat;
     });
@@ -5491,17 +5609,58 @@ function renderArticles(){
     bindTagCards();
   };
   $('#searchInput').addEventListener('input', list);
-  if(categories.length > 1){
-    $('#catFilterRow').querySelectorAll('.chip-filter').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        $('#catFilterRow').querySelectorAll('.chip-filter').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        activeCat = btn.dataset.cat;
-        list();
-      });
+  $('#catFilterRow').querySelectorAll('.chip-filter[data-cat]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      $('#catFilterRow').querySelectorAll('.chip-filter[data-cat]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      activeCat = btn.dataset.cat;
+      list();
     });
-  }
+  });
   list();
+}
+// Eigene, direkt im Artikel-Reiter erreichbare Verwaltung der Artikelgruppen: anlegen
+// (auch ohne gleich einen Artikel zu erfassen) und löschen. Artikel, die bereits einer
+// gelöschten Gruppe zugeordnet sind, behalten ihre Kategorie-Bezeichnung einfach weiter
+// (sie taucht dann wieder als abgeleitete Gruppe auf, bis sie umbenannt werden).
+function openManageGroupsSheet(){
+  const render = () => {
+    const names = allCategoryNames();
+    sheet.querySelector('#groupsList').innerHTML = names.length
+      ? names.map(n => `<div class="material-row" style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;">${escapeHtml(n)}</div>
+          <button type="button" class="mat-remove" data-group="${escapeHtml(n)}" title="Gruppe löschen">✕</button>
+        </div>`).join('')
+      : `<div style="font-size:12.5px;color:var(--text-muted);">Noch keine Artikelgruppen.</div>`;
+    sheet.querySelectorAll('[data-group]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const name = btn.dataset.group;
+        const inUse = articles.filter(a=>(a.category||'Sonstiges')===name).length;
+        if(inUse>0 && !confirm('"' + name + '" wird noch bei ' + inUse + ' Artikel(n) verwendet. Gruppe trotzdem aus der Liste entfernen? Die Artikel behalten die Bezeichnung.')) return;
+        const g = artikelgruppen.find(x=>(x.name||'').toLowerCase()===name.toLowerCase());
+        if(g){ try{ await deleteDoc(doc(db,'artikelgruppen',g.id)); }catch(e){ console.error(e); } }
+        render();
+      };
+    });
+  };
+  const sheet = buildSheet(`
+    <div class="sheet-head"><h3>Artikelgruppen</h3><button class="x" data-close>×</button></div>
+    <div id="groupsList" style="margin-bottom:14px;"></div>
+    <label>Neue Gruppe</label>
+    <input type="text" id="f-new-group" placeholder="z. B. Dichtungen">
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-block" data-close>Schliessen</button>
+      <button class="btn btn-primary btn-block" id="addGroupBtn">+ Gruppe anlegen</button>
+    </div>
+  `);
+  sheet.querySelector('#addGroupBtn').onclick = async ()=>{
+    const name = sheet.querySelector('#f-new-group').value.trim();
+    if(!name){ toast('Bitte einen Namen eingeben'); return; }
+    await ensureArtikelgruppe(name);
+    sheet.querySelector('#f-new-group').value = '';
+    render();
+  };
+  render();
 }
 
 function renderHistory(){
@@ -6182,11 +6341,9 @@ function openAssignBlankTagSheet(scannedId){
 const IMPORT_COLUMN_ALIASES = {
   name: ['name', 'artikelname', 'bezeichnung', 'artikel'],
   category: ['kategorie', 'category', 'gruppe'],
-  vendorArticleNumber: ['artnr', 'artnrhaendler', 'artikelnummer', 'haendlernummer', 'lieferantennummer', 'vendornumber', 'artnrhändler'],
-  price: ['preis', 'price', 'chf', 'verkaufspreis', 'einkaufspreis'],
-  location: ['standort', 'lagerort', 'ort', 'location', 'lager'],
-  stock: ['bestand', 'menge', 'anzahl', 'stock', 'startbestand'],
-  minStock: ['mindestbestand', 'minbestand', 'min', 'minstock']
+  vendorArticleNumber: ['artnr', 'artnrhaendler', 'artikelnummer', 'haendlernummer', 'lieferantennummer', 'vendornumber', 'artnrhändler', 'nummer'],
+  verkaufspreis: ['verkaufspreis', 'vk', 'preis', 'price', 'chf'],
+  einkaufspreis: ['einkaufspreis', 'ek']
 };
 function normalizeHeaderKey(key){
   return String(key||'').toLowerCase().replace(/[.\s_-]/g, '');
@@ -6211,7 +6368,7 @@ function openImportExcelSheet(){
   const sheet = buildSheet(`
     <div class="sheet-head"><h3>Artikel aus Excel importieren</h3><button class="x" data-close>×</button></div>
     <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
-      Erste Zeile muss Spaltenüberschriften enthalten. Erkannte Spalten (Gross-/Kleinschreibung egal): <strong>Name</strong> (Pflicht), Kategorie, Art. Nr. Händler, Standort, Bestand, Mindestbestand, Preis.
+      Erste Zeile muss Spaltenüberschriften enthalten. Erkannte Spalten (Gross-/Kleinschreibung egal): <strong>Name</strong> (Pflicht), Kategorie, Art. Nr., Einkaufspreis, Verkaufspreis.
     </div>
     <input type="file" id="importFile" accept=".xlsx,.xls,.csv">
     <div id="importPreview"></div>
@@ -6255,16 +6412,16 @@ function openImportExcelSheet(){
                 name: String(r.name).trim(),
                 category,
                 vendorArticleNumber: r.vendorArticleNumber ? String(r.vendorArticleNumber).trim() : '',
-                price: r.price ? parseFloat(String(r.price).replace(',', '.')) || 0 : 0,
-                location: r.location ? String(r.location).trim() : '',
-                stock: parseInt(r.stock) || 0,
-                minStock: parseInt(r.minStock) || 0,
+                einkaufspreis: r.einkaufspreis ? parseFloat(String(r.einkaufspreis).replace(',', '.')) || 0 : 0,
+                verkaufspreis: r.verkaufspreis ? parseFloat(String(r.verkaufspreis).replace(',', '.')) || 0 : 0,
                 createdAt: Date.now(),
                 importBatchId: batchId
               }
             };
           });
           await Promise.all(toCreate.map(item => setDoc(doc(db, 'articles', item.id), item.data)));
+          const newCats = [...new Set(toCreate.map(item => item.data.category))];
+          await Promise.all(newCats.map(c => ensureArtikelgruppe(c)));
           await setDoc(doc(db, 'imports', batchId), {
             fileName: file.name,
             importedAt: Date.now(),
@@ -6274,7 +6431,6 @@ function openImportExcelSheet(){
           });
           closeSheet();
           toast(toCreate.length + ' Artikel importiert');
-          openPrintImportedTagsSheet(toCreate);
         }catch(e){
           toast('Import fehlgeschlagen: ' + (e.code || e.message));
           console.error(e);
@@ -6430,8 +6586,15 @@ function getSelectedImageFile(sheet){
   return sheet._selectedImageFile || null;
 }
 
+// Artikelgruppen = eigenständig gepflegte Liste (artikelgruppen-Collection), ergänzt um
+// Kategorien, die nur noch auf alten Artikeln stehen (z.B. aus der Zeit vor dieser Liste).
+function allCategoryNames(){
+  const fromGroups = artikelgruppen.map(g => g.name);
+  const fromArticles = articles.map(a => a.category || 'Sonstiges');
+  return [...new Set([...fromGroups, ...fromArticles])].sort((a,b)=>a.localeCompare(b));
+}
 function categorySelectHtml(selectedValue){
-  const categories = [...new Set(articles.map(a => a.category || 'Sonstiges'))].sort();
+  const categories = allCategoryNames();
   const isKnown = selectedValue && categories.includes(selectedValue);
   return `
     <select id="f-cat">
@@ -6457,69 +6620,58 @@ function getCategoryValue(sheet){
   }
   return sel.value;
 }
+// Legt eine Artikelgruppe im Stamm an, falls sie (unabhängig von Gross-/Kleinschreibung)
+// dort noch nicht existiert – damit auch über "+ Neue Kategorie…" im Artikel-Formular
+// erfasste Gruppen künftig in der Gruppen-Verwaltung auftauchen.
+async function ensureArtikelgruppe(name){
+  const n = (name||'').trim();
+  if(!n) return;
+  const exists = artikelgruppen.some(g => (g.name||'').toLowerCase() === n.toLowerCase());
+  if(exists) return;
+  try{ await addDoc(collection(db, 'artikelgruppen'), { name: n, createdAt: Date.now() }); }
+  catch(e){ console.error(e); }
+}
 
 function openAddArticleSheet(presetId){
   if(!isAdmin){ toast('Nur Admins können Artikel anlegen'); return; }
   const sheet = buildSheet(`
     <div class="sheet-head"><h3>Neuer Artikel</h3><button class="x" data-close>×</button></div>
-    ${presetId ? `<div class="stencil-id">TAG · ${escapeHtml(presetId)} (bereits gedruckt/vorhanden)</div>` : ''}
-    <label>Name</label>
+    <label>Art. Nr.</label>
+    <input type="text" id="f-vendor" placeholder="z. B. 123456-A">
+    <label>Bezeichnung</label>
     <input type="text" id="f-name" placeholder="z. B. Schrauben M6x30">
     <label>Kategorie</label>
     ${categorySelectHtml('')}
-    <label>Art. Nr. Händler <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    <input type="text" id="f-vendor" placeholder="z. B. 123456-A">
-    <label>Preis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    <input type="number" id="f-price" placeholder="z. B. 12.50" step="0.01" min="0">
-    <label>Standort</label>
-    <input type="text" id="f-loc" placeholder="z. B. Regal A2">
-    <label>Startbestand</label>
-    <input type="number" id="f-stock" value="0" min="0">
-    <label>Mindestbestand</label>
-    <input type="number" id="f-min" value="10" min="0">
-    <label>Bild <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    <div class="btn-row" style="margin-top:0;">
-      <button type="button" class="btn btn-secondary btn-block" id="btnCamera">📷 Foto aufnehmen</button>
-      <button type="button" class="btn btn-secondary btn-block" id="btnGallery">Aus Galerie</button>
-    </div>
-    <input type="file" id="f-image-camera" accept="image/*" capture="environment" style="display:none;">
-    <input type="file" id="f-image" accept="image/*" style="display:none;">
-    <div id="f-image-preview"></div>
+    <label>Einkaufspreis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="number" id="f-ek" placeholder="z. B. 8.50" step="0.01" min="0">
+    <label>Verkaufspreis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="number" id="f-vk" placeholder="z. B. 12.50" step="0.01" min="0">
     <div class="btn-row">
       <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
       <button class="btn btn-primary btn-block" id="saveArticle">Anlegen</button>
     </div>
   `);
   bindCategorySelect(sheet);
-  bindImagePreview(sheet);
-  sheet.querySelector('#btnCamera').onclick = ()=> sheet.querySelector('#f-image-camera').click();
-  sheet.querySelector('#btnGallery').onclick = ()=> sheet.querySelector('#f-image').click();
   sheet.querySelector('#saveArticle').onclick = async ()=>{
     const btn = sheet.querySelector('#saveArticle');
     const name = sheet.querySelector('#f-name').value.trim();
-    if(!name){ toast('Bitte einen Namen eingeben'); return; }
+    if(!name){ toast('Bitte eine Bezeichnung eingeben'); return; }
     const category = getCategoryValue(sheet) || 'Sonstiges';
     const newId = presetId || genArticleId(category);
     const article = {
       name,
       category,
       vendorArticleNumber: sheet.querySelector('#f-vendor').value.trim(),
-      price: parseFloat(sheet.querySelector('#f-price').value) || 0,
-      location: sheet.querySelector('#f-loc').value.trim(),
-      stock: parseInt(sheet.querySelector('#f-stock').value)||0,
-      minStock: parseInt(sheet.querySelector('#f-min').value)||0,
+      einkaufspreis: parseFloat(sheet.querySelector('#f-ek').value) || 0,
+      verkaufspreis: parseFloat(sheet.querySelector('#f-vk').value) || 0,
       createdAt: Date.now()
     };
     btn.disabled = true; btn.textContent = 'Speichere…';
     try{
-      const imageFile = getSelectedImageFile(sheet);
-      if(imageFile){
-        btn.textContent = 'Lade Bild hoch…';
-        article.imageUrl = await uploadArticleImage(newId, imageFile);
-      }
+      await ensureArtikelgruppe(category);
       await setDoc(doc(db, 'articles', newId), article);
       closeSheet();
-      openArticleDetail(newId, true);
+      toast('Artikel angelegt.');
     }catch(e){
       toast('Speichern fehlgeschlagen – Verbindung prüfen');
       btn.disabled = false; btn.textContent = 'Anlegen';
@@ -6531,42 +6683,15 @@ function openAddArticleSheet(presetId){
 function openArticleDetail(id, justCreated){
   const a = articles.find(x=>x.id===id);
   if(!a){ toast('Artikel nicht gefunden'); return; }
+  const ek = (a.einkaufspreis!=null && a.einkaufspreis!=='') ? a.einkaufspreis : null;
+  const vk = (a.verkaufspreis!=null && a.verkaufspreis!=='') ? a.verkaufspreis : a.price;
   const sheet = buildSheet(`
     <div class="sheet-head"><h3>${escapeHtml(a.name)}</h3><button class="x" data-close>×</button></div>
-    <div class="stencil-id">TAG · ${a.id}</div>
-    ${a.imageUrl ? `<img src="${a.imageUrl}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:12px;">` : ''}
-    ${justCreated ? `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">Artikel angelegt. Jetzt einen leeren NFC-Tag beschreiben oder den QR-Code ausdrucken und am Lagerplatz anbringen.</div>` : ''}
-    <div style="display:flex;gap:16px;align-items:flex-start;">
-      <div>
-        <div class="qr-box" id="qrHolder"></div>
-      </div>
-      <div style="flex:1;">
-        <button class="btn btn-secondary btn-block" id="writeNfcBtn" style="margin-bottom:8px;">Tag beschreiben (NFC)</button>
-        <button class="btn btn-secondary btn-block" id="printQrBtn" style="margin-bottom:8px;">QR-Code drucken</button>
-        <div style="font-size:11px;color:var(--text-muted);">Leeren Tag ans Handy halten, ID wird geschrieben.</div>
-      </div>
-    </div>
     <div class="detail-grid">
-      <div><div class="dlabel">Bestand</div><div class="dval">${a.stock}</div></div>
-      <div><div class="dlabel">Mindestbestand</div><div class="dval">${a.minStock}</div></div>
-      <div><div class="dlabel">Standort</div><div class="dval">${escapeHtml(a.location||'—')}</div></div>
+      <div><div class="dlabel">Art. Nr.</div><div class="dval">${escapeHtml(a.vendorArticleNumber||'—')}</div></div>
       <div><div class="dlabel">Kategorie</div><div class="dval">${escapeHtml(a.category||'—')}</div></div>
-      <div><div class="dlabel">Art. Nr. Händler</div><div class="dval">${escapeHtml(a.vendorArticleNumber||'—')}</div></div>
-      <div><div class="dlabel">Preis</div><div class="dval">${a.price ? 'CHF ' + a.price.toFixed(2) : '—'}</div></div>
-    </div>
-    <label style="text-align:center;">Buchung</label>
-    <div class="qty-stepper">
-      <button data-step="-1">−</button>
-      <div class="qty-val" id="qtyVal">1</div>
-      <button data-step="1">+</button>
-    </div>
-    <label>Person</label>
-    <input type="text" id="f-person" placeholder="Wer bezieht/liefert das Material?">
-    <label>Kommissionsnr. <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    <input type="text" id="f-komm" placeholder="z. B. Auftrag/Projekt-Nr.">
-    <div class="btn-row">
-      <button class="btn btn-danger btn-block" id="bookOut">Entnahme</button>
-      <button class="btn btn-success btn-block" id="bookIn">Einlagerung</button>
+      <div><div class="dlabel">Einkaufspreis</div><div class="dval">${ek ? 'CHF ' + Number(ek).toFixed(2) : '—'}</div></div>
+      <div><div class="dlabel">Verkaufspreis</div><div class="dval">${vk ? 'CHF ' + Number(vk).toFixed(2) : '—'}</div></div>
     </div>
     ${isAdmin ? `
     <div class="btn-row">
@@ -6575,35 +6700,13 @@ function openArticleDetail(id, justCreated){
     </div>` : ''}
   `);
 
-  // Buttons zuerst verknüpfen, damit ein Fehler bei QR/Storage sie nie blockiert.
-  let qty = 1;
-  const qtyVal = sheet.querySelector('#qtyVal');
-  sheet.querySelectorAll('[data-step]').forEach(btn=>{
-    btn.onclick = ()=>{
-      qty = Math.max(1, qty + parseInt(btn.dataset.step));
-      qtyVal.textContent = qty;
-    };
-  });
-
-  sheet.querySelector('#bookIn').onclick = async ()=>{
-    const person = sheet.querySelector('#f-person').value.trim();
-    const komm = sheet.querySelector('#f-komm').value.trim();
-    await book(a.id, 'in', qty, person, komm);
-  };
-  sheet.querySelector('#bookOut').onclick = async ()=>{
-    const person = sheet.querySelector('#f-person').value.trim();
-    const komm = sheet.querySelector('#f-komm').value.trim();
-    if(!person){ toast('Bitte Person angeben, wer das Material bezieht'); return; }
-    const fresh = articles.find(x=>x.id===a.id);
-    if(fresh && qty > fresh.stock){ toast('Nicht genug Bestand für diese Entnahme'); return; }
-    await book(a.id, 'out', qty, person, komm);
-  };
   if(isAdmin){
     sheet.querySelector('#editArticle').onclick = ()=>{
       closeSheet();
       openEditArticleSheet(a.id);
     };
     sheet.querySelector('#deleteArticle').onclick = async ()=>{
+      if(!confirm('Artikel "' + a.name + '" wirklich löschen?')) return;
       try{
         await deleteDoc(doc(db, 'articles', a.id));
         closeSheet();
@@ -6614,32 +6717,6 @@ function openArticleDetail(id, justCreated){
       }
     };
   }
-  sheet.querySelector('#writeNfcBtn').onclick = async ()=>{
-    if(!('NDEFReader' in window)){
-      toast('Web NFC wird auf diesem Gerät nicht unterstützt');
-      return;
-    }
-    try{
-      const writer = new NDEFReader();
-      await writer.write({ records: [{ recordType: 'text', data: a.id }] });
-      toast('Tag erfolgreich beschrieben: ' + a.id);
-    }catch(e){
-      toast('Schreiben fehlgeschlagen oder abgebrochen');
-    }
-  };
-  sheet.querySelector('#printQrBtn').onclick = ()=>{
-    closeSheet();
-    openPrintImportedTagsSheet([{ id: a.id, data: { name: a.name } }]);
-  };
-
-  try{
-    new QRCode(sheet.querySelector('#qrHolder'), { text: a.id, width: 96, height: 96, colorDark:'#1b1d1f', colorLight:'#ffffff' });
-  }catch(e){
-    sheet.querySelector('#qrHolder').innerHTML = `<div style="width:96px;height:96px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888;text-align:center;padding:4px;">QR nicht verfügbar</div>`;
-  }
-
-  const lastPerson = localStorage.getItem('mat-lager-last-person') || authEmailToUsername(currentUserEmail);
-  if(lastPerson) sheet.querySelector('#f-person').value = lastPerson;
 }
 
 function openEditArticleSheet(id){
@@ -6648,68 +6725,37 @@ function openEditArticleSheet(id){
   if(!a) return;
   const sheet = buildSheet(`
     <div class="sheet-head"><h3>Artikel bearbeiten</h3><button class="x" data-close>×</button></div>
-    <div class="stencil-id">TAG · ${a.id} (ID bleibt unverändert)</div>
-    <label>Name</label>
+    <label>Art. Nr.</label>
+    <input type="text" id="f-vendor" value="${escapeHtml(a.vendorArticleNumber||'')}" placeholder="z. B. 123456-A">
+    <label>Bezeichnung</label>
     <input type="text" id="f-name" value="${escapeHtml(a.name)}">
     <label>Kategorie</label>
     ${categorySelectHtml(a.category||'')}
-    <label>Art. Nr. Händler <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    <input type="text" id="f-vendor" value="${escapeHtml(a.vendorArticleNumber||'')}" placeholder="z. B. 123456-A">
-    <label>Preis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    <input type="number" id="f-price" value="${a.price || ''}" placeholder="z. B. 12.50" step="0.01" min="0">
-    <label>Standort</label>
-    <input type="text" id="f-loc" value="${escapeHtml(a.location||'')}">
-    <label>Bestand</label>
-    <input type="number" id="f-stock" value="${a.stock}" min="0">
-    <label>Mindestbestand</label>
-    <input type="number" id="f-min" value="${a.minStock}" min="0">
-    <label>Bild <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
-    ${a.imageUrl ? `<div id="f-image-preview"><img src="${a.imageUrl}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;"></div>
-    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:12.5px;color:var(--text);margin-top:6px;">
-      <input type="checkbox" id="f-image-remove" style="width:auto;"> Bild entfernen
-    </label>` : '<div id="f-image-preview"></div>'}
-    <div class="btn-row" style="margin-top:8px;">
-      <button type="button" class="btn btn-secondary btn-block" id="btnCamera">📷 Foto aufnehmen</button>
-      <button type="button" class="btn btn-secondary btn-block" id="btnGallery">Aus Galerie</button>
-    </div>
-    <input type="file" id="f-image-camera" accept="image/*" capture="environment" style="display:none;">
-    <input type="file" id="f-image" accept="image/*" style="display:none;">
-    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Neues Bild ersetzt automatisch das bestehende.</div>
-    <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">
-      Hinweis: Eine manuelle Bestandsänderung hier wird nicht als Ein-/Auslagerung im Verlauf protokolliert.
-    </div>
+    <label>Einkaufspreis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="number" id="f-ek" value="${a.einkaufspreis || ''}" placeholder="z. B. 8.50" step="0.01" min="0">
+    <label>Verkaufspreis (CHF) <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+    <input type="number" id="f-vk" value="${(a.verkaufspreis!=null?a.verkaufspreis:a.price) || ''}" placeholder="z. B. 12.50" step="0.01" min="0">
     <div class="btn-row">
       <button class="btn btn-secondary btn-block" data-close>Abbrechen</button>
       <button class="btn btn-primary btn-block" id="saveEdit">Speichern</button>
     </div>
   `);
   bindCategorySelect(sheet);
-  bindImagePreview(sheet);
-  sheet.querySelector('#btnCamera').onclick = ()=> sheet.querySelector('#f-image-camera').click();
-  sheet.querySelector('#btnGallery').onclick = ()=> sheet.querySelector('#f-image').click();
   sheet.querySelector('#saveEdit').onclick = async ()=>{
     const btn = sheet.querySelector('#saveEdit');
     const name = sheet.querySelector('#f-name').value.trim();
-    if(!name){ toast('Bitte einen Namen eingeben'); return; }
+    if(!name){ toast('Bitte eine Bezeichnung eingeben'); return; }
+    const category = getCategoryValue(sheet) || 'Sonstiges';
     btn.disabled = true; btn.textContent = 'Speichere…';
     try{
       const updates = {
         name,
-        category: getCategoryValue(sheet) || 'Sonstiges',
+        category,
         vendorArticleNumber: sheet.querySelector('#f-vendor').value.trim(),
-        price: parseFloat(sheet.querySelector('#f-price').value) || 0,
-        location: sheet.querySelector('#f-loc').value.trim(),
-        stock: parseInt(sheet.querySelector('#f-stock').value)||0,
-        minStock: parseInt(sheet.querySelector('#f-min').value)||0
+        einkaufspreis: parseFloat(sheet.querySelector('#f-ek').value) || 0,
+        verkaufspreis: parseFloat(sheet.querySelector('#f-vk').value) || 0
       };
-      const imageFile = getSelectedImageFile(sheet);
-      const removeCheckbox = sheet.querySelector('#f-image-remove');
-      if(imageFile){
-        btn.textContent = 'Lade Bild hoch…';
-        updates.imageUrl = await uploadArticleImage(a.id, imageFile);
-      } else if(removeCheckbox && removeCheckbox.checked){
-        updates.imageUrl = '';
-      }
+      await ensureArtikelgruppe(category);
       await updateDoc(doc(db, 'articles', a.id), updates);
       closeSheet();
       toast('Artikel aktualisiert');
