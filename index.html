@@ -1190,7 +1190,7 @@
             <th data-sort="customer">Kunde</th>
             <th data-sort="workshop">Werkstatt</th>
             <th data-sort="auftragswert">Auftragswert</th>
-            <th data-sort="status">Status</th>
+            <th data-sort="completed">Status</th>
           </tr>
         </thead>
         <tbody id="overview-tbody"></tbody>
@@ -1836,13 +1836,8 @@
           <label for="f-workshop">Werkstatt</label>
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
         </div>
-        <div class="field">
-          <label for="f-status">Status</label>
-          <select id="f-status">
-            <option value="fabrikation">In Fabrikation</option>
-            <option value="abgeschlossen">Abgeschlossen</option>
-            <option value="fakturiert">Fakturiert</option>
-          </select>
+        <div class="field" style="justify-content:flex-end;">
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:0;"><input type="checkbox" id="f-abgeschlossen" style="width:auto;"> Abgeschlossen</label>
         </div>
       </div>
       <div class="field-row">
@@ -2378,7 +2373,7 @@ function renderHeader(){
   if(subEl) subEl.textContent = info[1];
 }
 function workshopLabel(w){ return w==="aluminium" ? "Aluminium" : (w==="reparaturen" ? "Reparaturen" : "Stahl"); }
-function statusLabel(s){ return s==="fakturiert" ? "Fakturiert" : (s==="abgeschlossen" ? "Abgeschlossen" : "In Fabrikation"); }
+function statusLabel(completed){ return completed ? "Abgeschlossen" : "In Fabrikation"; }
 function fmtChf(n){ var v = typeof n==="number" ? n : parseFloat(n)||0; return v.toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2}) + " Fr."; }
 function kundeName(kundeId, fallback){ var k = state.kunden.find(x=>x.id===kundeId); return k ? k.firma : (fallback||""); }
 
@@ -2409,7 +2404,7 @@ function renderTable(){
     html += '<td data-label="Kunde"><div class="ov-customer">' + (o.intern?'<span class="tag" style="background:#eef;color:#447;margin-right:5px;">Intern</span>':'') + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(o.description) + '</div>':'') + '</td>';
     html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
     html += '<td data-label="Auftragswert">' + fmtChf(o.auftragswert) + '</td>';
-    html += '<td data-label="Status"><span class="tag status-' + (o.status||"fabrikation") + '">' + statusLabel(o.status) + '</span></td>';
+    html += '<td data-label="Status"><span class="tag ' + (o.completed?"status-abgeschlossen":"status-fabrikation") + '">' + statusLabel(o.completed) + '</span></td>';
     html += '</tr>';
   });
   tbody.innerHTML = html;
@@ -4709,7 +4704,7 @@ function openModal(order, prefillDate){
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-bkp").value = order ? (order.bkp||"") : "";
   $("#f-workshop").value = order ? order.workshop : "stahl";
-  $("#f-status").value = order ? (order.status || (order.completed ? "abgeschlossen" : "fabrikation")) : "fabrikation";
+  $("#f-abgeschlossen").checked = order ? !!order.completed : false;
   $("#f-auftragswert").value = (order && order.auftragswert) ? order.auftragswert : "";
   $("#f-materialplan").value = (order && order.materialPlan) ? order.materialPlan : "";
   $("#voka-import-status").textContent = "";
@@ -4823,16 +4818,15 @@ form.addEventListener("submit", async e=>{
       var kObj = state.kunden.find(x=>x.id===kundeSelVal);
       customer = kObj ? kObj.firma : "";
     }
-    // Interne Aufträge bleiben dauerhaft im Status "fabrikation" (= nicht abgeschlossen), damit sie
-    // in der Stempeluhr/Personalplanung immer als wählbarer Auftrag verfügbar bleiben.
-    var status = intern ? "fabrikation" : $("#f-status").value;
+    // Interne Aufträge bleiben dauerhaft offen, damit sie in der Stempeluhr/Personalplanung
+    // immer als wählbarer Auftrag verfügbar bleiben.
+    var completed = intern ? false : $("#f-abgeschlossen").checked;
     var payload = {
       orderNumber: orderNumber, kundeId: kundeId, customer: customer, intern: intern,
       description: $("#f-description").value.trim(),
       bkp: $("#f-bkp").value.trim(),
       workshop: $("#f-workshop").value,
-      status: status,
-      completed: status !== "fabrikation",
+      completed: completed,
       auftragswert: parseFloat($("#f-auftragswert").value) || 0,
       materialPlan: parseFloat($("#f-materialplan").value) || 0,
       kostenarten: kostenarten,
@@ -4858,6 +4852,8 @@ form.addEventListener("submit", async e=>{
 
 $("#delete-btn").addEventListener("click", async ()=>{
   if(!state.editingId) return;
+  var order = state.orders.find(o=>o.id===state.editingId);
+  if(!(await showConfirm('Auftrag "' + (order?order.orderNumber:"") + '" wirklich endgültig löschen?'))) return;
   try{
     await deleteDoc(doc(db, COLLECTION, state.editingId));
     closeModal();
