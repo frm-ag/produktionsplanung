@@ -4850,6 +4850,26 @@ $("#assign-delete-btn").addEventListener("click", async ()=>{
 /* ---------- Kostenarten mini-form ---------- */
 
 function kostenartBetrag(k){ return (parseFloat(k.stunden)||0) * (parseFloat(k.ansatz)||0); }
+// Statt eines Freitextfelds mit HTML5-Datalist (zeigt auf vielen mobilen Browsern, v.a. iOS
+// Safari, gar keine oder keine vernünftig scrollbare Vorschlagsliste) ein echtes <select> mit
+// allen Kostenarten aus dem Stamm — das ist auf jeder Plattform eine scrollbare Liste. Eine
+// Zeile, deren Bezeichnung zu keinem Stamm-Eintrag passt (freier Text oder ein Eintrag von vor
+// dieser Umstellung), zeigt stattdessen automatisch das Freitextfeld "+ Andere".
+function kostenartSelectHtml(selectedBezeichnung){
+  var sorted = (state.kostenartenStamm||[]).slice().sort(function(a,b){
+    return (a.nummer||"").localeCompare(b.nummer||"", undefined, {numeric:true}) || (a.bezeichnung||"").localeCompare(b.bezeichnung||"");
+  });
+  var isKnown = selectedBezeichnung && sorted.some(function(s){ return (s.bezeichnung||"")===selectedBezeichnung; });
+  var optsHtml = sorted.map(function(s){
+    return '<option value="' + escapeHtml(s.bezeichnung) + '" ' + (selectedBezeichnung===s.bezeichnung?'selected':'') + '>' + (s.nummer?escapeHtml(s.nummer)+' – ':'') + escapeHtml(s.bezeichnung) + '</option>';
+  }).join("");
+  return '<select class="ka-bez-select" style="width:100%;">' +
+    '<option value="" ' + (!selectedBezeichnung?'selected':'') + '>Kostenart wählen…</option>' +
+    optsHtml +
+    '<option value="__custom__" ' + (selectedBezeichnung && !isKnown?'selected':'') + '>+ Andere (Text eingeben)…</option>' +
+    '</select>' +
+    '<input type="text" class="ka-bez-custom" placeholder="Bezeichnung eingeben" style="width:100%;margin-top:6px;display:' + (selectedBezeichnung && !isKnown?'block':'none') + ';" value="' + (selectedBezeichnung && !isKnown?escapeHtml(selectedBezeichnung):'') + '">';
+}
 function renderKostenartenRows(){
   var list = $("#kostenarten-list");
   if(state.modalKostenarten.length===0){ list.innerHTML = '<div class="materials-empty">Noch keine Kostenart erfasst.</div>'; return; }
@@ -4857,7 +4877,7 @@ function renderKostenartenRows(){
   state.modalKostenarten.forEach((k,i)=>{
     html += '<div class="material-row" data-idx="' + i + '">' +
       '<div class="mat-row1">' +
-      '<input class="ka-bez" list="kostenarten-stamm-list" placeholder="z. B. 4003 WS Brandschutz Stahl" value="' + escapeHtml(k.bezeichnung||"") + '">' +
+      '<div style="flex:1;">' + kostenartSelectHtml(k.bezeichnung||"") + '</div>' +
       '<button type="button" class="mat-remove" aria-label="Kostenart entfernen">✕</button>' +
       '</div><div class="mat-row2">' +
       '<input type="number" min="0" step="0.01" class="ka-std" placeholder="Std." value="' + (k.stunden!=null&&k.stunden!==""?k.stunden:"") + '">' +
@@ -4873,18 +4893,35 @@ $("#kostenarten-list").addEventListener("click", e=>{
   var idx = Number(btn.closest(".material-row").dataset.idx);
   state.modalKostenarten.splice(idx,1); renderKostenartenRows();
 });
+$("#kostenarten-list").addEventListener("change", e=>{
+  var row = e.target.closest(".material-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalKostenarten[idx]) return;
+  if(e.target.classList.contains("ka-bez-select")){
+    var val = e.target.value;
+    var customInput = row.querySelector(".ka-bez-custom");
+    if(val === "__custom__"){
+      customInput.style.display = "block";
+      customInput.value = "";
+      state.modalKostenarten[idx].bezeichnung = "";
+      customInput.focus();
+      return;
+    }
+    customInput.style.display = "none";
+    state.modalKostenarten[idx].bezeichnung = val;
+    // Beim Auswählen einer Stamm-Kostenart den Standard-Ansatz übernehmen, sofern noch kein
+    // Ansatz für diese Zeile erfasst wurde.
+    var stammMatch = (state.kostenartenStamm||[]).find(function(s){ return (s.bezeichnung||"") === val; });
+    if(stammMatch && stammMatch.ansatz!=null && !state.modalKostenarten[idx].ansatz){
+      state.modalKostenarten[idx].ansatz = stammMatch.ansatz;
+    }
+    renderKostenartenRows();
+  }
+});
 $("#kostenarten-list").addEventListener("input", e=>{
   var row = e.target.closest(".material-row"); if(!row) return;
   var idx = Number(row.dataset.idx); if(!state.modalKostenarten[idx]) return;
-  if(e.target.classList.contains("ka-bez")){
+  if(e.target.classList.contains("ka-bez-custom")){
     state.modalKostenarten[idx].bezeichnung = e.target.value;
-    // Beim Auswählen einer Stamm-Kostenart aus der Vorschlagsliste den Standard-Ansatz übernehmen,
-    // sofern noch kein Ansatz für diese Zeile erfasst wurde.
-    var stammMatch = (state.kostenartenStamm||[]).find(function(s){ return (s.bezeichnung||"").toLowerCase() === e.target.value.trim().toLowerCase(); });
-    if(stammMatch && stammMatch.ansatz!=null && !state.modalKostenarten[idx].ansatz){
-      state.modalKostenarten[idx].ansatz = stammMatch.ansatz;
-      renderKostenartenRows();
-    }
   }
   if(e.target.classList.contains("ka-std")) state.modalKostenarten[idx].stunden = e.target.value;
   if(e.target.classList.contains("ka-ansatz")) state.modalKostenarten[idx].ansatz = e.target.value;
