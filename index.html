@@ -5629,34 +5629,61 @@ function toISOFromSwissDate(s){
   return yr + "-" + String(mon).padStart(2,"0") + "-" + String(day).padStart(2,"0");
 }
 // Durchsucht den per OCR erkannten Fliesstext heuristisch nach den gängigen Rechnungsangaben.
+// Bewusst breit gehalten (viele Synonyme, tolerant gegenüber OCR-Fehlern wie fehlenden
+// Leerzeichen/Bindestrichen) — eine Garantie für jedes Lieferanten-Layout gibt es dabei nie,
+// da hier nach Textmustern gesucht wird, nicht wirklich "verstanden" wird.
+var AMOUNT_RE_SRC = "(?:CHF|Fr\\.?|sFr\\.?)?\\s*([\\d'’]{1,3}(?:[\\d'’]{0,9})?[.,]\\d{2})";
 function parseBelegText(text){
   var norm = (text||"").replace(/\r/g, "");
   var result = {};
-  var mNr = /(?:Rechnungs?-?\s?(?:Nr|Nummer)\.?|Invoice\s?(?:No|Number)\.?|Beleg-?Nr\.?)\s*[:#]?\s*([A-Za-z0-9\-\/\.]{3,20})/i.exec(norm);
-  if(mNr) result.rechnungsnummer = mNr[1].trim();
-  var mDate = /(?:zahlbar bis|fällig(?:keit)?(?:sdatum)?|due date|payment date)\D{0,15}(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i.exec(norm);
+
+  // --- Rechnungsnummer: viele gängige Bezeichnungen, auch über Zeilenumbrüche hinweg ---
+  var mNr = /(?:Rechnungs?[\s\-]?(?:Nr|Nummer)|Rechnungs?Nr|Beleg[\s\-]?(?:Nr|Nummer)|Dokument[\s\-]?(?:Nr|Nummer)|Faktura[\s\-]?(?:Nr|Nummer)|Referenz[\s\-]?(?:Nr|Nummer)?|Invoice[\s\-]?(?:No|Number|#)|Order[\s\-]?No)\.?\s*[:#]?\s*[\r\n]{0,2}\s*([A-Za-z]{0,3}[\s\-]?\d[\d\-\/\.]{2,18})/i.exec(norm);
+  if(mNr) result.rechnungsnummer = mNr[1].trim().replace(/\s+/g," ");
+
+  // --- Fälligkeitsdatum ---
+  var mDate = /(?:zahlbar\s*bis|zahlungsziel|zahlungsfrist|fällig(?:keit)?(?:sdatum)?|valuta|due\s*date|payment\s*date)\D{0,20}(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i.exec(norm);
   if(mDate) result.faelligkeitsdatum = toISOFromSwissDate(mDate[1]);
-  var mMwstRate = /(7[.,]7|8[.,]1|2[.,]6|3[.,]8)\s*%/.exec(norm);
-  if(mMwstRate){
-    var rate = parseSwissNumber(mMwstRate[1]);
-    result.mwstSatz = rate === 7.7 ? 8.1 : rate; // alter Satz 7.7% -> heutiger Code 8.1%
+
+  // --- MWST-Satz: alle Prozentwerte im Text einsammeln und den nächstliegenden bekannten
+  // Schweizer Satz nehmen (toleriert OCR-Ungenauigkeiten wie "8.1 %" vs "81%") ---
+  var bekannteSaetze = [8.1, 2.6, 3.8, 7.7, 2.5, 7.6];
+  var mwstMatches = norm.match(/\d{1,2}[.,]?\d?\s*%/g) || [];
+  for(var pi=0; pi<mwstMatches.length; pi++){
+    var val = parseSwissNumber(mwstMatches[pi].replace("%",""));
+    var naechster = bekannteSaetze.reduce((best,s)=> (Math.abs(s-val)<Math.abs(best-val)?s:best), bekannteSaetze[0]);
+    if(Math.abs(naechster-val) <= 0.25){
+      result.mwstSatz = (naechster===7.7||naechster===2.5||naechster===7.6) ? 8.1 : naechster; // alte Sätze -> heutiger nächstliegender Code
+      break;
+    }
   }
-  var numPattern = "(?:CHF\\s*)?([\\d']{1,9}[.,]\\d{2})";
-  var mNetto = new RegExp("(?:Netto|Zwischensumme|exkl\\.?\\s*MWST)\\D{0,10}" + numPattern, "i").exec(norm);
+
+  // --- Betrag: zuerst gezielt nach Netto-/Zwischensumme suchen, sonst nach Total/Endbetrag,
+  // sonst als letzten Ausweg den grössten CHF-Betrag im ganzen Text nehmen (meist der Total) ---
+  var mNetto = new RegExp("(?:Netto(?:betrag)?|Zwischensumme|Subtotal|Warenwert|exkl\\.?\\s*MWST|ohne\\s*MWST)\\D{0,12}" + AMOUNT_RE_SRC, "i").exec(norm);
   if(mNetto){
     result.betrag = parseSwissNumber(mNetto[1]);
   }else{
-    var mTotal = new RegExp("(?:Total|Endbetrag|Zu zahlen|Rechnungsbetrag|Gesamtbetrag)\\D{0,10}" + numPattern, "i").exec(norm);
-    if(mTotal){
-      var brutto = parseSwissNumber(mTotal[1]);
+    var mTotal = new RegExp("(?:Total(?:betrag)?|End(?:summe|betrag)|Zu\\s*(?:bezahlen|zahlen)|Zahlbetrag|Rechnungs(?:betrag|summe)|Gesamt(?:betrag|summe)|Summe)\\D{0,12}" + AMOUNT_RE_SRC, "i").exec(norm);
+    var brutto = mTotal ? parseSwissNumber(mTotal[1]) : null;
+    if(brutto == null || !isFinite(brutto)){
+      // Fallback: grösster Betrag im ganzen Text (Annahme: der Rechnungstotalbetrag ist meist
+      // die grösste Zahl auf der Rechnung, grösser als alle Positionsbeträge).
+      var alle = norm.match(new RegExp(AMOUNT_RE_SRC, "gi")) || [];
+      var werte = alle.map(a=>{ var m=new RegExp(AMOUNT_RE_SRC,"i").exec(a); return m?parseSwissNumber(m[1]):NaN; }).filter(v=>isFinite(v) && v>0);
+      if(werte.length) brutto = Math.max.apply(null, werte);
+    }
+    if(brutto != null && isFinite(brutto)){
       if(result.mwstSatz != null && result.mwstSatz > 0) result.betrag = Math.round((brutto/(1+result.mwstSatz/100))*100)/100;
       else result.betragBrutto = brutto;
     }
   }
+
+  // --- Lieferant: erste plausible Zeile oben im Dokument, Firmenzusätze/URLs bereinigt ---
   var lines = norm.split("\n").map(l=>l.trim()).filter(Boolean);
-  for(var i=0;i<Math.min(lines.length,6);i++){
-    var l = lines[i];
-    if(l.length>=3 && l.length<=60 && /[A-Za-zÀ-ÿ]/.test(l) && !/rechnung|invoice|datum|seite\s*\d|page\s*\d/i.test(l)){
+  for(var i=0;i<Math.min(lines.length,8);i++){
+    var l = lines[i].replace(/^[®©™•\-\*\s]+/,"").replace(/\s+(https?:\/\/|www\.)\S+$/i,"").trim();
+    if(l.length>=3 && l.length<=60 && /[A-Za-zÀ-ÿ]/.test(l) && !/rechnung|invoice|datum|seite\s*\d|page\s*\d|^chf\b/i.test(l)){
       result.lieferant = l;
       break;
     }
@@ -5900,7 +5927,7 @@ $("#bh-camt-upload").addEventListener("change", async e=>{
 // Dezimaltrennzeichen) in eine JS-Zahl um.
 function parseSwissNumber(str){
   if(str==null) return NaN;
-  var s = String(str).trim().replace(/'/g,"").replace(/\s/g,"");
+  var s = String(str).trim().replace(/['’  ]/g,"").replace(/\s/g,"");
   if(s.indexOf(",")!==-1 && s.indexOf(".")!==-1){
     // beide vorhanden: letztes Zeichen entscheidet, welches das Dezimaltrennzeichen ist
     if(s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g,"").replace(",", ".");
