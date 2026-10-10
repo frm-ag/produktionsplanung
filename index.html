@@ -14,6 +14,8 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
 <style>
   :root{
     --bg:#f3f5f7;
@@ -1530,7 +1532,7 @@
         <div class="field">
           <label for="kreditor-beleg">Beleg (PDF/Bild, optional, max. ca. 700 KB)</label>
           <input type="file" id="kreditor-beleg" accept="application/pdf,image/*">
-          <div id="kreditor-beleg-info" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">Texterkennung (automatisches Auslesen) ist noch nicht verfügbar — der Beleg wird als Referenz gespeichert, Betrag/Lieferant bitte manuell prüfen.</div>
+          <div id="kreditor-beleg-info" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">Beim Hochladen wird automatisch versucht, Lieferant, Rechnungsnr., Betrag, MWST-Satz und Fälligkeitsdatum per Texterkennung auszulesen (kostenlose Browser-Texterkennung — bitte erkannte Werte immer prüfen).</div>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="kreditor-cancel-btn">Abbrechen</button>
@@ -5547,7 +5549,7 @@ function openKreditorModal(k){
   $("#kreditor-iban").value = k ? (k.iban||"") : "";
   $("#kreditor-faellig").value = k ? (k.faelligkeitsdatum||"") : "";
   $("#kreditor-beleg").value = "";
-  $("#kreditor-beleg-info").textContent = (k && k.belegName) ? ("Hinterlegter Beleg: " + k.belegName) : "Texterkennung (automatisches Auslesen) ist noch nicht verfügbar — der Beleg wird als Referenz gespeichert, Betrag/Lieferant bitte manuell prüfen.";
+  $("#kreditor-beleg-info").textContent = (k && k.belegName) ? ("Hinterlegter Beleg: " + k.belegName) : "Beim Hochladen wird automatisch versucht, Lieferant, Rechnungsnr., Betrag, MWST-Satz und Fälligkeitsdatum per Texterkennung auszulesen (kostenlose Browser-Texterkennung — bitte erkannte Werte immer prüfen).";
   var schwelleTotal = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
   var ueberSchwelle = k && (Number(k.betrag)||0)*(1+(Number(k.mwstSatz)||0)/100) >= schwelleTotal;
   $("#kreditor-delete-btn").style.display = k ? "inline-block" : "none";
@@ -5588,7 +5590,107 @@ $("#kreditor-beleg").addEventListener("change", e=>{
     $("#kreditor-beleg-info").textContent = "Beleg bereit zum Speichern: " + file.name;
   };
   reader.readAsDataURL(file);
+  ocrKreditorBeleg(file);
 });
+
+/* ---- Texterkennung (OCR) für hochgeladene Kreditoren-Belege ---- */
+// Nutzt die kostenlos im Browser laufenden Bibliotheken pdf.js (PDF -> Bild) und Tesseract.js
+// (Bild -> Text). Läuft vollständig lokal im Browser, keine Cloud-/API-Kosten. Die Erkennung ist
+// eine Heuristik auf dem erkannten Fliesstext — bei unüblichen Rechnungslayouts kann sie daneben
+// liegen, darum werden nur LEERE Felder automatisch befüllt und der Erfolg wird klar angezeigt.
+function ensurePdfWorker(){
+  if(window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc){
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  }
+}
+async function renderPdfFirstPageToCanvas(file){
+  ensurePdfWorker();
+  var buf = await file.arrayBuffer();
+  var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  var page = await pdf.getPage(1);
+  var viewport = page.getViewport({ scale: 2.2 });
+  var canvas = document.createElement("canvas");
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+  return canvas;
+}
+async function extractTextFromBeleg(file){
+  var isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  var ocrQuelle = isPdf ? await renderPdfFirstPageToCanvas(file) : file;
+  var result = await window.Tesseract.recognize(ocrQuelle, "deu");
+  return result.data.text || "";
+}
+function toISOFromSwissDate(s){
+  var m = /(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})/.exec(s||"");
+  if(!m) return "";
+  var day = Number(m[1]), mon = Number(m[2]), yr = Number(m[3]);
+  if(yr < 100) yr += 2000;
+  if(mon<1||mon>12||day<1||day>31) return "";
+  return yr + "-" + String(mon).padStart(2,"0") + "-" + String(day).padStart(2,"0");
+}
+// Durchsucht den per OCR erkannten Fliesstext heuristisch nach den gängigen Rechnungsangaben.
+function parseBelegText(text){
+  var norm = (text||"").replace(/\r/g, "");
+  var result = {};
+  var mNr = /(?:Rechnungs?-?\s?(?:Nr|Nummer)\.?|Invoice\s?(?:No|Number)\.?|Beleg-?Nr\.?)\s*[:#]?\s*([A-Za-z0-9\-\/\.]{3,20})/i.exec(norm);
+  if(mNr) result.rechnungsnummer = mNr[1].trim();
+  var mDate = /(?:zahlbar bis|fällig(?:keit)?(?:sdatum)?|due date|payment date)\D{0,15}(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i.exec(norm);
+  if(mDate) result.faelligkeitsdatum = toISOFromSwissDate(mDate[1]);
+  var mMwstRate = /(7[.,]7|8[.,]1|2[.,]6|3[.,]8)\s*%/.exec(norm);
+  if(mMwstRate){
+    var rate = parseSwissNumber(mMwstRate[1]);
+    result.mwstSatz = rate === 7.7 ? 8.1 : rate; // alter Satz 7.7% -> heutiger Code 8.1%
+  }
+  var numPattern = "(?:CHF\\s*)?([\\d']{1,9}[.,]\\d{2})";
+  var mNetto = new RegExp("(?:Netto|Zwischensumme|exkl\\.?\\s*MWST)\\D{0,10}" + numPattern, "i").exec(norm);
+  if(mNetto){
+    result.betrag = parseSwissNumber(mNetto[1]);
+  }else{
+    var mTotal = new RegExp("(?:Total|Endbetrag|Zu zahlen|Rechnungsbetrag|Gesamtbetrag)\\D{0,10}" + numPattern, "i").exec(norm);
+    if(mTotal){
+      var brutto = parseSwissNumber(mTotal[1]);
+      if(result.mwstSatz != null && result.mwstSatz > 0) result.betrag = Math.round((brutto/(1+result.mwstSatz/100))*100)/100;
+      else result.betragBrutto = brutto;
+    }
+  }
+  var lines = norm.split("\n").map(l=>l.trim()).filter(Boolean);
+  for(var i=0;i<Math.min(lines.length,6);i++){
+    var l = lines[i];
+    if(l.length>=3 && l.length<=60 && /[A-Za-zÀ-ÿ]/.test(l) && !/rechnung|invoice|datum|seite\s*\d|page\s*\d/i.test(l)){
+      result.lieferant = l;
+      break;
+    }
+  }
+  return result;
+}
+async function ocrKreditorBeleg(file){
+  var infoEl = $("#kreditor-beleg-info");
+  if(!window.Tesseract){ infoEl.textContent = "Beleg bereit zum Speichern: " + file.name + " — Texterkennung konnte nicht geladen werden, bitte Felder manuell ausfüllen."; return; }
+  infoEl.textContent = "Texterkennung läuft… (" + file.name + ")";
+  try{
+    var text = await extractTextFromBeleg(file);
+    if(!text || text.trim().length < 8){
+      infoEl.textContent = "Beleg bereit zum Speichern: " + file.name + " — Texterkennung lieferte keinen brauchbaren Text, bitte Felder manuell ausfüllen.";
+      return;
+    }
+    var found = parseBelegText(text);
+    var gefuellt = [];
+    if(found.lieferant && !$("#kreditor-lieferant").value.trim()){ $("#kreditor-lieferant").value = found.lieferant; gefuellt.push("Lieferant"); }
+    if(found.rechnungsnummer && !$("#kreditor-nummer").value.trim()){ $("#kreditor-nummer").value = found.rechnungsnummer; gefuellt.push("Rechnungsnr."); }
+    if(found.mwstSatz != null){ $("#kreditor-mwst").value = found.mwstSatz; gefuellt.push("MWST-Satz"); }
+    if(found.betrag && !$("#kreditor-betrag").value){ $("#kreditor-betrag").value = found.betrag; gefuellt.push("Betrag (netto, berechnet)"); }
+    if(found.faelligkeitsdatum && !$("#kreditor-faellig").value){ $("#kreditor-faellig").value = found.faelligkeitsdatum; gefuellt.push("Fälligkeitsdatum"); }
+    updateKreditorTotalPreview();
+    var hinweis = "";
+    if(gefuellt.length) hinweis = '<br><span style="color:var(--accent);">Automatisch erkannt (bitte prüfen): ' + gefuellt.join(", ") + '</span>';
+    else if(found.betragBrutto) hinweis = '<br><span style="color:var(--text-muted);">Bruttobetrag CHF ' + formatCHF(found.betragBrutto) + ' erkannt, aber MWST-Satz nicht eindeutig — Netto-Betrag bitte manuell eintragen.</span>';
+    else hinweis = '<br><span style="color:var(--text-muted);">Texterkennung lief, aber es konnten keine Felder sicher erkannt werden — bitte manuell ausfüllen.</span>';
+    infoEl.innerHTML = "Beleg bereit zum Speichern: " + escapeHtml(file.name) + hinweis;
+  }catch(err){
+    console.error(err);
+    infoEl.textContent = "Beleg bereit zum Speichern: " + file.name + " — Texterkennung fehlgeschlagen, bitte Felder manuell ausfüllen.";
+  }
+}
 $("#bh-kreditor-add-btn").addEventListener("click", ()=>openKreditorModal(null));
 $("#kreditor-cancel-btn").addEventListener("click", closeKreditorModal);
 kreditorBackdrop.addEventListener("click", e=>{ if(e.target===kreditorBackdrop) closeKreditorModal(); });
