@@ -125,6 +125,16 @@
   }
   .buchhaltung-placeholder strong{display:block;color:var(--text);font-size:17px;margin-bottom:8px;font-family:var(--disp);}
 
+  .bh-tabbar{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--border);}
+  .bh-tab{border:none;background:transparent;color:var(--text-muted);font:inherit;font-size:13.5px;font-weight:600;padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;}
+  .bh-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .bh-stamm-block{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;max-width:680px;}
+  .bh-stamm-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .bh-status{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;}
+  .bh-status.offen{background:#fdf1d3;color:#8a5a00;}
+  .bh-status.freigegeben{background:#dce8fd;color:#1b4fa0;}
+  .bh-status.bezahlt{background:#dcf5e0;color:#1c7a34;}
+
   @media (max-width:860px){
     #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:50;box-shadow:2px 0 12px rgba(0,0,0,.08);}
   }
@@ -1228,7 +1238,9 @@
       <div class="side-section" data-section="buchhaltung">
         <button type="button" class="side-section-head" data-toggle="buchhaltung"><span class="side-arrow">▸</span>Buchhaltung</button>
         <div class="side-section-body">
-          <button class="side-item sub" data-view="buchhaltung">Übersicht<span class="soon-tag">bald</span></button>
+          <button class="side-item sub" data-view="buchhaltung" data-buchhaltung-tab="debitoren">Debitoren</button>
+          <button class="side-item sub" data-view="buchhaltung" data-buchhaltung-tab="kreditoren">Kreditoren</button>
+          <button class="side-item sub" data-view="buchhaltung" data-buchhaltung-tab="stammdaten">Stammdaten</button>
         </div>
       </div>
 
@@ -1255,9 +1267,204 @@
   </header>
 
   <div id="buchhaltung-page" style="display:none;">
-    <div class="buchhaltung-placeholder">
-      <strong>Buchhaltung</strong>
-      Dieser Bereich kommt noch.
+    <div class="bh-tabbar" id="bh-tabbar">
+      <button type="button" class="bh-tab" data-bh-tab="debitoren">Debitoren</button>
+      <button type="button" class="bh-tab" data-bh-tab="kreditoren">Kreditoren</button>
+      <button type="button" class="bh-tab" data-bh-tab="stammdaten">Stammdaten</button>
+    </div>
+
+    <div id="bh-debitoren-panel" style="display:none;">
+      <div class="table-toolbar">
+        <input type="text" id="bh-debitoren-search" placeholder="Nummer, Auftrag oder Kunde suchen…" autocomplete="off">
+        <button type="button" class="btn primary" id="bh-rechnung-add-btn">+ Rechnung</button>
+      </div>
+      <div class="table-scroll">
+        <table class="overview-table" id="bh-debitoren-table">
+          <thead><tr>
+            <th>Nummer</th><th>Datum</th><th>Auftrag</th><th>Kunde</th><th>Typ</th><th>Betrag inkl. MWST</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="bh-debitoren-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="bh-kreditoren-panel" style="display:none;">
+      <div class="table-toolbar">
+        <input type="text" id="bh-kreditoren-search" placeholder="Lieferant oder Rechnungsnr. suchen…" autocomplete="off">
+        <button type="button" class="btn primary" id="bh-kreditor-add-btn">+ Kreditorenrechnung</button>
+      </div>
+      <div class="table-scroll">
+        <table class="overview-table" id="bh-kreditoren-table">
+          <thead><tr>
+            <th>Lieferant</th><th>Rechnungsnr.</th><th>Konto</th><th>Betrag</th><th>Fällig</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="bh-kreditoren-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="bh-stammdaten-panel" style="display:none;">
+      <div class="bh-stamm-block">
+        <div class="bh-stamm-head">
+          <h2 class="zeit-h2" style="margin:0;">Kontenplan</h2>
+          <button type="button" class="btn btn-secondary" id="bh-konto-add-btn">+ Konto</button>
+        </div>
+        <input type="text" id="bh-konten-search" placeholder="Kontonummer oder Bezeichnung suchen…" autocomplete="off" style="margin:8px 0;">
+        <div class="table-scroll" style="max-height:360px;">
+          <table class="overview-table" id="bh-konten-table">
+            <thead><tr><th>Nr.</th><th>Bezeichnung</th><th>Klasse</th><th></th></tr></thead>
+            <tbody id="bh-konten-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="bh-stamm-block">
+        <h2 class="zeit-h2" style="margin:0 0 8px;">MWST-Sätze</h2>
+        <div class="table-scroll" style="max-height:220px;">
+          <table class="overview-table">
+            <thead><tr><th>Code</th><th>Satz</th><th>Verwendung</th></tr></thead>
+            <tbody id="bh-mwst-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="bh-stamm-block">
+        <h2 class="zeit-h2" style="margin:0 0 8px;">Freigabe Kreditorenrechnungen</h2>
+        <div class="field" style="max-width:320px;">
+          <label for="bh-freigabe-schwelle">Freigabe durch Geschäftsleitung ab (CHF)</label>
+          <input type="number" id="bh-freigabe-schwelle" min="0" step="100">
+        </div>
+        <button type="button" class="btn btn-secondary" id="bh-freigabe-save-btn">Speichern</button>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Kreditorenrechnungen unter diesem Betrag kann die Buchhaltung selbst freigeben. Ab diesem Betrag ist eine Freigabe durch ein Admin-Konto nötig.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rechnung-Modal (Debitoren) -->
+  <div class="modal-backdrop" id="rechnung-modal-backdrop">
+    <div class="modal">
+      <h3 id="rechnung-modal-title">Neue Rechnung</h3>
+      <form id="rechnung-form">
+        <div class="field" id="rechnung-order-field">
+          <label for="rechnung-order-search">Auftrag (Nummer)</label>
+          <input type="text" id="rechnung-order-search" list="rechnung-order-list" placeholder="Auftragsnummer eingeben…" autocomplete="off">
+          <datalist id="rechnung-order-list"></datalist>
+          <div id="rechnung-order-info" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;"></div>
+        </div>
+        <div class="field">
+          <label for="rechnung-typ">Typ</label>
+          <select id="rechnung-typ">
+            <option value="schlussrechnung">Schlussrechnung</option>
+            <option value="akonto">Akontorechnung</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="rechnung-betrag">Betrag (netto, ohne MWST)</label>
+          <input type="number" id="rechnung-betrag" min="0" step="0.05" required>
+        </div>
+        <div class="field">
+          <label for="rechnung-mwst">MWST-Satz</label>
+          <select id="rechnung-mwst"></select>
+        </div>
+        <div class="field">
+          <label for="rechnung-faellig">Fälligkeit</label>
+          <select id="rechnung-faellig">
+            <option value="30">Netto 30 Tage</option>
+            <option value="10-3">Innert 10 Tagen 3% Skonto, sonst 30 Tage</option>
+            <option value="30-2">Innert 30 Tagen 2% Skonto, sonst 30 Tage</option>
+            <option value="60">Netto 60 Tage</option>
+          </select>
+        </div>
+        <div id="rechnung-total-preview" style="font-size:13px;margin:4px 0 10px;color:var(--text-muted);"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="rechnung-cancel-btn">Abbrechen</button>
+          <button type="button" class="btn btn-secondary" id="rechnung-bezahlt-btn" style="display:none;">Als bezahlt markieren</button>
+          <button type="submit" class="btn primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Kreditorenrechnung-Modal -->
+  <div class="modal-backdrop" id="kreditor-modal-backdrop">
+    <div class="modal">
+      <h3 id="kreditor-modal-title">Neue Kreditorenrechnung</h3>
+      <form id="kreditor-form">
+        <div class="field">
+          <label for="kreditor-lieferant">Lieferant</label>
+          <input type="text" id="kreditor-lieferant" required>
+        </div>
+        <div class="field">
+          <label for="kreditor-nummer">Rechnungsnummer (Lieferant)</label>
+          <input type="text" id="kreditor-nummer">
+        </div>
+        <div class="field">
+          <label for="kreditor-kategorie">Artikel-Kategorie (für Konto-Vorschlag)</label>
+          <select id="kreditor-kategorie">
+            <option value="">— keine Vorkontierung —</option>
+            <option value="Profile">Profile</option>
+            <option value="Beschläge">Beschläge</option>
+            <option value="Peterhans">Peterhans</option>
+            <option value="Sonstiges">Sonstiges / Div. Material</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="kreditor-konto">Konto</label>
+          <select id="kreditor-konto"></select>
+        </div>
+        <div class="field">
+          <label for="kreditor-betrag">Betrag</label>
+          <input type="number" id="kreditor-betrag" min="0" step="0.05" required>
+        </div>
+        <div class="field">
+          <label for="kreditor-faellig">Fälligkeitsdatum</label>
+          <input type="date" id="kreditor-faellig">
+        </div>
+        <div class="field">
+          <label for="kreditor-beleg">Beleg (PDF/Bild, optional, max. ca. 700 KB)</label>
+          <input type="file" id="kreditor-beleg" accept="application/pdf,image/*">
+          <div id="kreditor-beleg-info" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">Texterkennung (automatisches Auslesen) ist noch nicht verfügbar — der Beleg wird als Referenz gespeichert, Betrag/Lieferant bitte manuell prüfen.</div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="kreditor-cancel-btn">Abbrechen</button>
+          <button type="button" class="btn btn-secondary" id="kreditor-delete-btn" style="display:none;">Löschen</button>
+          <button type="button" class="btn btn-secondary" id="kreditor-freigeben-btn" style="display:none;">Freigeben</button>
+          <button type="button" class="btn btn-secondary" id="kreditor-bezahlt-btn" style="display:none;">Als bezahlt markieren</button>
+          <button type="submit" class="btn primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Konto-Modal (Stammdaten) -->
+  <div class="modal-backdrop" id="konto-modal-backdrop">
+    <div class="modal">
+      <h3>Neues Konto</h3>
+      <form id="konto-form">
+        <div class="field">
+          <label for="konto-nummer">Kontonummer</label>
+          <input type="text" id="konto-nummer" required>
+        </div>
+        <div class="field">
+          <label for="konto-bezeichnung">Bezeichnung</label>
+          <input type="text" id="konto-bezeichnung" required>
+        </div>
+        <div class="field">
+          <label for="konto-klasse">Klasse</label>
+          <select id="konto-klasse">
+            <option value="1">1 — Aktiven</option>
+            <option value="2">2 — Passiven</option>
+            <option value="3">3 — Betriebsertrag</option>
+            <option value="4">4 — Material-/Fremdleistungsaufwand</option>
+            <option value="5">5 — Personalaufwand</option>
+            <option value="6">6 — Übriger Betriebsaufwand</option>
+            <option value="7">7 — Betriebliche Nebenerfolge</option>
+            <option value="8">8 — Betriebsfremd/ausserordentlich</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="konto-cancel-btn">Abbrechen</button>
+          <button type="submit" class="btn primary">Speichern</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -2008,7 +2215,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, increment
+  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, increment, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -2047,6 +2254,84 @@ const KOSTENSTELLEN_COLLECTION = "kostenstellen";
 // Artikel-Katalog: dieselbe Collection wie im Artikel-Reiter (Modul "mat-lager"), hier nur
 // lesend abonniert, um sie auf einen Auftrag buchen zu können.
 const ARTICLES_COLLECTION = "articles";
+// ---- Buchhaltung ----
+const RECHNUNGEN_COLLECTION = "rechnungen";
+const LIEFERANTENRECHNUNGEN_COLLECTION = "lieferantenrechnungen";
+const KONTEN_COLLECTION = "konten";
+const BUCHHALTUNG_SETTINGS_DOC = ["einstellungen", "buchhaltung"];
+// Vorgegebener Kontenplan (aus Contria/ERP übernommen) — wird beim ersten Start einmalig
+// in die Firestore-Collection "konten" importiert, falls diese noch leer ist.
+const KONTENPLAN_SEED = [
+  ["1000","Kasse","1"],["1010","Post","1"],["1015","WIR-Barkonto","1"],["1020","KK Valiant Bank","1"],
+  ["1023","KK Berner Kantonalbank","1"],["1030","KK Bank Oberaargau AG","1"],["1040","Eurokonto, Bank Oberaargau AG","1"],
+  ["1090","Geld-Transferkonto","1"],["1100","Forderungen (Debitoren)","1"],["1109","Delkredere","1"],
+  ["1176","Guthaben Verrechnungssteuer","1"],["1190","WIR-Guthaben","1"],["1200","Vorräte","1"],
+  ["1209","Privil. Warenreserve","1"],["1280","Angefangene Arbeiten","1"],["1300","Aktive Rechnungsabgrenzung","1"],
+  ["1310","Kontrollkonto FIBU","1"],["1320","Kontrollkonto DEBI","1"],["1330","Lohnabrechnungskonto","1"],
+  ["1331","Sozialleistungen Ferien/Ueberzeiten","1"],["1400","Wertschriften","1"],["1420","Beteiligungen","1"],
+  ["1440","Darlehensforderungen","1"],["1500","Maschinen und Apparate","1"],["1501","Fahrzeuge in Leasing","1"],
+  ["1510","Mobiliar und Einrichtungen","1"],["1520","Büromaschinen, EDV-Anlagen","1"],["1526","Software","1"],
+  ["1530","Fahrzeuge","1"],["1540","Werkzeuge und Geräte","1"],["1600","Werkhalle Neubau 2001","1"],
+  ["1601","Erweiterung 2008","1"],["1602","Erweiterung 2015","1"],["1603","Erweiterung Zwillingshalle 2022","1"],
+  ["1800","Gründungskosten","1"],["1960","Betriebsfremde Liegenschaften","1"],
+  ["2000","Kreditoren","2"],["2030","Anzahlungen von Kunden","2"],["2100","Bankschulden","2"],
+  ["2160","Kontokorrent M. Füglistaller","2"],["2161","Kontokorrent St. Ramseier","2"],["2162","Kontokorrent Joel Ramseier","2"],
+  ["2165","FRM Holding AG","2"],["2200","Quartalsabrechnung MWST","2"],["2201","Umsatzsteuer 8.1 %","2"],
+  ["2205","Vorsteuer Material/Dienstleistung","2"],["2207","Vorsteuer Investitionen/Betriebsaufwand","2"],
+  ["2230","Dividendenkonto","2"],["2300","Passive Rechnungsabgrenzung","2"],["2310","Kompensationszeiten Kontrollkonto","2"],
+  ["2440","Hypothekarschulden","2"],["2500","Darlehensschulden Dritte","2"],["2600","Rückstellungen Garantiearbeiten","2"],
+  ["2610","Rückstellungen Steuern","2"],["2800","Aktienkapital","2"],["2900","Gesetzliche Reserve","2"],
+  ["2915","Freie Reserve","2"],["2990","Bilanzgewinn/-verlust","2"],["2999","Abklärungskonto","2"],
+  ["3000","Erlös Stahl","3"],["3020","Erlös Alu","3"],["3070","Barverkäufe inkl. MWST","3"],
+  ["3089","Veränderung angef. Arbeiten ohne MWST","3"],["3090","Skontoabzüge","3"],["3092","Akontorechnungen inkl. MWST","3"],
+  ["3600","Nebenertrag aus Lieferungen/Leistungen","3"],["3800","Bestandesänderungen","3"],["3900","Rabatte und Skonti","3"],
+  ["3905","Verluste und Veränderung WB aus Forderungen","3"],["3907","Frachten, Porti","3"],
+  ["4000","Div. Material","4"],["4011","Div. Material Stahl","4"],["4012","Div. Material Alu","4"],
+  ["4021","Div. Material Profile Stahl","4"],["4022","Div. Material Profile Alu","4"],["4031","Div. Material Bleche Stahl","4"],
+  ["4032","Div. Material Bleche Alu","4"],["4041","Div. Material Beschläge Stahl","4"],["4042","Div. Material Beschläge Alu","4"],
+  ["4051","Div. Material Isolationen Stahl","4"],["4061","Div. Material für Montage Stahl","4"],["4070","Abdichtungsmaterial","4"],
+  ["4211","Fremdarb. Oberflächen Stahl","4"],["4212","Fremdarb. Oberflächen Alu","4"],["4221","Glas nur Lieferung Stahl","4"],
+  ["4222","Glas nur Lieferung Alu","4"],["4231","Glas Montage Stahl","4"],["4232","Glas Montage Alu","4"],
+  ["4240","Beschattungen","4"],["4241","Beschattungen Stahl","4"],["4242","Beschattungen Alu","4"],
+  ["4250","Abdichtungen","4"],["4251","Abdichtungen Stahl","4"],["4400","Fremdarbeiten","4"],
+  ["4401","Fremdarbeiten Stahl","4"],["4402","Fremdarbeiten Alu","4"],["4403","Fremdarbeiten Blech","4"],
+  ["4490","Transporte, Pneukran","4"],["4491","Kreditoren, Skonti","4"],
+  ["5000","Löhne","5"],["5001","Lohnpfändung","5"],["5005","Taggelder, EO-Entschädigungen","5"],
+  ["5700","AHV/IV/EO/ALV/FAK","5"],["5720","Berufliche Vorsorge, BVG Futura","5"],["5730","Unfallversicherung, SUVA","5"],
+  ["5740","Krankentaggeldversicherung, Zürich","5"],["5745","Quellensteuer","5"],["5750","Solidaritätsbeiträge, GAV","5"],
+  ["5760","Betriebssanität- und Sicherheit","5"],["5770","Lehrlingsausbildung","5"],["5800","Personalbeschaffung","5"],
+  ["5810","Aus- und Weiterbildung","5"],["5820","Spesenentschädigungen","5"],["5830","Fixe Spesen","5"],
+  ["5850","Ueberkleider","5"],["5880","Sonstiger Personalaufwand","5"],["5900","Temporäre Arbeitnehmer","5"],
+  ["5999","Lohnrundungsdifferenzkonto","5"],
+  ["6000","Mietwert, Steinackerweg 16","6"],["6030","Nebenkosten","6"],["6040","Reinigung Geschäftslokalitäten","6"],
+  ["6050","Unterhalt Geschäftslokalitäten","6"],["6100","Unterhalt, Ersatz und Reparaturen","6"],["6110","Verbrauchswerkzeuge","6"],
+  ["6160","Leasingaufwand mobile Sachanlagen","6"],["6200","Betriebsaufwand Fahrzeuge","6"],["6260","Leasing/Miete Fahrzeuge","6"],
+  ["6270","Privatanteile Fahrzeuge","6"],["6280","Frachten, Spediteur","6"],["6300","Sach- und Haftpflichtversicherungen","6"],
+  ["6360","Abgaben, Gebühren, Bewilligungen","6"],["6400","Strom, Gas","6"],["6430","Wasser und Abwasser","6"],
+  ["6480","Entsorgungsaufwand","6"],["6500","Büromaterial, Fachliteratur","6"],["6510","Telefon / Kommunikation","6"],
+  ["6513","Portogebühren","6"],["6520","Verbandsbeiträge","6"],["6530","Rechtsberatung / Treuhand","6"],
+  ["6540","Zertifizierungen / Lizenzen","6"],["6560","Leasing Hard- und Software","6"],["6570","Übriger Informatikaufwand","6"],
+  ["6590","Betreibungen / Creditreform","6"],["6600","Werbeaufwand","6"],["6610","Inserate / Publikationen","6"],
+  ["6620","Werbung Internet","6"],["6640","Reise- und Repräsentationsspesen","6"],["6700","Übriger Betriebsaufwand, Allg. Unkosten","6"],
+  ["6820","Abschreibungen mobile Sachanlagen","6"],["6830","Abschreibungen immobile Sachanlagen","6"],
+  ["6850","Übriger Finanzertrag","6"],["6900","Zinsaufwand, Bankspesen","6"],["6940","Bankspesen","6"],["6950","Finanzertrag","6"],
+  ["7500","Eigenmiete Steinackerweg 16","7"],["7510","Hypothekarzinsen 16","7"],["7511","Baurechtszins 16","7"],
+  ["7520","Liegenschaftsunterhalt 16","7"],["7521","Liegenschaftssteuern und Vers.16","7"],["7530","Abschreibungen Liegenschaft 16","7"],
+  ["7600","Mietzinseinnahmen 14","7"],["7610","Hypothekarzinsen 14","7"],["7611","Baurechtszins 14","7"],
+  ["7620","Liegenschaftsunterhalt 14","7"],["7621","Liegenschaftssteuern und Vers. 14","7"],["7622","Nebenkosten Heizung/Strom 14","7"],
+  ["7630","Abschreibung Liegenschaft 14","7"],["7900","Gewinne aus Finanzanlagen","7"],["7910","Gewinne aus mobilen Sachanlagen","7"],
+  ["7920","Gewinne aus immobilen Sachanlagen","7"],
+  ["8000","Ausserordentlicher Ertrag","8"],["8010","Ausserordentlicher Aufwand","8"],["8700","Sonstiger betriebsfremder Ertrag","8"],
+  ["8710","Sonstiger betriebsfremder Aufwand","8"],["8900","Steuern","8"]
+];
+const MWST_CODES = [
+  {code:"Ust81", satz:8.1, label:"Umsatzsteuer Normalsatz 8.1%"},
+  {code:"VSB81", satz:8.1, label:"Vorsteuer Betriebsaufwand 8.1%"},
+  {code:"VSM81", satz:8.1, label:"Vorsteuer Material/Dienstleistung 8.1%"},
+  {code:"VSB26", satz:2.6, label:"Vorsteuer reduziert 2.6%"},
+  {code:"VSB38", satz:3.8, label:"Vorsteuer Sondersatz 3.8%"},
+  {code:"VSB00", satz:0, label:"Nicht steuerbar / befreit 0%"}
+];
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -2097,6 +2382,11 @@ let unsubKunden = null;
 let unsubKostenartenStamm = null;
 let unsubKostenstellen = null;
 let unsubArtikelStamm = null;
+let unsubRechnungen = null;
+let unsubLieferantenrechnungen = null;
+let unsubKonten = null;
+let unsubBuchhaltungSettings = null;
+let buchhaltungSubscribed = false;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -2107,8 +2397,13 @@ onAuthStateChanged(auth, async user => {
     state.currentName = usernameToAuthEmail ? (user.email||'').replace(AUTH_DOMAIN_SUFFIX,'') : '';
     try{
       const roleSnap = await getDoc(doc(db, 'roles', user.uid));
-      state.isAdmin = !!(roleSnap.exists() && roleSnap.data().role === 'admin');
-    }catch(e){ console.error('Rolle konnte nicht geladen werden', e); state.isAdmin = false; }
+      var roleVal = roleSnap.exists() ? roleSnap.data().role : null;
+      state.isAdmin = roleVal === 'admin';
+      // Buchhaltung: Admins (Geschäftsleitung) haben immer Zugriff + Freigaberecht; zusätzlich
+      // kann eine Bürokraft die Rolle "buchhaltung" erhalten (erfassen, aber keine Freigabe
+      // über der Schwelle in buchhaltungSettings.freigabeSchwelle).
+      state.isBuchhaltung = state.isAdmin || roleVal === 'buchhaltung';
+    }catch(e){ console.error('Rolle konnte nicht geladen werden', e); state.isAdmin = false; state.isBuchhaltung = false; }
     applyRoleVisibility();
     if(unsubOrders) unsubOrders();
     if(unsubStaff) unsubStaff();
@@ -2164,14 +2459,20 @@ onAuthStateChanged(auth, async user => {
 // Admin/Produktionsleitung sieht weiterhin alles.
 function applyRoleVisibility(){
   var adminOnlyTabs = ["table","verwaltung","einstellungen","saldo"];
+  var buchhaltungOnlyTabs = ["buchhaltung"];
   document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
     var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
-    b.style.display = (isAdminOnly && !state.isAdmin) ? "none" : "flex";
+    var isBuchhaltungOnly = buchhaltungOnlyTabs.indexOf(b.dataset.view) !== -1;
+    var hidden = (isAdminOnly && !state.isAdmin) || (isBuchhaltungOnly && !state.isBuchhaltung);
+    b.style.display = hidden ? "none" : "flex";
   });
+  var buchhaltungSection = document.querySelector('.side-section[data-section="buchhaltung"]');
+  if(buchhaltungSection) buchhaltungSection.style.display = state.isBuchhaltung ? "" : "none";
   // Falls ein Mitarbeiter gerade auf einer für ihn ausgeblendeten Ansicht steht, auf die Stempeluhr wechseln.
-  if(!state.isAdmin && adminOnlyTabs.indexOf(state.view) !== -1){
+  if((!state.isAdmin && adminOnlyTabs.indexOf(state.view) !== -1) || (!state.isBuchhaltung && buchhaltungOnlyTabs.indexOf(state.view) !== -1)){
     state.view = "zeit";
   }
+  if(state.isBuchhaltung) subscribeBuchhaltung();
   render();
 }
 
@@ -2193,6 +2494,53 @@ function subscribeOrders(){
   });
 }
 
+// ---- Buchhaltung: Stammdaten + Debitoren/Kreditoren ----
+async function seedKontenplanIfEmpty(){
+  try{
+    const snap = await getDoc(doc(db, 'meta', 'kontenplanSeeded'));
+    if(snap.exists()) return;
+    for(var i=0;i<KONTENPLAN_SEED.length;i++){
+      var row = KONTENPLAN_SEED[i];
+      await setDoc(doc(db, KONTEN_COLLECTION, row[0]), { nummer: row[0], bezeichnung: row[1], klasse: row[2] });
+    }
+    await setDoc(doc(db, 'meta', 'kontenplanSeeded'), { seededAt: Date.now() });
+  }catch(e){ console.error('Kontenplan-Import fehlgeschlagen', e); }
+}
+function subscribeBuchhaltung(){
+  if(buchhaltungSubscribed) return;
+  buchhaltungSubscribed = true;
+  seedKontenplanIfEmpty();
+  unsubRechnungen = onSnapshot(query(collection(db, RECHNUNGEN_COLLECTION), orderBy('nummer', 'desc')), snap => {
+    state.rechnungen = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => console.error(err));
+  unsubLieferantenrechnungen = onSnapshot(query(collection(db, LIEFERANTENRECHNUNGEN_COLLECTION), orderBy('erfasstAm', 'desc')), snap => {
+    state.lieferantenrechnungen = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => console.error(err));
+  unsubKonten = onSnapshot(query(collection(db, KONTEN_COLLECTION), orderBy('nummer')), snap => {
+    state.konten = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => console.error(err));
+  unsubBuchhaltungSettings = onSnapshot(doc(db, BUCHHALTUNG_SETTINGS_DOC[0], BUCHHALTUNG_SETTINGS_DOC[1]), snap => {
+    if(snap.exists()) state.buchhaltungSettings = Object.assign({ freigabeSchwelle: 5000 }, snap.data());
+    render();
+  }, err => console.error(err));
+}
+// Rechnungsnummernkreis neu ab 1.1.2027: Format "<Jahr>-<4-stellig>", z.B. "2027-0001".
+// Läuft als Transaktion über einen Zählerdocument pro Jahr, damit zwei gleichzeitige
+// Erfassungen nie dieselbe Nummer erhalten.
+async function naechsteRechnungsnummer(){
+  var jahr = new Date().getFullYear();
+  if(jahr < 2027) jahr = 2027; // Nummernkreis beginnt erst zum 1.1.2027 neu
+  var counterRef = doc(db, 'zaehler', 'rechnungsnummer_' + jahr);
+  return runTransaction(db, async tx => {
+    var snap = await tx.get(counterRef);
+    var naechste = snap.exists() ? (snap.data().naechste || 1) : 1;
+    tx.set(counterRef, { naechste: naechste + 1 }, { merge: true });
+    return jahr + '-' + String(naechste).padStart(4, '0');
+  });
+}
 function subscribeKunden(){
   const q = query(collection(db, KUNDEN_COLLECTION), orderBy('firma'));
   unsubKunden = onSnapshot(q, snap => {
@@ -2344,7 +2692,12 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "" };
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "",
+  // ---- Buchhaltung ----
+  rechnungen: [], lieferantenrechnungen: [], konten: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
+  buchhaltungSettings: { freigabeSchwelle: 5000 }, editingRechnungId: null, editingKreditorId: null, rechnungOrderId: null,
+  kreditorBelegDataUrl: null, kreditorBelegName: ""
+};
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
 function fromISO(iso){ return new Date(iso + "T00:00:00"); }
@@ -2472,7 +2825,7 @@ var HEADER_INFO = {
   staff: ["Personalplanung", "Mitarbeiter den Aufträgen zuteilen"],
   lager: ["Artikelsammlung", "Lagerbestand und Artikel"],
   verwaltung: ["Verwaltung", "Nutzerkonten und Mitarbeiter verwalten"],
-  buchhaltung: ["Buchhaltung", "Dieser Bereich kommt noch"]
+  buchhaltung: ["Buchhaltung", "Debitoren, Kreditoren und Stammdaten"]
 };
 var lastRenderedView = null;
 function render(){
@@ -2517,10 +2870,13 @@ function render(){
   if(isSaldo){ renderFerienSaldoPanel(); return; }
   if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); renderKostenstellenPanel(); return; }
   if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
-  if(isBuchhaltung){ return; }
+  if(isBuchhaltung){ renderBuchhaltungPage(); return; }
 }
 function renderHeader(){
-  document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>b.classList.toggle("active", b.dataset.view===state.view));
+  document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
+    var active = b.dataset.view===state.view && (!b.dataset.buchhaltungTab || b.dataset.buchhaltungTab===state.buchhaltungTab);
+    b.classList.toggle("active", active);
+  });
   document.querySelectorAll("#filter-chips button").forEach(b=>b.classList.toggle("active", b.dataset.filter===state.filter));
   var info = HEADER_INFO[state.view] || ["PRODUKTION.PLAN", ""];
   var titleEl = $("#header-title"), subEl = $("#header-sub");
@@ -4603,6 +4959,325 @@ $("#kunde-delete-btn").addEventListener("click", async ()=>{
   catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
 });
 
+/* ========== Buchhaltung ========== */
+function formatCHF(n){ return (Number(n)||0).toLocaleString('de-CH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function orderDisplayNameSafe(o){ return o ? (typeof orderDisplayName==="function" ? orderDisplayName(o) : (o.customer||"")) : ""; }
+
+function renderBuchhaltungPage(){
+  document.querySelectorAll("#bh-tabbar .bh-tab").forEach(b=>b.classList.toggle("active", b.dataset.bhTab===state.buchhaltungTab));
+  $("#bh-debitoren-panel").style.display = state.buchhaltungTab==="debitoren" ? "block" : "none";
+  $("#bh-kreditoren-panel").style.display = state.buchhaltungTab==="kreditoren" ? "block" : "none";
+  $("#bh-stammdaten-panel").style.display = state.buchhaltungTab==="stammdaten" ? "block" : "none";
+  if(state.buchhaltungTab==="debitoren") renderDebitorenPanel();
+  else if(state.buchhaltungTab==="kreditoren") renderKreditorenPanel();
+  else renderStammdatenPanel();
+}
+
+function renderDebitorenPanel(){
+  var tbody = $("#bh-debitoren-tbody");
+  if(!tbody) return;
+  var search = ($("#bh-debitoren-search").value||"").trim().toLowerCase();
+  var rows = state.rechnungen.slice();
+  if(search){
+    rows = rows.filter(r => (r.nummer||"").toLowerCase().includes(search) || (r.orderNumber||"").toLowerCase().includes(search) || (r.kunde||"").toLowerCase().includes(search));
+  }
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="8">Noch keine Rechnungen erfasst.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r=>{
+    var total = (Number(r.betrag)||0) * (1 + (Number(r.mwstSatz)||0)/100);
+    return '<tr data-id="' + r.id + '">' +
+      '<td data-label="Nummer"><strong>' + escapeHtml(r.nummer||"") + '</strong></td>' +
+      '<td data-label="Datum">' + escapeHtml(r.datum||"") + '</td>' +
+      '<td data-label="Auftrag">' + escapeHtml(r.orderNumber||"–") + '</td>' +
+      '<td data-label="Kunde">' + escapeHtml(r.kunde||"") + '</td>' +
+      '<td data-label="Typ">' + (r.typ==="akonto" ? "Akonto" : "Schlussrechnung") + '</td>' +
+      '<td data-label="Betrag">CHF ' + formatCHF(total) + '</td>' +
+      '<td data-label="Status"><span class="bh-status ' + (r.status||"offen") + '">' + (r.status==="bezahlt"?"Bezahlt":"Offen") + '</span></td>' +
+      '<td style="text-align:right;"><button type="button" class="btn" data-edit-rechnung="' + r.id + '">Öffnen</button></td>' +
+      '</tr>';
+  }).join("");
+}
+$("#bh-debitoren-search").addEventListener("input", renderDebitorenPanel);
+
+function renderKreditorenPanel(){
+  var tbody = $("#bh-kreditoren-tbody");
+  if(!tbody) return;
+  var search = ($("#bh-kreditoren-search").value||"").trim().toLowerCase();
+  var rows = state.lieferantenrechnungen.slice();
+  if(search){
+    rows = rows.filter(r => (r.lieferant||"").toLowerCase().includes(search) || (r.rechnungsnummer||"").toLowerCase().includes(search));
+  }
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Noch keine Kreditorenrechnungen erfasst.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r=>{
+    var statusLabelK = r.status==="bezahlt" ? "Bezahlt" : (r.status==="freigegeben" ? "Freigegeben" : "Offen");
+    return '<tr data-id="' + r.id + '">' +
+      '<td data-label="Lieferant"><strong>' + escapeHtml(r.lieferant||"") + '</strong></td>' +
+      '<td data-label="Rechnungsnr.">' + escapeHtml(r.rechnungsnummer||"") + '</td>' +
+      '<td data-label="Konto">' + escapeHtml((r.konto||"") + (r.kontoBezeichnung?(" – "+r.kontoBezeichnung):"")) + '</td>' +
+      '<td data-label="Betrag">CHF ' + formatCHF(r.betrag) + '</td>' +
+      '<td data-label="Fällig">' + escapeHtml(r.faelligkeitsdatum||"–") + '</td>' +
+      '<td data-label="Status"><span class="bh-status ' + (r.status||"offen") + '">' + statusLabelK + '</span></td>' +
+      '<td style="text-align:right;"><button type="button" class="btn" data-edit-kreditor="' + r.id + '">Öffnen</button></td>' +
+      '</tr>';
+  }).join("");
+}
+$("#bh-kreditoren-search").addEventListener("input", renderKreditorenPanel);
+
+function renderStammdatenPanel(){
+  var tbody = $("#bh-konten-tbody");
+  if(tbody){
+    var search = ($("#bh-konten-search").value||"").trim().toLowerCase();
+    var rows = state.konten.slice().sort((a,b)=>(a.nummer||"").localeCompare(b.nummer||"", undefined, {numeric:true}));
+    if(search) rows = rows.filter(k=>(k.nummer||"").toLowerCase().includes(search) || (k.bezeichnung||"").toLowerCase().includes(search));
+    tbody.innerHTML = rows.length ? rows.map(k=>
+      '<tr><td>' + escapeHtml(k.nummer||"") + '</td><td>' + escapeHtml(k.bezeichnung||"") + '</td><td>' + escapeHtml(k.klasse||"") + '</td>' +
+      '<td style="text-align:right;"><button type="button" class="btn" data-delete-konto="' + k.id + '">Löschen</button></td></tr>'
+    ).join("") : '<tr class="ov-empty-row"><td colspan="4">Keine Konten gefunden.</td></tr>';
+  }
+  var mwstBody = $("#bh-mwst-tbody");
+  if(mwstBody){
+    mwstBody.innerHTML = MWST_CODES.map(m=>'<tr><td>' + m.code + '</td><td>' + m.satz + '%</td><td>' + escapeHtml(m.label) + '</td></tr>').join("");
+  }
+  var schwelleInput = $("#bh-freigabe-schwelle");
+  if(schwelleInput && document.activeElement !== schwelleInput){
+    schwelleInput.value = state.buchhaltungSettings.freigabeSchwelle != null ? state.buchhaltungSettings.freigabeSchwelle : 5000;
+  }
+}
+$("#bh-konten-search").addEventListener("input", renderStammdatenPanel);
+$("#bh-konten-tbody").addEventListener("click", async e=>{
+  var btn = e.target.closest("[data-delete-konto]"); if(!btn) return;
+  if(!confirm("Dieses Konto wirklich löschen?")) return;
+  try{ await deleteDoc(doc(db, KONTEN_COLLECTION, btn.dataset.deleteKonto)); } catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+});
+$("#bh-freigabe-save-btn").addEventListener("click", async ()=>{
+  var val = Number($("#bh-freigabe-schwelle").value) || 0;
+  try{
+    await setDoc(doc(db, BUCHHALTUNG_SETTINGS_DOC[0], BUCHHALTUNG_SETTINGS_DOC[1]), { freigabeSchwelle: val }, { merge: true });
+    toast("Freigabe-Schwelle gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+
+/* ---- Konto-Modal ---- */
+var kontoBackdrop = $("#konto-modal-backdrop");
+$("#bh-konto-add-btn").addEventListener("click", ()=>{
+  $("#konto-nummer").value = ""; $("#konto-bezeichnung").value = ""; $("#konto-klasse").value = "4";
+  kontoBackdrop.classList.add("open");
+  setTimeout(()=>$("#konto-nummer").focus(),30);
+});
+$("#konto-cancel-btn").addEventListener("click", ()=> kontoBackdrop.classList.remove("open"));
+kontoBackdrop.addEventListener("click", e=>{ if(e.target===kontoBackdrop) kontoBackdrop.classList.remove("open"); });
+$("#konto-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var nummer = $("#konto-nummer").value.trim();
+  var bezeichnung = $("#konto-bezeichnung").value.trim();
+  if(!nummer || !bezeichnung) return;
+  try{
+    await setDoc(doc(db, KONTEN_COLLECTION, nummer), { nummer: nummer, bezeichnung: bezeichnung, klasse: $("#konto-klasse").value });
+    kontoBackdrop.classList.remove("open");
+    toast("Konto gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+
+/* ---- Rechnung-Modal (Debitoren) ---- */
+var rechnungBackdrop = $("#rechnung-modal-backdrop");
+function populateRechnungMwstSelect(){
+  var sel = $("#rechnung-mwst");
+  sel.innerHTML = MWST_CODES.filter(m=>m.code.indexOf("Ust")===0 || m.code==="VSB00").map(m=>'<option value="' + m.satz + '">' + m.satz + '% (' + m.code + ')</option>').join("");
+  sel.value = "8.1";
+}
+function openRechnungModal(rechnung, presetOrderId){
+  state.editingRechnungId = rechnung ? rechnung.id : null;
+  state.rechnungOrderId = rechnung ? rechnung.orderId : (presetOrderId || null);
+  $("#rechnung-modal-title").textContent = rechnung ? ("Rechnung " + (rechnung.nummer||"")) : "Neue Rechnung";
+  populateRechnungMwstSelect();
+  var order = state.orders.find(o=>o.id===state.rechnungOrderId);
+  $("#rechnung-order-search").value = order ? (order.orderNumber + " – " + orderDisplayNameSafe(order)) : (rechnung ? (rechnung.orderNumber||"") : "");
+  $("#rechnung-order-list").innerHTML = state.orders.slice().sort((a,b)=>(a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true})).map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(orderDisplayNameSafe(o)) + '">').join("");
+  $("#rechnung-order-info").textContent = order ? ("Kunde: " + (order.customer||"–") + (order.auftragswert ? (" · Auftragswert CHF " + formatCHF(order.auftragswert)) : "")) : "";
+  $("#rechnung-typ").value = rechnung ? (rechnung.typ||"schlussrechnung") : "schlussrechnung";
+  $("#rechnung-betrag").value = rechnung ? rechnung.betrag : (order ? (order.auftragswert||"") : "");
+  if(rechnung) $("#rechnung-mwst").value = rechnung.mwstSatz;
+  $("#rechnung-faellig").value = rechnung ? (rechnung.faelligkeitscode||"30") : "30";
+  $("#rechnung-bezahlt-btn").style.display = (rechnung && rechnung.status!=="bezahlt") ? "inline-block" : "none";
+  updateRechnungTotalPreview();
+  rechnungBackdrop.classList.add("open");
+  setTimeout(()=>$(state.rechnungOrderId?"#rechnung-betrag":"#rechnung-order-search").focus(),30);
+}
+function closeRechnungModal(){ rechnungBackdrop.classList.remove("open"); state.editingRechnungId = null; state.rechnungOrderId = null; }
+function updateRechnungTotalPreview(){
+  var betrag = Number($("#rechnung-betrag").value)||0;
+  var satz = Number($("#rechnung-mwst").value)||0;
+  var total = betrag * (1+satz/100);
+  $("#rechnung-total-preview").textContent = "Total inkl. MWST: CHF " + formatCHF(total);
+}
+$("#rechnung-betrag").addEventListener("input", updateRechnungTotalPreview);
+$("#rechnung-mwst").addEventListener("change", updateRechnungTotalPreview);
+$("#bh-rechnung-add-btn").addEventListener("click", ()=>openRechnungModal(null, null));
+$("#rechnung-cancel-btn").addEventListener("click", closeRechnungModal);
+rechnungBackdrop.addEventListener("click", e=>{ if(e.target===rechnungBackdrop) closeRechnungModal(); });
+$("#rechnung-order-search").addEventListener("input", e=>{
+  var val = e.target.value;
+  var num = val.split(" – ")[0].trim();
+  var order = state.orders.find(o=>o.orderNumber===num);
+  state.rechnungOrderId = order ? order.id : null;
+  $("#rechnung-order-info").textContent = order ? ("Kunde: " + (order.customer||"–") + (order.auftragswert ? (" · Auftragswert CHF " + formatCHF(order.auftragswert)) : "")) : "";
+  if(order && !$("#rechnung-betrag").value) $("#rechnung-betrag").value = order.auftragswert||"";
+  updateRechnungTotalPreview();
+});
+$("#bh-debitoren-tbody").addEventListener("click", e=>{
+  var btn = e.target.closest("[data-edit-rechnung]"); if(!btn) return;
+  var r = state.rechnungen.find(x=>x.id===btn.dataset.editRechnung);
+  if(r) openRechnungModal(r, null);
+});
+$("#rechnung-bezahlt-btn").addEventListener("click", async ()=>{
+  if(!state.editingRechnungId) return;
+  try{
+    await updateDoc(doc(db, RECHNUNGEN_COLLECTION, state.editingRechnungId), { status: "bezahlt", bezahltAm: Date.now() });
+    closeRechnungModal();
+    toast("Als bezahlt markiert.");
+  }catch(err){ console.error(err); toast("Fehlgeschlagen."); }
+});
+$("#rechnung-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var betrag = Number($("#rechnung-betrag").value);
+  if(!betrag || betrag<=0) return;
+  var order = state.orders.find(o=>o.id===state.rechnungOrderId);
+  var payload = {
+    orderId: state.rechnungOrderId || null,
+    orderNumber: order ? order.orderNumber : "",
+    kunde: order ? (order.customer||"") : "",
+    typ: $("#rechnung-typ").value,
+    betrag: betrag,
+    mwstSatz: Number($("#rechnung-mwst").value),
+    faelligkeitscode: $("#rechnung-faellig").value
+  };
+  try{
+    if(state.editingRechnungId){
+      await updateDoc(doc(db, RECHNUNGEN_COLLECTION, state.editingRechnungId), payload);
+    }else{
+      payload.nummer = await naechsteRechnungsnummer();
+      payload.datum = toISO(new Date());
+      payload.status = "offen";
+      payload.erstelltAm = Date.now();
+      await addDoc(collection(db, RECHNUNGEN_COLLECTION), payload);
+    }
+    closeRechnungModal();
+    toast("Rechnung gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+
+/* ---- Kreditorenrechnung-Modal ---- */
+var kreditorBackdrop = $("#kreditor-modal-backdrop");
+function vorschlagKontoFuerKategorie(kategorie){
+  var map = { "Profile":"4021", "Beschläge":"4041", "Peterhans":"4000", "Sonstiges":"4000" };
+  return map[kategorie] || "";
+}
+function populateKreditorKontoSelect(){
+  var sel = $("#kreditor-konto");
+  var aufwandKonten = state.konten.filter(k=>k.klasse==="4" || k.klasse==="6").sort((a,b)=>(a.nummer||"").localeCompare(b.nummer||"", undefined, {numeric:true}));
+  sel.innerHTML = aufwandKonten.map(k=>'<option value="' + escapeHtml(k.nummer) + '">' + escapeHtml(k.nummer) + ' – ' + escapeHtml(k.bezeichnung) + '</option>').join("");
+}
+function openKreditorModal(k){
+  state.editingKreditorId = k ? k.id : null;
+  state.kreditorBelegDataUrl = k ? (k.belegDataUrl||null) : null;
+  state.kreditorBelegName = k ? (k.belegName||"") : "";
+  $("#kreditor-modal-title").textContent = k ? "Kreditorenrechnung bearbeiten" : "Neue Kreditorenrechnung";
+  populateKreditorKontoSelect();
+  $("#kreditor-lieferant").value = k ? (k.lieferant||"") : "";
+  $("#kreditor-nummer").value = k ? (k.rechnungsnummer||"") : "";
+  $("#kreditor-kategorie").value = k ? (k.kategorie||"") : "";
+  $("#kreditor-konto").value = k ? (k.konto||"") : (vorschlagKontoFuerKategorie("")||"");
+  $("#kreditor-betrag").value = k ? k.betrag : "";
+  $("#kreditor-faellig").value = k ? (k.faelligkeitsdatum||"") : "";
+  $("#kreditor-beleg").value = "";
+  $("#kreditor-beleg-info").textContent = (k && k.belegName) ? ("Hinterlegter Beleg: " + k.belegName) : "Texterkennung (automatisches Auslesen) ist noch nicht verfügbar — der Beleg wird als Referenz gespeichert, Betrag/Lieferant bitte manuell prüfen.";
+  var schwelle = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
+  var ueberSchwelle = k && Number(k.betrag) >= schwelle;
+  $("#kreditor-delete-btn").style.display = k ? "inline-block" : "none";
+  $("#kreditor-freigeben-btn").style.display = (k && k.status==="offen" && (!ueberSchwelle || state.isAdmin)) ? "inline-block" : "none";
+  $("#kreditor-bezahlt-btn").style.display = (k && k.status==="freigegeben") ? "inline-block" : "none";
+  kreditorBackdrop.classList.add("open");
+  setTimeout(()=>$("#kreditor-lieferant").focus(),30);
+}
+function closeKreditorModal(){ kreditorBackdrop.classList.remove("open"); state.editingKreditorId = null; }
+$("#kreditor-kategorie").addEventListener("change", e=>{
+  var vorschlag = vorschlagKontoFuerKategorie(e.target.value);
+  if(vorschlag) $("#kreditor-konto").value = vorschlag;
+});
+$("#kreditor-beleg").addEventListener("change", e=>{
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(file.size > 730000){ toast("Datei zu gross (max. ca. 700 KB) — bitte kleiner scannen/komprimieren."); e.target.value=""; return; }
+  var reader = new FileReader();
+  reader.onload = function(){
+    state.kreditorBelegDataUrl = reader.result;
+    state.kreditorBelegName = file.name;
+    $("#kreditor-beleg-info").textContent = "Beleg bereit zum Speichern: " + file.name;
+  };
+  reader.readAsDataURL(file);
+});
+$("#bh-kreditor-add-btn").addEventListener("click", ()=>openKreditorModal(null));
+$("#kreditor-cancel-btn").addEventListener("click", closeKreditorModal);
+kreditorBackdrop.addEventListener("click", e=>{ if(e.target===kreditorBackdrop) closeKreditorModal(); });
+$("#bh-kreditoren-tbody").addEventListener("click", e=>{
+  var btn = e.target.closest("[data-edit-kreditor]"); if(!btn) return;
+  var k = state.lieferantenrechnungen.find(x=>x.id===btn.dataset.editKreditor);
+  if(k) openKreditorModal(k);
+});
+$("#kreditor-delete-btn").addEventListener("click", async ()=>{
+  if(!state.editingKreditorId) return;
+  if(!confirm("Diese Kreditorenrechnung wirklich löschen?")) return;
+  try{ await deleteDoc(doc(db, LIEFERANTENRECHNUNGEN_COLLECTION, state.editingKreditorId)); closeKreditorModal(); toast("Gelöscht."); }
+  catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+});
+$("#kreditor-freigeben-btn").addEventListener("click", async ()=>{
+  if(!state.editingKreditorId) return;
+  try{
+    await updateDoc(doc(db, LIEFERANTENRECHNUNGEN_COLLECTION, state.editingKreditorId), { status: "freigegeben", freigegebenAm: Date.now(), freigegebenVon: state.currentName });
+    closeKreditorModal();
+    toast("Freigegeben.");
+  }catch(err){ console.error(err); toast("Fehlgeschlagen."); }
+});
+$("#kreditor-bezahlt-btn").addEventListener("click", async ()=>{
+  if(!state.editingKreditorId) return;
+  try{
+    await updateDoc(doc(db, LIEFERANTENRECHNUNGEN_COLLECTION, state.editingKreditorId), { status: "bezahlt", bezahltAm: Date.now() });
+    closeKreditorModal();
+    toast("Als bezahlt markiert.");
+  }catch(err){ console.error(err); toast("Fehlgeschlagen."); }
+});
+$("#kreditor-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var lieferant = $("#kreditor-lieferant").value.trim();
+  var betrag = Number($("#kreditor-betrag").value);
+  if(!lieferant || !betrag || betrag<=0) return;
+  var kontoNr = $("#kreditor-konto").value;
+  var kontoObj = state.konten.find(k=>k.nummer===kontoNr);
+  var schwelle = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
+  var payload = {
+    lieferant: lieferant,
+    rechnungsnummer: $("#kreditor-nummer").value.trim(),
+    kategorie: $("#kreditor-kategorie").value,
+    konto: kontoNr,
+    kontoBezeichnung: kontoObj ? kontoObj.bezeichnung : "",
+    betrag: betrag,
+    faelligkeitsdatum: $("#kreditor-faellig").value,
+    belegDataUrl: state.kreditorBelegDataUrl || null,
+    belegName: state.kreditorBelegName || ""
+  };
+  try{
+    if(state.editingKreditorId){
+      await updateDoc(doc(db, LIEFERANTENRECHNUNGEN_COLLECTION, state.editingKreditorId), payload);
+    }else{
+      payload.status = betrag < schwelle ? "freigegeben" : "offen";
+      payload.erfasstAm = Date.now();
+      payload.erfasstVon = state.currentName;
+      await addDoc(collection(db, LIEFERANTENRECHNUNGEN_COLLECTION), payload);
+    }
+    closeKreditorModal();
+    toast("Kreditorenrechnung gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+
 var staffAddBackdrop = $("#staff-add-modal-backdrop");
 $("#staff-add-btn").addEventListener("click", ()=>{ $("#staff-add-name").value=""; staffAddBackdrop.classList.add("open"); setTimeout(()=>$("#staff-add-name").focus(),30); });
 $("#staff-add-cancel-btn").addEventListener("click", ()=> staffAddBackdrop.classList.remove("open"));
@@ -5429,8 +6104,13 @@ $("#sidebar-nav").addEventListener("click", e=>{
   }
   var b = e.target.closest("button[data-view]");
   if(!b) return;
-  if(b.dataset.view === "buchhaltung"){ toast("Buchhaltung kommt noch."); }
+  if(b.dataset.buchhaltungTab) state.buchhaltungTab = b.dataset.buchhaltungTab;
   state.view = b.dataset.view;
+  render();
+});
+$("#bh-tabbar").addEventListener("click", e=>{
+  var b = e.target.closest("button[data-bh-tab]"); if(!b) return;
+  state.buchhaltungTab = b.dataset.bhTab;
   render();
 });
 $("#filter-chips").addEventListener("click", e=>{ var b=e.target.closest("button[data-filter]"); if(!b) return; state.filter=b.dataset.filter; render(); });
