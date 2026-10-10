@@ -135,6 +135,30 @@
   .bh-status.freigegeben{background:#dce8fd;color:#1b4fa0;}
   .bh-status.bezahlt{background:#dcf5e0;color:#1c7a34;}
 
+  #qr-bill-overlay{position:fixed;inset:0;background:#fff;z-index:400;overflow:auto;}
+  #qr-bill-toolbar{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;gap:10px;z-index:1;}
+  #qr-bill-sheet{width:210mm;min-height:106mm;margin:20px auto;border:1px solid #ccc;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;display:flex;}
+  .qrb-receipt{width:62mm;padding:5mm;box-sizing:border-box;border-right:1px dashed #000;font-size:9px;}
+  .qrb-payment{width:148mm;padding:5mm;box-sizing:border-box;font-size:10px;display:flex;}
+  .qrb-payment-left{width:51mm;}
+  .qrb-payment-right{flex:1;padding-left:5mm;}
+  .qrb-title{font-weight:700;font-size:11px;margin-bottom:3mm;}
+  .qrb-label{font-weight:700;font-size:8px;margin-top:2.5mm;}
+  .qrb-value{font-size:9px;white-space:pre-line;}
+  .qrb-amount-row{display:flex;gap:4mm;margin-top:3mm;}
+  .qrb-qr-wrap{position:relative;width:46mm;height:46mm;margin-top:3mm;}
+  .qrb-cross{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7mm;height:7mm;background:#000;display:flex;align-items:center;justify-content:center;}
+  .qrb-cross::before,.qrb-cross::after{content:"";position:absolute;background:#fff;}
+  .qrb-cross::before{width:3.4mm;height:1mm;}
+  .qrb-cross::after{width:1mm;height:3.4mm;}
+  @media print{
+    #qr-bill-toolbar{display:none;}
+    #qr-bill-sheet{margin:0;border:none;}
+    body *{visibility:hidden;}
+    #qr-bill-overlay, #qr-bill-overlay *{visibility:visible;}
+    #qr-bill-overlay{position:absolute;inset:0;}
+  }
+
   @media (max-width:860px){
     #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:50;box-shadow:2px 0 12px rgba(0,0,0,.08);}
   }
@@ -1291,6 +1315,7 @@
     <div id="bh-kreditoren-panel" style="display:none;">
       <div class="table-toolbar">
         <input type="text" id="bh-kreditoren-search" placeholder="Lieferant oder Rechnungsnr. suchen…" autocomplete="off">
+        <button type="button" class="btn btn-secondary" id="bh-zahlungslauf-btn">Zahlungslauf erstellen</button>
         <button type="button" class="btn primary" id="bh-kreditor-add-btn">+ Kreditorenrechnung</button>
       </div>
       <div class="table-scroll">
@@ -1335,6 +1360,43 @@
         <button type="button" class="btn btn-secondary" id="bh-freigabe-save-btn">Speichern</button>
         <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Kreditorenrechnungen unter diesem Betrag kann die Buchhaltung selbst freigeben. Ab diesem Betrag ist eine Freigabe durch ein Admin-Konto nötig.</div>
       </div>
+      <div class="bh-stamm-block">
+        <h2 class="zeit-h2" style="margin:0 0 8px;">Firmendaten &amp; Bankverbindung (für QR-Rechnung)</h2>
+        <div class="field"><label for="bh-firma-name">Firma</label><input type="text" id="bh-firma-name" placeholder="FR Metallbau AG"></div>
+        <div class="field"><label for="bh-firma-strasse">Strasse + Nr.</label><input type="text" id="bh-firma-strasse"></div>
+        <div style="display:flex;gap:10px;">
+          <div class="field" style="max-width:120px;"><label for="bh-firma-plz">PLZ</label><input type="text" id="bh-firma-plz"></div>
+          <div class="field" style="flex:1;"><label for="bh-firma-ort">Ort</label><input type="text" id="bh-firma-ort"></div>
+        </div>
+        <div class="field"><label for="bh-firma-iban">IBAN / QR-IBAN</label><input type="text" id="bh-firma-iban" placeholder="CH00 0000 0000 0000 0000 0" autocomplete="off"></div>
+        <button type="button" class="btn btn-secondary" id="bh-firma-save-btn">Speichern</button>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Wird für die QR-Rechnung auf den Debitorenrechnungen verwendet. Die IBAN muss von der Bank als QR-IBAN bestätigt sein, sonst wird die Referenznummer beim Scannen nicht erkannt.</div>
+      </div>
+      <div class="bh-stamm-block">
+        <div class="bh-stamm-head"><h2 class="zeit-h2" style="margin:0;">Zahlungsläufe</h2></div>
+        <div class="table-scroll" style="max-height:260px;margin-top:8px;">
+          <table class="overview-table">
+            <thead><tr><th>Datum</th><th>Anzahl Rechnungen</th><th>Total</th><th></th></tr></thead>
+            <tbody id="bh-zahlungslauf-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="bh-stamm-block">
+        <div class="bh-stamm-head"><h2 class="zeit-h2" style="margin:0;">Bankabgleich (camt.053)</h2></div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin:6px 0 10px;">Kontoauszug (camt.053-XML) von der Bank hochladen — Zahlungseingänge werden anhand der QR-Referenznummer automatisch den offenen Rechnungen zugeordnet.</div>
+        <input type="file" id="bh-camt-upload" accept=".xml">
+        <div id="bh-camt-result" style="margin-top:10px;"></div>
+      </div>
+      <div class="bh-stamm-block">
+        <div class="bh-stamm-head"><h2 class="zeit-h2" style="margin:0;">MWST-Übersicht</h2></div>
+        <div class="field" style="max-width:220px;margin-top:8px;"><label for="bh-mwst-quartal">Quartal</label><input type="text" id="bh-mwst-quartal" placeholder="2027-Q1"></div>
+        <div id="bh-mwst-uebersicht"></div>
+      </div>
+      <div class="bh-stamm-block">
+        <div class="bh-stamm-head"><h2 class="zeit-h2" style="margin:0;">Bilanz &amp; Erfolgsrechnung (einfach)</h2></div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin:6px 0 10px;">Auf Basis der automatisch erzeugten Buchungen aus Debitoren-/Kreditorenrechnungen. Noch ohne manuelle Journalbuchungen, Abschreibungen oder Abgrenzungen.</div>
+        <div id="bh-fibu-uebersicht"></div>
+      </div>
     </div>
   </div>
 
@@ -1376,11 +1438,21 @@
         <div id="rechnung-total-preview" style="font-size:13px;margin:4px 0 10px;color:var(--text-muted);"></div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="rechnung-cancel-btn">Abbrechen</button>
+          <button type="button" class="btn btn-secondary" id="rechnung-qr-btn" style="display:none;">QR-Rechnung</button>
           <button type="button" class="btn btn-secondary" id="rechnung-bezahlt-btn" style="display:none;">Als bezahlt markieren</button>
           <button type="submit" class="btn primary">Speichern</button>
         </div>
       </form>
     </div>
+  </div>
+
+  <!-- QR-Rechnung Druckansicht -->
+  <div id="qr-bill-overlay" style="display:none;">
+    <div id="qr-bill-toolbar">
+      <button type="button" class="btn primary" id="qr-bill-print-btn">Drucken</button>
+      <button type="button" class="btn btn-secondary" id="qr-bill-close-btn">Schliessen</button>
+    </div>
+    <div id="qr-bill-sheet"></div>
   </div>
 
   <!-- Kreditorenrechnung-Modal -->
@@ -1411,12 +1483,26 @@
           <select id="kreditor-konto"></select>
         </div>
         <div class="field">
-          <label for="kreditor-betrag">Betrag</label>
+          <label for="kreditor-betrag">Betrag (netto, ohne MWST)</label>
           <input type="number" id="kreditor-betrag" min="0" step="0.05" required>
         </div>
         <div class="field">
+          <label for="kreditor-mwst">Vorsteuer-Satz</label>
+          <select id="kreditor-mwst">
+            <option value="0">0% (keine Vorsteuer)</option>
+            <option value="8.1" selected>8.1% Material/Dienstleistung</option>
+            <option value="2.6">2.6% reduziert</option>
+            <option value="3.8">3.8% Sondersatz</option>
+          </select>
+        </div>
+        <div id="kreditor-total-preview" style="font-size:13px;margin:4px 0 2px;color:var(--text-muted);"></div>
+        <div class="field">
           <label for="kreditor-faellig">Fälligkeitsdatum</label>
           <input type="date" id="kreditor-faellig">
+        </div>
+        <div class="field">
+          <label for="kreditor-iban">Lieferanten-IBAN (für Zahlungslauf, optional)</label>
+          <input type="text" id="kreditor-iban" placeholder="CH00 0000 0000 0000 0000 0" autocomplete="off">
         </div>
         <div class="field">
           <label for="kreditor-beleg">Beleg (PDF/Bild, optional, max. ca. 700 KB)</label>
@@ -2259,6 +2345,13 @@ const RECHNUNGEN_COLLECTION = "rechnungen";
 const LIEFERANTENRECHNUNGEN_COLLECTION = "lieferantenrechnungen";
 const KONTEN_COLLECTION = "konten";
 const BUCHHALTUNG_SETTINGS_DOC = ["einstellungen", "buchhaltung"];
+const BUCHUNGEN_COLLECTION = "buchungen";
+const ZAHLUNGSLAEUFE_COLLECTION = "zahlungslaeufe";
+function mwstAktuellesQuartal(){
+  var d = new Date();
+  var q = Math.floor(d.getMonth()/3)+1;
+  return d.getFullYear() + "-Q" + q;
+}
 // Vorgegebener Kontenplan (aus Contria/ERP übernommen) — wird beim ersten Start einmalig
 // in die Firestore-Collection "konten" importiert, falls diese noch leer ist.
 const KONTENPLAN_SEED = [
@@ -2332,6 +2425,31 @@ const MWST_CODES = [
   {code:"VSB38", satz:3.8, label:"Vorsteuer Sondersatz 3.8%"},
   {code:"VSB00", satz:0, label:"Nicht steuerbar / befreit 0%"}
 ];
+// Mod10-rekursiv-Prüfziffer nach Schweizer Zahlungsstandard (für QR-Referenznummern).
+// Offizielle Tabelle der SIX Implementation Guidelines.
+const MOD10_TABLE = [
+  [0,9,4,6,8,2,7,1,3,5],[9,4,6,8,2,7,1,3,5,0],[4,6,8,2,7,1,3,5,0,9],[6,8,2,7,1,3,5,0,9,4],
+  [8,2,7,1,3,5,0,9,4,6],[2,7,1,3,5,0,9,4,6,8],[7,1,3,5,0,9,4,6,8,2],[1,3,5,0,9,4,6,8,2,7],
+  [3,5,0,9,4,6,8,2,7,1],[5,0,9,4,6,8,2,7,1,3]
+];
+function mod10CheckDigit(digits){
+  var carry = 0;
+  for(var i=0;i<digits.length;i++){ carry = MOD10_TABLE[carry][parseInt(digits[i],10)]; }
+  return [0,9,8,7,6,5,4,3,2,1][carry];
+}
+// QR-Referenznummer (QRR) aus der Rechnungsnummer ableiten: nur Ziffern verwenden,
+// auf 26 Stellen auffüllen + Mod10-Prüfziffer anhängen = 27 Stellen total.
+function qrReferenzAusRechnungsnummer(nummer){
+  var ziffern = String(nummer||"").replace(/\D/g,"");
+  ziffern = ziffern.padStart(26,"0").slice(-26);
+  return ziffern + mod10CheckDigit(ziffern);
+}
+function formatReferenzAnzeige(ref){
+  // In 5er-Gruppen von rechts, wie auf der Schweizer QR-Rechnung üblich.
+  var rev = ref.split("").reverse().join("");
+  var grouped = rev.match(/.{1,5}/g).join(" ");
+  return grouped.split("").reverse().join("");
+}
 // Fallback-Sollstunden pro Werktag, wenn einem Mitarbeiter (noch) kein Zeitmodell zugewiesen ist.
 const FALLBACK_DAILY_HOURS = 8.4;
 
@@ -2387,6 +2505,8 @@ let unsubLieferantenrechnungen = null;
 let unsubKonten = null;
 let unsubBuchhaltungSettings = null;
 let buchhaltungSubscribed = false;
+let unsubBuchungen = null;
+let unsubZahlungslaeufe = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -2523,9 +2643,29 @@ function subscribeBuchhaltung(){
     render();
   }, err => console.error(err));
   unsubBuchhaltungSettings = onSnapshot(doc(db, BUCHHALTUNG_SETTINGS_DOC[0], BUCHHALTUNG_SETTINGS_DOC[1]), snap => {
-    if(snap.exists()) state.buchhaltungSettings = Object.assign({ freigabeSchwelle: 5000 }, snap.data());
+    if(snap.exists()) state.buchhaltungSettings = Object.assign({ freigabeSchwelle: 5000, firma:"", strasse:"", plz:"", ort:"", iban:"" }, snap.data());
     render();
   }, err => console.error(err));
+  unsubBuchungen = onSnapshot(query(collection(db, BUCHUNGEN_COLLECTION), orderBy('datum', 'desc')), snap => {
+    state.buchungen = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => console.error(err));
+  unsubZahlungslaeufe = onSnapshot(query(collection(db, ZAHLUNGSLAEUFE_COLLECTION), orderBy('erstelltAm', 'desc')), snap => {
+    state.zahlungslaeufe = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => console.error(err));
+}
+// Legt einen einfachen Buchungssatz im Hauptbuch an (Soll/Haben je ein Konto, wie bei einer
+// Grundbuchhaltung ohne Mehrfachkontierung). Wird automatisch bei den zentralen Belegvorgängen
+// ausgelöst (Rechnung erstellt/bezahlt, Kreditorenrechnung erfasst/bezahlt).
+async function legeBuchung(text, sollKonto, habenKonto, betrag, belegRef){
+  if(!betrag || betrag<=0) return;
+  try{
+    await addDoc(collection(db, BUCHUNGEN_COLLECTION), {
+      datum: toISO(new Date()), text: text, soll: sollKonto, haben: habenKonto, betrag: betrag,
+      belegRef: belegRef || "", erstelltAm: Date.now(), erstelltVon: state.currentName
+    });
+  }catch(e){ console.error("Buchung fehlgeschlagen", e); }
 }
 // Rechnungsnummernkreis neu ab 1.1.2027: Format "<Jahr>-<4-stellig>", z.B. "2027-0001".
 // Läuft als Transaktion über einen Zählerdocument pro Jahr, damit zwei gleichzeitige
@@ -2694,9 +2834,10 @@ function subscribeTerminserien(){
 
 var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "",
   // ---- Buchhaltung ----
-  rechnungen: [], lieferantenrechnungen: [], konten: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
-  buchhaltungSettings: { freigabeSchwelle: 5000 }, editingRechnungId: null, editingKreditorId: null, rechnungOrderId: null,
-  kreditorBelegDataUrl: null, kreditorBelegName: ""
+  rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
+  buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
+  editingRechnungId: null, editingKreditorId: null, rechnungOrderId: null,
+  kreditorBelegDataUrl: null, kreditorBelegName: "", mwstQuartal: mwstAktuellesQuartal()
 };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
@@ -5013,7 +5154,7 @@ function renderKreditorenPanel(){
       '<td data-label="Lieferant"><strong>' + escapeHtml(r.lieferant||"") + '</strong></td>' +
       '<td data-label="Rechnungsnr.">' + escapeHtml(r.rechnungsnummer||"") + '</td>' +
       '<td data-label="Konto">' + escapeHtml((r.konto||"") + (r.kontoBezeichnung?(" – "+r.kontoBezeichnung):"")) + '</td>' +
-      '<td data-label="Betrag">CHF ' + formatCHF(r.betrag) + '</td>' +
+      '<td data-label="Betrag">CHF ' + formatCHF((Number(r.betrag)||0)*(1+(Number(r.mwstSatz)||0)/100)) + '</td>' +
       '<td data-label="Fällig">' + escapeHtml(r.faelligkeitsdatum||"–") + '</td>' +
       '<td data-label="Status"><span class="bh-status ' + (r.status||"offen") + '">' + statusLabelK + '</span></td>' +
       '<td style="text-align:right;"><button type="button" class="btn" data-edit-kreditor="' + r.id + '">Öffnen</button></td>' +
@@ -5041,7 +5182,95 @@ function renderStammdatenPanel(){
   if(schwelleInput && document.activeElement !== schwelleInput){
     schwelleInput.value = state.buchhaltungSettings.freigabeSchwelle != null ? state.buchhaltungSettings.freigabeSchwelle : 5000;
   }
+  if(document.activeElement !== $("#bh-firma-name")) $("#bh-firma-name").value = state.buchhaltungSettings.firma||"";
+  if(document.activeElement !== $("#bh-firma-strasse")) $("#bh-firma-strasse").value = state.buchhaltungSettings.strasse||"";
+  if(document.activeElement !== $("#bh-firma-plz")) $("#bh-firma-plz").value = state.buchhaltungSettings.plz||"";
+  if(document.activeElement !== $("#bh-firma-ort")) $("#bh-firma-ort").value = state.buchhaltungSettings.ort||"";
+  if(document.activeElement !== $("#bh-firma-iban")) $("#bh-firma-iban").value = state.buchhaltungSettings.iban||"";
+
+  var zlBody = $("#bh-zahlungslauf-tbody");
+  if(zlBody){
+    zlBody.innerHTML = state.zahlungslaeufe.length ? state.zahlungslaeufe.map(z=>
+      '<tr><td>' + escapeHtml(z.datum||"") + '</td><td>' + (z.anzahl||0) + '</td><td>CHF ' + formatCHF(z.total) + '</td>' +
+      '<td style="text-align:right;"><button type="button" class="btn" data-dl-zahlungslauf="' + z.id + '">pain.001 herunterladen</button></td></tr>'
+    ).join("") : '<tr class="ov-empty-row"><td colspan="4">Noch kein Zahlungslauf erstellt.</td></tr>';
+  }
+
+  if(document.activeElement !== $("#bh-mwst-quartal")) $("#bh-mwst-quartal").value = state.mwstQuartal;
+  renderMwstUebersicht();
+  renderFibuUebersicht();
 }
+function parseQuartal(q){
+  var m = /^(\d{4})-Q([1-4])$/.exec(q||"");
+  if(!m) return null;
+  var jahr = Number(m[1]), quartal = Number(m[2]);
+  var startMonat = (quartal-1)*3;
+  var von = new Date(jahr, startMonat, 1);
+  var bis = new Date(jahr, startMonat+3, 0);
+  return { von: toISO(von), bis: toISO(bis) };
+}
+function renderMwstUebersicht(){
+  var el = $("#bh-mwst-uebersicht");
+  if(!el) return;
+  var range = parseQuartal(state.mwstQuartal);
+  if(!range){ el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Quartal im Format "2027-Q1" eingeben.</div>'; return; }
+  var rechnungenImQuartal = state.rechnungen.filter(r=>r.datum && r.datum>=range.von && r.datum<=range.bis);
+  var umsatzNetto = rechnungenImQuartal.reduce((s,r)=>s+(Number(r.betrag)||0), 0);
+  var umsatzsteuer = rechnungenImQuartal.reduce((s,r)=>s+(Number(r.betrag)||0)*(Number(r.mwstSatz)||0)/100, 0);
+  var kreditorenImQuartal = state.lieferantenrechnungen.filter(r=>r.erfasstAm && toISO(new Date(r.erfasstAm))>=range.von && toISO(new Date(r.erfasstAm))<=range.bis);
+  var vorsteuer = kreditorenImQuartal.reduce((s,r)=>s+(Number(r.betrag)||0)*(Number(r.mwstSatz)||0)/100, 0);
+  var zahllast = umsatzsteuer - vorsteuer;
+  el.innerHTML =
+    '<table class="overview-table" style="margin-top:8px;"><tbody>' +
+    '<tr><td>Umsatz netto (' + rechnungenImQuartal.length + ' Rechnungen)</td><td style="text-align:right;">CHF ' + formatCHF(umsatzNetto) + '</td></tr>' +
+    '<tr><td>Umsatzsteuer (geschuldet)</td><td style="text-align:right;">CHF ' + formatCHF(umsatzsteuer) + '</td></tr>' +
+    '<tr><td>Vorsteuer (abziehbar, ' + kreditorenImQuartal.length + ' Kreditorenrechnungen)</td><td style="text-align:right;">CHF ' + formatCHF(vorsteuer) + '</td></tr>' +
+    '<tr style="font-weight:700;"><td>Zahllast an die ESTV</td><td style="text-align:right;">CHF ' + formatCHF(zahllast) + '</td></tr>' +
+    '</tbody></table>';
+}
+$("#bh-mwst-quartal").addEventListener("input", e=>{ state.mwstQuartal = e.target.value.trim(); renderMwstUebersicht(); });
+function renderFibuUebersicht(){
+  var el = $("#bh-fibu-uebersicht");
+  if(!el) return;
+  var salden = {};
+  state.buchungen.forEach(b=>{
+    salden[b.soll] = (salden[b.soll]||0) + (Number(b.betrag)||0);
+    salden[b.haben] = (salden[b.haben]||0) - (Number(b.betrag)||0);
+  });
+  var kontoName = function(nr){ var k = state.konten.find(x=>x.nummer===nr); return k ? k.bezeichnung : nr; };
+  var aktiven=0, passiven=0, ertrag=0, aufwand=0;
+  Object.keys(salden).forEach(function(nr){
+    var klasse = (state.konten.find(k=>k.nummer===nr)||{}).klasse;
+    var val = salden[nr];
+    if(klasse==="1") aktiven += val;
+    else if(klasse==="2") passiven += -val;
+    else if(klasse==="3") ertrag += -val;
+    else if(klasse==="4"||klasse==="5"||klasse==="6") aufwand += val;
+  });
+  var gewinn = ertrag - aufwand;
+  var rows = Object.keys(salden).filter(nr=>Math.abs(salden[nr])>0.005).sort().map(function(nr){
+    return '<tr><td>' + escapeHtml(nr) + ' – ' + escapeHtml(kontoName(nr)) + '</td><td style="text-align:right;">CHF ' + formatCHF(salden[nr]) + '</td></tr>';
+  }).join("");
+  el.innerHTML =
+    '<table class="overview-table" style="margin-top:8px;"><tbody>' +
+    '<tr><td>Aktiven (Konten Klasse 1)</td><td style="text-align:right;">CHF ' + formatCHF(aktiven) + '</td></tr>' +
+    '<tr><td>Passiven inkl. Kreditoren (Konten Klasse 2)</td><td style="text-align:right;">CHF ' + formatCHF(passiven) + '</td></tr>' +
+    '<tr><td>Ertrag (Konten Klasse 3)</td><td style="text-align:right;">CHF ' + formatCHF(ertrag) + '</td></tr>' +
+    '<tr><td>Aufwand (Konten Klasse 4–6)</td><td style="text-align:right;">CHF ' + formatCHF(aufwand) + '</td></tr>' +
+    '<tr style="font-weight:700;"><td>Betriebsergebnis (vereinfacht)</td><td style="text-align:right;">CHF ' + formatCHF(gewinn) + '</td></tr>' +
+    '</tbody></table>' +
+    '<h3 style="font-size:13px;margin:14px 0 6px;">Kontosalden</h3>' +
+    '<table class="overview-table"><tbody>' + (rows||'<tr class="ov-empty-row"><td colspan="2">Noch keine Buchungen.</td></tr>') + '</tbody></table>';
+}
+$("#bh-firma-save-btn").addEventListener("click", async ()=>{
+  try{
+    await setDoc(doc(db, BUCHHALTUNG_SETTINGS_DOC[0], BUCHHALTUNG_SETTINGS_DOC[1]), {
+      firma: $("#bh-firma-name").value.trim(), strasse: $("#bh-firma-strasse").value.trim(),
+      plz: $("#bh-firma-plz").value.trim(), ort: $("#bh-firma-ort").value.trim(), iban: $("#bh-firma-iban").value.replace(/\s+/g,"").toUpperCase()
+    }, { merge: true });
+    toast("Firmendaten gespeichert.");
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
 $("#bh-konten-search").addEventListener("input", renderStammdatenPanel);
 $("#bh-konten-tbody").addEventListener("click", async e=>{
   var btn = e.target.closest("[data-delete-konto]"); if(!btn) return;
@@ -5098,6 +5327,7 @@ function openRechnungModal(rechnung, presetOrderId){
   if(rechnung) $("#rechnung-mwst").value = rechnung.mwstSatz;
   $("#rechnung-faellig").value = rechnung ? (rechnung.faelligkeitscode||"30") : "30";
   $("#rechnung-bezahlt-btn").style.display = (rechnung && rechnung.status!=="bezahlt") ? "inline-block" : "none";
+  $("#rechnung-qr-btn").style.display = rechnung ? "inline-block" : "none";
   updateRechnungTotalPreview();
   rechnungBackdrop.classList.add("open");
   setTimeout(()=>$(state.rechnungOrderId?"#rechnung-betrag":"#rechnung-order-search").focus(),30);
@@ -5130,11 +5360,20 @@ $("#bh-debitoren-tbody").addEventListener("click", e=>{
 });
 $("#rechnung-bezahlt-btn").addEventListener("click", async ()=>{
   if(!state.editingRechnungId) return;
+  var r = state.rechnungen.find(x=>x.id===state.editingRechnungId);
   try{
     await updateDoc(doc(db, RECHNUNGEN_COLLECTION, state.editingRechnungId), { status: "bezahlt", bezahltAm: Date.now() });
+    if(r){
+      var total = (Number(r.betrag)||0) * (1+(Number(r.mwstSatz)||0)/100);
+      await legeBuchung("Zahlungseingang Rechnung " + r.nummer, "1020", "1100", total, r.nummer);
+    }
     closeRechnungModal();
     toast("Als bezahlt markiert.");
   }catch(err){ console.error(err); toast("Fehlgeschlagen."); }
+});
+$("#rechnung-qr-btn").addEventListener("click", ()=>{
+  var r = state.rechnungen.find(x=>x.id===state.editingRechnungId);
+  if(r) openQrBillOverlay(r);
 });
 $("#rechnung-form").addEventListener("submit", async e=>{
   e.preventDefault();
@@ -5158,12 +5397,87 @@ $("#rechnung-form").addEventListener("submit", async e=>{
       payload.datum = toISO(new Date());
       payload.status = "offen";
       payload.erstelltAm = Date.now();
-      await addDoc(collection(db, RECHNUNGEN_COLLECTION), payload);
+      var newRef = await addDoc(collection(db, RECHNUNGEN_COLLECTION), payload);
+      var total = betrag * (1+payload.mwstSatz/100);
+      var ertragKonto = payload.typ==="akonto" ? "3092" : "3000";
+      await legeBuchung("Rechnung " + payload.nummer + (payload.kunde?(" – "+payload.kunde):""), "1100", ertragKonto, total, payload.nummer);
     }
     closeRechnungModal();
     toast("Rechnung gespeichert.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
 });
+
+/* ---- QR-Rechnung ---- */
+function berechneFaelligkeitsdatum(rechnung){
+  var basis = new Date(rechnung.datum || toISO(new Date()));
+  var tage = { "30":30, "60":60, "10-3":30, "30-2":30 }[rechnung.faelligkeitscode] || 30;
+  var d = new Date(basis); d.setDate(d.getDate()+tage);
+  return toISO(d);
+}
+function skontoHinweis(code){
+  if(code==="10-3") return "3% Skonto bei Zahlung innert 10 Tagen, sonst netto innert 30 Tagen.";
+  if(code==="30-2") return "2% Skonto bei Zahlung innert 30 Tagen.";
+  if(code==="60") return "Zahlbar innert 60 Tagen.";
+  return "Zahlbar innert 30 Tagen.";
+}
+function buildQrPayload(rechnung){
+  var s = state.buchhaltungSettings;
+  var iban = (s.iban||"").replace(/\s+/g,"").toUpperCase();
+  var total = (Number(rechnung.betrag)||0) * (1+(Number(rechnung.mwstSatz)||0)/100);
+  var ref = qrReferenzAusRechnungsnummer(rechnung.nummer);
+  var kunde = (rechnung.kunde||"").split(",")[0] || rechnung.kunde || "";
+  var lines = [
+    "SPC","0200","1", iban,
+    "K", s.firma||"", (s.strasse||""), ((s.plz||"")+" "+(s.ort||"")).trim(), "", "", "CH",
+    "","","","","","","",
+    total.toFixed(2), "CHF",
+    "K", kunde, "", "", "", "", "CH",
+    "QRR", ref,
+    "Rechnung " + (rechnung.nummer||"") + (rechnung.orderNumber ? (" / Auftrag " + rechnung.orderNumber) : ""),
+    "EPD"
+  ];
+  return lines.join("\r\n");
+}
+function openQrBillOverlay(rechnung){
+  var s = state.buchhaltungSettings;
+  if(!s.iban){ toast("Bitte zuerst in Stammdaten die IBAN hinterlegen."); return; }
+  var total = (Number(rechnung.betrag)||0) * (1+(Number(rechnung.mwstSatz)||0)/100);
+  var ref = qrReferenzAusRechnungsnummer(rechnung.nummer);
+  var refFormatted = formatReferenzAnzeige(ref);
+  var ibanFormatted = (s.iban||"").replace(/\s+/g,"").replace(/(.{4})/g,"$1 ").trim();
+  var faellig = berechneFaelligkeitsdatum(rechnung);
+  var sheet = $("#qr-bill-sheet");
+  sheet.innerHTML =
+    '<div class="qrb-receipt">' +
+      '<div class="qrb-title">Empfangsschein</div>' +
+      '<div class="qrb-label">Konto / Zahlbar an</div><div class="qrb-value">' + escapeHtml(ibanFormatted) + '\n' + escapeHtml(s.firma||"") + '\n' + escapeHtml(s.strasse||"") + '\n' + escapeHtml(((s.plz||"")+" "+(s.ort||"")).trim()) + '</div>' +
+      '<div class="qrb-label">Referenz</div><div class="qrb-value">' + escapeHtml(refFormatted) + '</div>' +
+      '<div class="qrb-label">Zahlbar durch</div><div class="qrb-value">' + escapeHtml(rechnung.kunde||"") + '</div>' +
+      '<div class="qrb-amount-row"><div><div class="qrb-label">Währung</div><div class="qrb-value">CHF</div></div><div><div class="qrb-label">Betrag</div><div class="qrb-value">' + formatCHF(total) + '</div></div></div>' +
+      '<div class="qrb-label" style="margin-top:8mm;">Annahmestelle</div>' +
+    '</div>' +
+    '<div class="qrb-payment">' +
+      '<div class="qrb-payment-left">' +
+        '<div class="qrb-title">Zahlteil</div>' +
+        '<div class="qrb-qr-wrap" id="qrb-qrcode"><div class="qrb-cross"></div></div>' +
+        '<div class="qrb-amount-row"><div><div class="qrb-label">Währung</div><div class="qrb-value">CHF</div></div><div><div class="qrb-label">Betrag</div><div class="qrb-value">' + formatCHF(total) + '</div></div></div>' +
+      '</div>' +
+      '<div class="qrb-payment-right">' +
+        '<div class="qrb-label">Konto / Zahlbar an</div><div class="qrb-value">' + escapeHtml(ibanFormatted) + '\n' + escapeHtml(s.firma||"") + '\n' + escapeHtml(s.strasse||"") + '\n' + escapeHtml(((s.plz||"")+" "+(s.ort||"")).trim()) + '</div>' +
+        '<div class="qrb-label">Referenz</div><div class="qrb-value">' + escapeHtml(refFormatted) + '</div>' +
+        '<div class="qrb-label">Zusätzliche Informationen</div><div class="qrb-value">Rechnung ' + escapeHtml(rechnung.nummer||"") + ' · Fällig bis ' + escapeHtml(faellig) + '\n' + escapeHtml(skontoHinweis(rechnung.faelligkeitscode)) + '</div>' +
+        '<div class="qrb-label">Zahlbar durch</div><div class="qrb-value">' + escapeHtml(rechnung.kunde||"") + '</div>' +
+      '</div>' +
+    '</div>';
+  var qrEl = $("#qrb-qrcode");
+  try{
+    var payload = buildQrPayload(rechnung);
+    new QRCode(qrEl, { text: unescape(encodeURIComponent(payload)), width: 174, height: 174, colorDark:'#000000', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  }catch(e){ console.error("QR-Code konnte nicht erzeugt werden", e); }
+  $("#qr-bill-overlay").style.display = "block";
+}
+$("#qr-bill-close-btn").addEventListener("click", ()=>{ $("#qr-bill-overlay").style.display = "none"; });
+$("#qr-bill-print-btn").addEventListener("click", ()=> window.print());
 
 /* ---- Kreditorenrechnung-Modal ---- */
 var kreditorBackdrop = $("#kreditor-modal-backdrop");
@@ -5187,18 +5501,29 @@ function openKreditorModal(k){
   $("#kreditor-kategorie").value = k ? (k.kategorie||"") : "";
   $("#kreditor-konto").value = k ? (k.konto||"") : (vorschlagKontoFuerKategorie("")||"");
   $("#kreditor-betrag").value = k ? k.betrag : "";
+  $("#kreditor-mwst").value = k ? (k.mwstSatz!=null?k.mwstSatz:8.1) : 8.1;
+  $("#kreditor-iban").value = k ? (k.iban||"") : "";
   $("#kreditor-faellig").value = k ? (k.faelligkeitsdatum||"") : "";
   $("#kreditor-beleg").value = "";
   $("#kreditor-beleg-info").textContent = (k && k.belegName) ? ("Hinterlegter Beleg: " + k.belegName) : "Texterkennung (automatisches Auslesen) ist noch nicht verfügbar — der Beleg wird als Referenz gespeichert, Betrag/Lieferant bitte manuell prüfen.";
-  var schwelle = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
-  var ueberSchwelle = k && Number(k.betrag) >= schwelle;
+  var schwelleTotal = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
+  var ueberSchwelle = k && (Number(k.betrag)||0)*(1+(Number(k.mwstSatz)||0)/100) >= schwelleTotal;
   $("#kreditor-delete-btn").style.display = k ? "inline-block" : "none";
   $("#kreditor-freigeben-btn").style.display = (k && k.status==="offen" && (!ueberSchwelle || state.isAdmin)) ? "inline-block" : "none";
   $("#kreditor-bezahlt-btn").style.display = (k && k.status==="freigegeben") ? "inline-block" : "none";
+  updateKreditorTotalPreview();
   kreditorBackdrop.classList.add("open");
   setTimeout(()=>$("#kreditor-lieferant").focus(),30);
 }
 function closeKreditorModal(){ kreditorBackdrop.classList.remove("open"); state.editingKreditorId = null; }
+function updateKreditorTotalPreview(){
+  var betrag = Number($("#kreditor-betrag").value)||0;
+  var satz = Number($("#kreditor-mwst").value)||0;
+  var total = betrag*(1+satz/100);
+  $("#kreditor-total-preview").textContent = "Total inkl. Vorsteuer: CHF " + formatCHF(total);
+}
+$("#kreditor-betrag").addEventListener("input", updateKreditorTotalPreview);
+$("#kreditor-mwst").addEventListener("change", updateKreditorTotalPreview);
 $("#kreditor-kategorie").addEventListener("change", e=>{
   var vorschlag = vorschlagKontoFuerKategorie(e.target.value);
   if(vorschlag) $("#kreditor-konto").value = vorschlag;
@@ -5239,8 +5564,13 @@ $("#kreditor-freigeben-btn").addEventListener("click", async ()=>{
 });
 $("#kreditor-bezahlt-btn").addEventListener("click", async ()=>{
   if(!state.editingKreditorId) return;
+  var k = state.lieferantenrechnungen.find(x=>x.id===state.editingKreditorId);
   try{
     await updateDoc(doc(db, LIEFERANTENRECHNUNGEN_COLLECTION, state.editingKreditorId), { status: "bezahlt", bezahltAm: Date.now() });
+    if(k){
+      var total = (Number(k.betrag)||0)*(1+(Number(k.mwstSatz)||0)/100);
+      await legeBuchung("Zahlung Kreditorenrechnung " + k.lieferant, "2000", "1020", total, k.rechnungsnummer);
+    }
     closeKreditorModal();
     toast("Als bezahlt markiert.");
   }catch(err){ console.error(err); toast("Fehlgeschlagen."); }
@@ -5252,6 +5582,8 @@ $("#kreditor-form").addEventListener("submit", async e=>{
   if(!lieferant || !betrag || betrag<=0) return;
   var kontoNr = $("#kreditor-konto").value;
   var kontoObj = state.konten.find(k=>k.nummer===kontoNr);
+  var mwstSatz = Number($("#kreditor-mwst").value)||0;
+  var total = betrag*(1+mwstSatz/100);
   var schwelle = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
   var payload = {
     lieferant: lieferant,
@@ -5260,6 +5592,8 @@ $("#kreditor-form").addEventListener("submit", async e=>{
     konto: kontoNr,
     kontoBezeichnung: kontoObj ? kontoObj.bezeichnung : "",
     betrag: betrag,
+    mwstSatz: mwstSatz,
+    iban: $("#kreditor-iban").value.replace(/\s+/g,"").toUpperCase(),
     faelligkeitsdatum: $("#kreditor-faellig").value,
     belegDataUrl: state.kreditorBelegDataUrl || null,
     belegName: state.kreditorBelegName || ""
@@ -5268,14 +5602,143 @@ $("#kreditor-form").addEventListener("submit", async e=>{
     if(state.editingKreditorId){
       await updateDoc(doc(db, LIEFERANTENRECHNUNGEN_COLLECTION, state.editingKreditorId), payload);
     }else{
-      payload.status = betrag < schwelle ? "freigegeben" : "offen";
+      payload.status = total < schwelle ? "freigegeben" : "offen";
       payload.erfasstAm = Date.now();
       payload.erfasstVon = state.currentName;
       await addDoc(collection(db, LIEFERANTENRECHNUNGEN_COLLECTION), payload);
+      await legeBuchung("Kreditorenrechnung " + lieferant, kontoNr, "2000", total, payload.rechnungsnummer);
     }
     closeKreditorModal();
     toast("Kreditorenrechnung gespeichert.");
   }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+
+/* ---- Zahlungslauf (pain.001) ---- */
+function downloadTextFile(filename, content, mime){
+  var blob = new Blob([content], { type: mime || "text/xml;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+function xmlEscape(s){ return String(s||"").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;" }[c])); }
+function buildPain001(zahlbareRechnungen, msgId){
+  var s = state.buchhaltungSettings;
+  var iban = (s.iban||"").replace(/\s+/g,"").toUpperCase();
+  var now = new Date().toISOString();
+  var total = zahlbareRechnungen.reduce((sum,r)=>sum+((Number(r.betrag)||0)*(1+(Number(r.mwstSatz)||0)/100)), 0);
+  var reqdExctnDt = toISO(new Date());
+  var txns = zahlbareRechnungen.map(function(r, i){
+    var betrag = ((Number(r.betrag)||0)*(1+(Number(r.mwstSatz)||0)/100)).toFixed(2);
+    return '' +
+      '<CdtTrfTxInf>' +
+        '<PmtId><EndToEndId>' + xmlEscape(r.rechnungsnummer || ("ZL"+i)) + '</EndToEndId></PmtId>' +
+        '<Amt><InstdAmt Ccy="CHF">' + betrag + '</InstdAmt></Amt>' +
+        '<Cdtr><Nm>' + xmlEscape(r.lieferant) + '</Nm></Cdtr>' +
+        '<CdtrAcct><Id><IBAN>' + xmlEscape((r.iban||"").replace(/\s+/g,"").toUpperCase()) + '</IBAN></Id></CdtrAcct>' +
+        '<RmtInf><Ustrd>' + xmlEscape(r.rechnungsnummer || r.lieferant) + '</Ustrd></RmtInf>' +
+      '</CdtTrfTxInf>';
+  }).join("");
+  return '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
+      '<CstmrCdtTrfInitn>' +
+        '<GrpHdr>' +
+          '<MsgId>' + xmlEscape(msgId) + '</MsgId>' +
+          '<CreDtTm>' + now + '</CreDtTm>' +
+          '<NbOfTxs>' + zahlbareRechnungen.length + '</NbOfTxs>' +
+          '<CtrlSum>' + total.toFixed(2) + '</CtrlSum>' +
+          '<InitgPty><Nm>' + xmlEscape(s.firma) + '</Nm></InitgPty>' +
+        '</GrpHdr>' +
+        '<PmtInf>' +
+          '<PmtInfId>' + xmlEscape(msgId) + '</PmtInfId>' +
+          '<PmtMtd>TRF</PmtMtd>' +
+          '<NbOfTxs>' + zahlbareRechnungen.length + '</NbOfTxs>' +
+          '<CtrlSum>' + total.toFixed(2) + '</CtrlSum>' +
+          '<ReqdExctnDt>' + reqdExctnDt + '</ReqdExctnDt>' +
+          '<Dbtr><Nm>' + xmlEscape(s.firma) + '</Nm></Dbtr>' +
+          '<DbtrAcct><Id><IBAN>' + xmlEscape(iban) + '</IBAN></Id></DbtrAcct>' +
+          '<DbtrAgt><FinInstnId><Othr><Id>NOTPROVIDED</Id></Othr></FinInstnId></DbtrAgt>' +
+          '<ChrgBr>SLEV</ChrgBr>' +
+          txns +
+        '</PmtInf>' +
+      '</CstmrCdtTrfInitn>' +
+    '</Document>';
+}
+$("#bh-zahlungslauf-btn").addEventListener("click", async ()=>{
+  var kandidaten = state.lieferantenrechnungen.filter(r=>r.status==="freigegeben" && r.iban);
+  if(kandidaten.length===0){ toast("Keine freigegebenen Kreditorenrechnungen mit hinterlegter IBAN gefunden."); return; }
+  if(!state.buchhaltungSettings.iban){ toast("Bitte zuerst in Stammdaten die eigene IBAN hinterlegen."); return; }
+  if(!confirm(kandidaten.length + " freigegebene Rechnung(en) in den Zahlungslauf aufnehmen?")) return;
+  var msgId = "ZL" + Date.now();
+  var xml = buildPain001(kandidaten, msgId);
+  var total = kandidaten.reduce((s,r)=>s+((Number(r.betrag)||0)*(1+(Number(r.mwstSatz)||0)/100)), 0);
+  try{
+    await addDoc(collection(db, ZAHLUNGSLAEUFE_COLLECTION), {
+      datum: toISO(new Date()), anzahl: kandidaten.length, total: total, xml: xml,
+      rechnungIds: kandidaten.map(r=>r.id), erstelltAm: Date.now(), erstelltVon: state.currentName
+    });
+    downloadTextFile(msgId + ".xml", xml);
+    toast("Zahlungslauf erstellt und pain.001-Datei heruntergeladen.");
+  }catch(err){ console.error(err); toast("Zahlungslauf fehlgeschlagen."); }
+});
+$("#bh-zahlungslauf-tbody").addEventListener("click", e=>{
+  var btn = e.target.closest("[data-dl-zahlungslauf]"); if(!btn) return;
+  var z = state.zahlungslaeufe.find(x=>x.id===btn.dataset.dlZahlungslauf);
+  if(z && z.xml) downloadTextFile("zahlungslauf_" + z.datum + ".xml", z.xml);
+});
+
+/* ---- Bankabgleich (camt.053) ---- */
+$("#bh-camt-upload").addEventListener("change", async e=>{
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  var resultEl = $("#bh-camt-result");
+  resultEl.innerHTML = "Verarbeite…";
+  try{
+    var text = await file.text();
+    var xml = new DOMParser().parseFromString(text, "application/xml");
+    if(xml.querySelector("parsererror")){ resultEl.innerHTML = '<div style="color:var(--danger);">Datei konnte nicht gelesen werden — ist es ein gültiges camt.053-XML?</div>'; return; }
+    // camt.053: jede Gutschrift steckt in einem <Ntry>-Element mit Betrag (<Amt>) und oft der
+    // Zahlungsreferenz irgendwo in <RmtInf>/<Strd>/<CdtrRefInf>/<Ref> bzw. als unstrukturierter Text.
+    var entries = Array.from(xml.getElementsByTagName("Ntry"));
+    var matched = [], unmatched = [];
+    for(var i=0;i<entries.length;i++){
+      var entry = entries[i];
+      var cdDr = (entry.getElementsByTagName("CdtDbtInd")[0]||{}).textContent;
+      if(cdDr !== "CRDT") continue; // nur Gutschriften (Zahlungseingänge) interessieren uns
+      var amtEl = entry.getElementsByTagName("Amt")[0];
+      var betrag = amtEl ? Number(amtEl.textContent) : null;
+      var refEls = entry.getElementsByTagName("Ref");
+      var refText = "";
+      for(var j=0;j<refEls.length;j++){ if(refEls[j].textContent && refEls[j].textContent.replace(/\D/g,"").length>=20){ refText = refEls[j].textContent; break; } }
+      if(!refText){
+        // Fallback: ganzen Entry-Text nach einer 27-stelligen Ziffernfolge durchsuchen.
+        var m = (entry.textContent||"").match(/\d[\d\s]{25,}\d/);
+        if(m) refText = m[0];
+      }
+      var refDigits = refText.replace(/\D/g,"");
+      var rechnung = state.rechnungen.find(r=>{
+        if(r.status==="bezahlt") return false;
+        var ref = qrReferenzAusRechnungsnummer(r.nummer);
+        return refDigits.indexOf(ref) !== -1 || ref.indexOf(refDigits) !== -1;
+      });
+      if(rechnung){ matched.push({ rechnung: rechnung, betrag: betrag }); }
+      else{ unmatched.push({ betrag: betrag, ref: refText || "(keine Referenz gefunden)" }); }
+    }
+    for(var k=0;k<matched.length;k++){
+      var r = matched[k].rechnung;
+      await updateDoc(doc(db, RECHNUNGEN_COLLECTION, r.id), { status: "bezahlt", bezahltAm: Date.now() });
+      var total = (Number(r.betrag)||0)*(1+(Number(r.mwstSatz)||0)/100);
+      await legeBuchung("Zahlungseingang (Bankabgleich) Rechnung " + r.nummer, "1020", "1100", total, r.nummer);
+    }
+    resultEl.innerHTML =
+      '<div style="color:var(--text);">' + matched.length + ' Zahlung(en) automatisch zugeordnet und als bezahlt markiert.</div>' +
+      (unmatched.length ? ('<div style="margin-top:6px;color:var(--text-muted);">' + unmatched.length + ' Eingang/Eingänge ohne Zuordnung (Referenz nicht gefunden): ' + unmatched.map(u=>'CHF '+formatCHF(u.betrag)).join(", ") + ' — bitte manuell prüfen.</div>') : "");
+    e.target.value = "";
+  }catch(err){
+    console.error(err);
+    resultEl.innerHTML = '<div style="color:var(--danger);">Verarbeitung fehlgeschlagen: ' + escapeHtml(err.message||"") + '</div>';
+  }
 });
 
 var staffAddBackdrop = $("#staff-add-modal-backdrop");
