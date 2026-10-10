@@ -1315,7 +1315,7 @@
       <div id="zeit-today-pairs" class="zeit-today-pairs"></div>
       <div id="zeit-punch-quick" class="zeit-punch-quick" style="display:none;"></div>
       <div class="field" style="margin:12px 0 10px;">
-        <label for="zeit-punch-order" style="font-size:11.5px;">Auftrag (optional) — gilt bis zum nächsten Stempeln</label>
+        <label for="zeit-punch-order" style="font-size:11.5px;" id="zeit-punch-order-label">Auftrag (optional) — gilt bis zum nächsten Stempeln</label>
         <input type="text" id="zeit-punch-order" list="zeit-punch-order-list" placeholder="Auftragsnummer eingeben…" autocomplete="off">
         <datalist id="zeit-punch-order-list"></datalist>
         <select id="zeit-punch-order-select" style="display:none;">
@@ -2765,17 +2765,19 @@ function renderZeitPage(){
     punchOrderSelect.style.display = "none";
     populateOrderDatalist("#zeit-punch-order-list");
     renderZeitPunchQuick(meEmp, status);
+    // Das Feld bleibt immer editierbar — auch während man eingestempelt ist. Ein anderer
+    // Auftrag als der aktuell gestempelte wird beim nächsten Klick auf "Kommen" automatisch als
+    // Wechsel behandelt (alter Auftrag wird automatisch abgestempelt, siehe #zeit-kommen unten).
+    punchOrderInput.disabled = false;
     if(status === "off"){
-      punchOrderInput.disabled = false;
       // Letzten gewählten Auftrag stehen lassen, bis bewusst ein anderer eingegeben wird.
       punchOrderInput.value = state.zeitLastOrderText || "";
       updateZeitPunchKostenartField(resolveOrderFromText(punchOrderInput.value), false);
     } else {
       punchOrderInput.value = lastKommen && lastKommen.orderNumber ? lastKommen.orderNumber : "";
       state.zeitLastOrderText = punchOrderInput.value;
-      punchOrderInput.disabled = true;
       var lockedOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
-      updateZeitPunchKostenartField(lockedOrder, true);
+      updateZeitPunchKostenartField(lockedOrder, false);
       if(lastKommen && lastKommen.kostenartIdx!=null) $("#zeit-punch-kostenart").value = String(lastKommen.kostenartIdx);
     }
   } else {
@@ -2798,8 +2800,11 @@ function renderZeitPage(){
     var optsHtml = '<option value="">— kein Auftrag —</option>' + assignedOptsHtml +
       (internOptsHtml ? '<optgroup label="Interne Aufträge">' + internOptsHtml + '</optgroup>' : '');
     punchOrderSelect.innerHTML = optsHtml;
+    // Auswahl bleibt immer möglich — auch während man eingestempelt ist. Wählt man einen
+    // anderen Auftrag als den aktuell gestempelten, wechselt der nächste Klick auf "Kommen"
+    // automatisch (alter Auftrag wird automatisch abgestempelt, siehe #zeit-kommen unten).
+    punchOrderSelect.disabled = false;
     if(status === "off"){
-      punchOrderSelect.disabled = false;
       // Letzte Auswahl wiederherstellen (das Neuaufbauen der Options oben verliert sie sonst
       // bei jedem Re-Render) — bis bewusst ein anderer Auftrag gewählt wird.
       if(state.zeitLastOrderId && punchOrderSelect.querySelector('option[value="' + state.zeitLastOrderId + '"]')) punchOrderSelect.value = state.zeitLastOrderId;
@@ -2808,8 +2813,7 @@ function renderZeitPage(){
       var lastOrder = lastKommen && lastKommen.orderId ? state.orders.find(x=>x.id===lastKommen.orderId) : null;
       punchOrderSelect.value = lastOrder ? lastOrder.id : "";
       state.zeitLastOrderId = punchOrderSelect.value;
-      punchOrderSelect.disabled = true;
-      updateZeitPunchKostenartField(lastOrder, true);
+      updateZeitPunchKostenartField(lastOrder, false);
       if(lastKommen && lastKommen.kostenartIdx!=null) $("#zeit-punch-kostenart").value = String(lastKommen.kostenartIdx);
     }
   }
@@ -2830,8 +2834,14 @@ function renderZeitPage(){
     meInfo.style.display = "none";
   }
 
-  $("#zeit-kommen").disabled = status !== "off";
+  // "Kommen" bleibt auch im eingestempelten Zustand klickbar: wird dort ein anderer Auftrag als
+  // der aktuell gestempelte gewählt, wechselt ein Klick automatisch (alter Auftrag wird dabei
+  // automatisch abgestempelt) — siehe #zeit-kommen-Handler weiter unten.
+  $("#zeit-kommen").disabled = false;
+  $("#zeit-kommen").title = status === "off" ? "Kommen" : "Auftrag wechseln (stempelt automatisch ab/an)";
   $("#zeit-gehen").disabled = status === "off";
+  var orderLabel = $("#zeit-punch-order-label");
+  if(orderLabel) orderLabel.textContent = status === "off" ? "Auftrag (optional) — gilt bis zum nächsten Stempeln" : "Anderer Auftrag? Einfach wählen und auf ▶ klicken — wechselt automatisch";
 
   // "Gestartet" / "Dauer" — nur solange heute eingestempelt (seit dem letzten "Kommen").
   var startedInfo = $("#zeit-started-info");
@@ -2925,7 +2935,34 @@ async function zeitPunch(type){
 }
 $("#zeit-punch-order").addEventListener("input", e=>{ if(!e.target.disabled){ state.zeitLastOrderText = e.target.value; updateZeitPunchKostenartField(resolveOrderFromText(e.target.value), false); } });
 $("#zeit-punch-order-select").addEventListener("change", e=>{ if(!e.target.disabled){ state.zeitLastOrderId = e.target.value; updateZeitPunchKostenartField(state.orders.find(x=>x.id===e.target.value), false); } });
-$("#zeit-kommen").addEventListener("click", async ()=>{ if(await showConfirm("Jetzt einstempeln?")) zeitPunch("kommen"); });
+// Beim Klick auf "Kommen" während man bereits eingestempelt ist: automatisch der alte Auftrag
+// abstempeln und direkt der (im Feld ausgewählte) neue Auftrag einstempeln — kein manuelles
+// "zuerst Gehen klicken" mehr nötig, um den Auftrag zu wechseln.
+async function zeitSwitchOrder(){
+  if(!state.currentUid) return;
+  try{
+    await addDoc(collection(db, TIME_COLLECTION), { uid: state.currentUid, name: state.currentName, type: "gehen", timestamp: Date.now(), date: todayISO() });
+    await zeitPunch("kommen");
+    toast("Auftrag gewechselt.");
+  }catch(err){ console.error(err); toast("Stempeln fehlgeschlagen."); }
+}
+$("#zeit-kommen").addEventListener("click", async ()=>{
+  var todayEntries = zeitTodayEntries(state.myTime);
+  var status = zeitCurrentStatus(todayEntries);
+  if(status === "off"){
+    if(await showConfirm("Jetzt einstempeln?")) zeitPunch("kommen");
+    return;
+  }
+  var lastKommen = todayEntries.slice().reverse().find(e=>e.type==="kommen");
+  var chosenOrderId = state.isAdmin
+    ? (resolveOrderFromText($("#zeit-punch-order").value) || {}).id
+    : ($("#zeit-punch-order-select").value || null);
+  if((lastKommen && lastKommen.orderId) === (chosenOrderId || null) || (!lastKommen?.orderId && !chosenOrderId)){
+    toast("Du bist bereits auf diesem Auftrag eingestempelt.");
+    return;
+  }
+  if(await showConfirm("Auftrag wechseln? Der aktuelle Auftrag wird dabei automatisch abgestempelt.")) await zeitSwitchOrder();
+});
 $("#zeit-gehen").addEventListener("click", async ()=>{ if(await showConfirm("Jetzt ausstempeln?")) zeitPunch("gehen"); });
 
 // Ein- bzw. Ausstempeln direkt über den eigenen Einsatz-Chip in der Personalplanung
