@@ -1321,7 +1321,7 @@
       <div class="table-scroll">
         <table class="overview-table" id="bh-kreditoren-table">
           <thead><tr>
-            <th>Lieferant</th><th>Rechnungsnr.</th><th>Konto</th><th>Betrag</th><th>Fällig</th><th>Status</th><th></th>
+            <th>Lieferant</th><th>Rechnungsnr.</th><th>Auftrag</th><th>Konto</th><th>Betrag</th><th>Fällig</th><th>Status</th><th></th>
           </tr></thead>
           <tbody id="bh-kreditoren-tbody"></tbody>
         </table>
@@ -1386,6 +1386,23 @@
         <div style="font-size:11.5px;color:var(--text-muted);margin:6px 0 10px;">Kontoauszug (camt.053-XML) von der Bank hochladen — Zahlungseingänge werden anhand der QR-Referenznummer automatisch den offenen Rechnungen zugeordnet.</div>
         <input type="file" id="bh-camt-upload" accept=".xml">
         <div id="bh-camt-result" style="margin-top:10px;"></div>
+      </div>
+      <div class="bh-stamm-block">
+        <div class="bh-stamm-head"><h2 class="zeit-h2" style="margin:0;">Lohnimport (ABACUS)</h2></div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin:6px 0 10px;">
+          Lohn-Sammelbuchung aus ABACUS als CSV-Datei hochladen (z. B. per Excel-Export aus dem ABACUS-Lohnjournal erstellt). Erwartete Spalten in der ersten Zeile (Reihenfolge egal, Trennzeichen "," oder ";"):
+          <strong>Text</strong> (Buchungstext), <strong>Soll</strong> (Sollkonto-Nr.), <strong>Haben</strong> (Habenkonto-Nr.), <strong>Betrag</strong>. Optional: <strong>Datum</strong>.
+          Jede Zeile wird 1:1 als Buchungssatz ins Hauptbuch übernommen — die Datei muss daher bereits eine ausgeglichene Sammelbuchung sein (Summe Soll = Summe Haben).
+        </div>
+        <input type="file" id="bh-lohn-upload" accept=".csv,text/csv">
+        <div id="bh-lohn-preview" style="margin-top:10px;"></div>
+        <h3 style="font-size:13px;margin:16px 0 6px;">Bisherige Importe</h3>
+        <div class="table-scroll" style="max-height:220px;">
+          <table class="overview-table">
+            <thead><tr><th>Datum</th><th>Datei</th><th>Anzahl Buchungen</th><th>Total</th><th>Erfasst von</th></tr></thead>
+            <tbody id="bh-lohnimporte-tbody"></tbody>
+          </table>
+        </div>
       </div>
       <div class="bh-stamm-block">
         <div class="bh-stamm-head"><h2 class="zeit-h2" style="margin:0;">MWST-Übersicht</h2></div>
@@ -1467,6 +1484,12 @@
         <div class="field">
           <label for="kreditor-nummer">Rechnungsnummer (Lieferant)</label>
           <input type="text" id="kreditor-nummer">
+        </div>
+        <div class="field" id="kreditor-order-field">
+          <label for="kreditor-order-search">Auftrag (optional)</label>
+          <input type="text" id="kreditor-order-search" list="kreditor-order-list" placeholder="Auftragsnummer eingeben…" autocomplete="off">
+          <datalist id="kreditor-order-list"></datalist>
+          <div id="kreditor-order-info" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;"></div>
         </div>
         <div class="field">
           <label for="kreditor-kategorie">Artikel-Kategorie (für Konto-Vorschlag)</label>
@@ -2347,6 +2370,7 @@ const KONTEN_COLLECTION = "konten";
 const BUCHHALTUNG_SETTINGS_DOC = ["einstellungen", "buchhaltung"];
 const BUCHUNGEN_COLLECTION = "buchungen";
 const ZAHLUNGSLAEUFE_COLLECTION = "zahlungslaeufe";
+const LOHNIMPORTE_COLLECTION = "lohnimporte";
 function mwstAktuellesQuartal(){
   var d = new Date();
   var q = Math.floor(d.getMonth()/3)+1;
@@ -2507,6 +2531,7 @@ let unsubBuchhaltungSettings = null;
 let buchhaltungSubscribed = false;
 let unsubBuchungen = null;
 let unsubZahlungslaeufe = null;
+let unsubLohnimporte = null;
 
 onAuthStateChanged(auth, async user => {
   if(user){
@@ -2652,6 +2677,10 @@ function subscribeBuchhaltung(){
   }, err => console.error(err));
   unsubZahlungslaeufe = onSnapshot(query(collection(db, ZAHLUNGSLAEUFE_COLLECTION), orderBy('erstelltAm', 'desc')), snap => {
     state.zahlungslaeufe = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => console.error(err));
+  unsubLohnimporte = onSnapshot(query(collection(db, LOHNIMPORTE_COLLECTION), orderBy('erstelltAm', 'desc')), snap => {
+    state.lohnimporte = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     render();
   }, err => console.error(err));
 }
@@ -2834,10 +2863,10 @@ function subscribeTerminserien(){
 
 var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "",
   // ---- Buchhaltung ----
-  rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
+  rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], lohnimporte: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
   buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
-  editingRechnungId: null, editingKreditorId: null, rechnungOrderId: null,
-  kreditorBelegDataUrl: null, kreditorBelegName: "", mwstQuartal: mwstAktuellesQuartal()
+  editingRechnungId: null, editingKreditorId: null, rechnungOrderId: null, kreditorOrderId: null,
+  kreditorBelegDataUrl: null, kreditorBelegName: "", mwstQuartal: mwstAktuellesQuartal(), lohnImportPreview: null, lohnImportFileName: ""
 };
 
 function toISO(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+day; }
@@ -5145,14 +5174,15 @@ function renderKreditorenPanel(){
   var search = ($("#bh-kreditoren-search").value||"").trim().toLowerCase();
   var rows = state.lieferantenrechnungen.slice();
   if(search){
-    rows = rows.filter(r => (r.lieferant||"").toLowerCase().includes(search) || (r.rechnungsnummer||"").toLowerCase().includes(search));
+    rows = rows.filter(r => (r.lieferant||"").toLowerCase().includes(search) || (r.rechnungsnummer||"").toLowerCase().includes(search) || (r.orderNumber||"").toLowerCase().includes(search));
   }
-  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Noch keine Kreditorenrechnungen erfasst.</td></tr>'; return; }
+  if(rows.length===0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="8">Noch keine Kreditorenrechnungen erfasst.</td></tr>'; return; }
   tbody.innerHTML = rows.map(r=>{
     var statusLabelK = r.status==="bezahlt" ? "Bezahlt" : (r.status==="freigegeben" ? "Freigegeben" : "Offen");
     return '<tr data-id="' + r.id + '">' +
       '<td data-label="Lieferant"><strong>' + escapeHtml(r.lieferant||"") + '</strong></td>' +
       '<td data-label="Rechnungsnr.">' + escapeHtml(r.rechnungsnummer||"") + '</td>' +
+      '<td data-label="Auftrag">' + escapeHtml(r.orderNumber||"–") + '</td>' +
       '<td data-label="Konto">' + escapeHtml((r.konto||"") + (r.kontoBezeichnung?(" – "+r.kontoBezeichnung):"")) + '</td>' +
       '<td data-label="Betrag">CHF ' + formatCHF((Number(r.betrag)||0)*(1+(Number(r.mwstSatz)||0)/100)) + '</td>' +
       '<td data-label="Fällig">' + escapeHtml(r.faelligkeitsdatum||"–") + '</td>' +
@@ -5194,6 +5224,13 @@ function renderStammdatenPanel(){
       '<tr><td>' + escapeHtml(z.datum||"") + '</td><td>' + (z.anzahl||0) + '</td><td>CHF ' + formatCHF(z.total) + '</td>' +
       '<td style="text-align:right;"><button type="button" class="btn" data-dl-zahlungslauf="' + z.id + '">pain.001 herunterladen</button></td></tr>'
     ).join("") : '<tr class="ov-empty-row"><td colspan="4">Noch kein Zahlungslauf erstellt.</td></tr>';
+  }
+
+  var lohnBody = $("#bh-lohnimporte-tbody");
+  if(lohnBody){
+    lohnBody.innerHTML = state.lohnimporte.length ? state.lohnimporte.map(li=>
+      '<tr><td>' + escapeHtml(li.datum||"") + '</td><td>' + escapeHtml(li.dateiname||"") + '</td><td>' + (li.anzahl||0) + '</td><td>CHF ' + formatCHF(li.total) + '</td><td>' + escapeHtml(li.erstelltVon||"") + '</td></tr>'
+    ).join("") : '<tr class="ov-empty-row"><td colspan="5">Noch kein Lohnimport durchgeführt.</td></tr>';
   }
 
   if(document.activeElement !== $("#bh-mwst-quartal")) $("#bh-mwst-quartal").value = state.mwstQuartal;
@@ -5494,10 +5531,15 @@ function openKreditorModal(k){
   state.editingKreditorId = k ? k.id : null;
   state.kreditorBelegDataUrl = k ? (k.belegDataUrl||null) : null;
   state.kreditorBelegName = k ? (k.belegName||"") : "";
+  state.kreditorOrderId = k ? (k.orderId||null) : null;
   $("#kreditor-modal-title").textContent = k ? "Kreditorenrechnung bearbeiten" : "Neue Kreditorenrechnung";
   populateKreditorKontoSelect();
   $("#kreditor-lieferant").value = k ? (k.lieferant||"") : "";
   $("#kreditor-nummer").value = k ? (k.rechnungsnummer||"") : "";
+  var kOrder = state.orders.find(o=>o.id===state.kreditorOrderId);
+  $("#kreditor-order-search").value = kOrder ? (kOrder.orderNumber + " – " + orderDisplayNameSafe(kOrder)) : (k ? (k.orderNumber||"") : "");
+  $("#kreditor-order-list").innerHTML = state.orders.slice().sort((a,b)=>(a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true})).map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(orderDisplayNameSafe(o)) + '">').join("");
+  $("#kreditor-order-info").textContent = kOrder ? ("Kunde: " + (kOrder.customer||"–")) : "";
   $("#kreditor-kategorie").value = k ? (k.kategorie||"") : "";
   $("#kreditor-konto").value = k ? (k.konto||"") : (vorschlagKontoFuerKategorie("")||"");
   $("#kreditor-betrag").value = k ? k.betrag : "";
@@ -5515,7 +5557,7 @@ function openKreditorModal(k){
   kreditorBackdrop.classList.add("open");
   setTimeout(()=>$("#kreditor-lieferant").focus(),30);
 }
-function closeKreditorModal(){ kreditorBackdrop.classList.remove("open"); state.editingKreditorId = null; }
+function closeKreditorModal(){ kreditorBackdrop.classList.remove("open"); state.editingKreditorId = null; state.kreditorOrderId = null; }
 function updateKreditorTotalPreview(){
   var betrag = Number($("#kreditor-betrag").value)||0;
   var satz = Number($("#kreditor-mwst").value)||0;
@@ -5527,6 +5569,13 @@ $("#kreditor-mwst").addEventListener("change", updateKreditorTotalPreview);
 $("#kreditor-kategorie").addEventListener("change", e=>{
   var vorschlag = vorschlagKontoFuerKategorie(e.target.value);
   if(vorschlag) $("#kreditor-konto").value = vorschlag;
+});
+$("#kreditor-order-search").addEventListener("input", e=>{
+  var val = e.target.value;
+  var num = val.split(" – ")[0].trim();
+  var order = state.orders.find(o=>o.orderNumber===num);
+  state.kreditorOrderId = order ? order.id : null;
+  $("#kreditor-order-info").textContent = order ? ("Kunde: " + (order.customer||"–")) : "";
 });
 $("#kreditor-beleg").addEventListener("change", e=>{
   var file = e.target.files && e.target.files[0];
@@ -5585,9 +5634,12 @@ $("#kreditor-form").addEventListener("submit", async e=>{
   var mwstSatz = Number($("#kreditor-mwst").value)||0;
   var total = betrag*(1+mwstSatz/100);
   var schwelle = Number(state.buchhaltungSettings.freigabeSchwelle)||0;
+  var kOrder = state.orders.find(o=>o.id===state.kreditorOrderId);
   var payload = {
     lieferant: lieferant,
     rechnungsnummer: $("#kreditor-nummer").value.trim(),
+    orderId: state.kreditorOrderId || null,
+    orderNumber: kOrder ? kOrder.orderNumber : "",
     kategorie: $("#kreditor-kategorie").value,
     konto: kontoNr,
     kontoBezeichnung: kontoObj ? kontoObj.bezeichnung : "",
@@ -5738,6 +5790,122 @@ $("#bh-camt-upload").addEventListener("change", async e=>{
   }catch(err){
     console.error(err);
     resultEl.innerHTML = '<div style="color:var(--danger);">Verarbeitung fehlgeschlagen: ' + escapeHtml(err.message||"") + '</div>';
+  }
+});
+
+/* ---- Lohnimport (ABACUS) ---- */
+// Wandelt eine schweizerisch formatierte Zahl (Tausender-Apostroph, Komma oder Punkt als
+// Dezimaltrennzeichen) in eine JS-Zahl um.
+function parseSwissNumber(str){
+  if(str==null) return NaN;
+  var s = String(str).trim().replace(/'/g,"").replace(/\s/g,"");
+  if(s.indexOf(",")!==-1 && s.indexOf(".")!==-1){
+    // beide vorhanden: letztes Zeichen entscheidet, welches das Dezimaltrennzeichen ist
+    if(s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g,"").replace(",", ".");
+    else s = s.replace(/,/g,"");
+  } else if(s.indexOf(",")!==-1){
+    s = s.replace(",", ".");
+  }
+  return Number(s);
+}
+// Parst eine CSV-Lohn-Sammelbuchung (Spalten: Text, Soll, Haben, Betrag, optional Datum).
+// Erkennt automatisch "," oder ";" als Trennzeichen. Gibt {rows, error} zurück.
+function parseLohnCsv(text){
+  var lines = text.split(/\r?\n/).filter(l=>l.trim()!=="");
+  if(lines.length<2) return { rows: [], error: "Datei enthält keine Datenzeilen." };
+  var delim = lines[0].indexOf(";") !== -1 ? ";" : ",";
+  var header = lines[0].split(delim).map(h=>h.trim().toLowerCase());
+  var idx = {
+    text: header.findIndex(h=>h.indexOf("text")!==-1 || h.indexOf("bezeichnung")!==-1),
+    soll: header.findIndex(h=>h.indexOf("soll")!==-1),
+    haben: header.findIndex(h=>h.indexOf("haben")!==-1),
+    betrag: header.findIndex(h=>h.indexOf("betrag")!==-1),
+    datum: header.findIndex(h=>h.indexOf("datum")!==-1)
+  };
+  if(idx.soll===-1 || idx.haben===-1 || idx.betrag===-1){
+    return { rows: [], error: "Spalten 'Soll', 'Haben' und 'Betrag' nicht gefunden — bitte Spaltenüberschriften in der ersten Zeile prüfen." };
+  }
+  var rows = [];
+  for(var i=1;i<lines.length;i++){
+    var cols = lines[i].split(delim).map(c=>c.trim().replace(/^"|"$/g,""));
+    var betrag = parseSwissNumber(cols[idx.betrag]);
+    if(!cols[idx.soll] || !cols[idx.haben] || !isFinite(betrag) || betrag===0) continue;
+    rows.push({
+      text: idx.text!==-1 ? (cols[idx.text]||"Lohnimport") : "Lohnimport",
+      soll: cols[idx.soll], haben: cols[idx.haben], betrag: Math.abs(betrag),
+      datum: idx.datum!==-1 ? cols[idx.datum] : ""
+    });
+  }
+  return { rows: rows, error: null };
+}
+function renderLohnImportPreview(){
+  var el = $("#bh-lohn-preview");
+  var p = state.lohnImportPreview;
+  if(!p){ el.innerHTML = ""; return; }
+  if(p.error){
+    el.innerHTML = '<div style="color:var(--danger);margin-top:6px;">' + escapeHtml(p.error) + '</div>';
+    return;
+  }
+  var sollSum = p.rows.reduce((s,r)=>s+r.betrag,0);
+  var habenSum = sollSum; // identisch, da wir Soll/Betrag je Zeile verwenden
+  var kontoName = function(nr){ var k = state.konten.find(x=>x.nummer===nr); return k ? (nr + " – " + k.bezeichnung) : (nr + " (unbekanntes Konto)"); };
+  var unbekannt = p.rows.filter(r=>!state.konten.find(k=>k.nummer===r.soll) || !state.konten.find(k=>k.nummer===r.haben));
+  el.innerHTML =
+    '<div style="font-size:12px;margin:8px 0;">' + p.rows.length + ' Buchungszeile(n) erkannt, Datei: ' + escapeHtml(p.fileName) + '</div>' +
+    '<div class="table-scroll" style="max-height:260px;"><table class="overview-table"><thead><tr><th>Text</th><th>Soll</th><th>Haben</th><th>Betrag</th></tr></thead><tbody>' +
+    p.rows.map(r=>'<tr><td>' + escapeHtml(r.text) + '</td><td>' + escapeHtml(kontoName(r.soll)) + '</td><td>' + escapeHtml(kontoName(r.haben)) + '</td><td style="text-align:right;">CHF ' + formatCHF(r.betrag) + '</td></tr>').join("") +
+    '</tbody></table></div>' +
+    '<div style="font-size:13px;margin:8px 0;font-weight:600;">Total: CHF ' + formatCHF(sollSum) + '</div>' +
+    (unbekannt.length ? ('<div style="color:var(--danger);font-size:12px;margin-bottom:8px;">' + unbekannt.length + ' Buchung(en) verwenden ein Konto, das noch nicht im Kontenplan existiert — bitte zuerst in den Stammdaten anlegen, sonst lässt sich die Zuordnung nicht nachvollziehen.</div>') : "") +
+    '<div class="modal-actions" style="justify-content:flex-start;">' +
+      '<button type="button" class="btn primary" id="bh-lohn-confirm-btn">Import bestätigen (' + p.rows.length + ' Buchungen)</button>' +
+      '<button type="button" class="btn btn-secondary" id="bh-lohn-cancel-btn">Abbrechen</button>' +
+    '</div>';
+}
+$("#bh-lohn-upload").addEventListener("change", async e=>{
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  try{
+    var text = await file.text();
+    var parsed = parseLohnCsv(text);
+    state.lohnImportPreview = { rows: parsed.rows, error: parsed.error, fileName: file.name };
+    renderLohnImportPreview();
+  }catch(err){
+    console.error(err);
+    state.lohnImportPreview = { rows: [], error: "Datei konnte nicht gelesen werden.", fileName: file.name };
+    renderLohnImportPreview();
+  }
+});
+$("#bh-lohn-preview").addEventListener("click", async e=>{
+  if(e.target.id==="bh-lohn-cancel-btn"){
+    state.lohnImportPreview = null;
+    $("#bh-lohn-upload").value = "";
+    renderLohnImportPreview();
+    return;
+  }
+  if(e.target.id==="bh-lohn-confirm-btn"){
+    var p = state.lohnImportPreview;
+    if(!p || !p.rows.length) return;
+    e.target.disabled = true;
+    try{
+      for(var i=0;i<p.rows.length;i++){
+        var r = p.rows[i];
+        await legeBuchung(r.text, r.soll, r.haben, r.betrag, "Lohnimport " + p.fileName);
+      }
+      var total = p.rows.reduce((s,r)=>s+r.betrag,0);
+      await addDoc(collection(db, LOHNIMPORTE_COLLECTION), {
+        dateiname: p.fileName, anzahl: p.rows.length, total: total,
+        datum: toISO(new Date()), erstelltAm: Date.now(), erstelltVon: state.currentName
+      });
+      state.lohnImportPreview = null;
+      $("#bh-lohn-upload").value = "";
+      renderLohnImportPreview();
+      toast("Lohnimport verbucht: " + p.rows.length + " Buchungen.");
+    }catch(err){
+      console.error(err);
+      toast("Import fehlgeschlagen.");
+      e.target.disabled = false;
+    }
   }
 });
 
