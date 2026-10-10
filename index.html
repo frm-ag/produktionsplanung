@@ -7049,6 +7049,13 @@ function renderUserAdmin(){
         ? `<button class="btn btn-secondary" data-unblock="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;">Freischalten</button>`
         : `<button class="btn btn-secondary" data-remove="${p.uid}" style="padding:4px 10px;font-size:10.5px;margin-top:4px;color:var(--danger);">Entfernen</button>`;
     }
+    const roleLabel = role==='admin' ? 'Admin' : (role==='buchhaltung' ? 'Buchhaltung' : 'Mitarbeiter');
+    const roleSelectHtml = isSelf ? '' : `
+        <select class="role-select" data-role-select="${p.uid}" style="margin-top:4px;font-size:10.5px;padding:3px 6px;">
+          <option value="user" ${role==='user'?'selected':''}>Mitarbeiter</option>
+          <option value="buchhaltung" ${role==='buchhaltung'?'selected':''}>Buchhaltung</option>
+          <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
+        </select>`;
     return `
     <div class="movement-row">
       <div class="m-icon ${role==='admin'?'in':'out'}">${role==='admin'?'A':'M'}</div>
@@ -7057,7 +7064,8 @@ function renderUserAdmin(){
         <div class="m-meta">Letzter Login: ${last}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;">
-        <span class="role-badge" style="margin-left:0;">${role==='admin'?'Admin':'Mitarbeiter'}</span>
+        <span class="role-badge" style="margin-left:0;">${roleLabel}</span>
+        ${roleSelectHtml}
         ${actionBtn}
       </div>
     </div>`;
@@ -7086,6 +7094,23 @@ function renderUserAdmin(){
       }
     };
   });
+  container.querySelectorAll('[data-role-select]').forEach(sel=>{
+    sel.onchange = async ()=>{
+      const uid = sel.dataset.roleSelect;
+      const newRole = sel.value;
+      try{
+        if(newRole === 'user'){
+          await deleteDoc(doc(db, 'roles', uid));
+        }else{
+          await setDoc(doc(db, 'roles', uid), { role: newRole });
+        }
+        toast('Rolle gespeichert.');
+      }catch(e){
+        toast('Rolle ändern fehlgeschlagen');
+        console.error(e);
+      }
+    };
+  });
 
   container.querySelector('#nu-open-add').onclick = openAddUserSheet;
 }
@@ -7105,6 +7130,7 @@ function openAddUserSheet(){
     <label>Rolle</label>
     <select id="nu-role">
       <option value="user">Mitarbeiter</option>
+      <option value="buchhaltung">Buchhaltung</option>
       <option value="admin">Admin</option>
     </select>
     <div class="btn-row">
@@ -7127,8 +7153,8 @@ function openAddUserSheet(){
       const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
       const newUid = cred.user.uid;
       await setDoc(doc(db, 'profiles', newUid), { username: username.toLowerCase(), createdAt: Date.now(), createdBy: currentUserEmail });
-      if(role === 'admin'){
-        await setDoc(doc(db, 'roles', newUid), { role: 'admin' });
+      if(role === 'admin' || role === 'buchhaltung'){
+        await setDoc(doc(db, 'roles', newUid), { role: role });
       }
       await addDoc(collection(db, 'mitarbeiter'), { name: fullName, uid: newUid, createdAt: Date.now() });
       await signOut(authSecondary);
