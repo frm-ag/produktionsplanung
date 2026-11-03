@@ -161,6 +161,43 @@
     #qr-bill-overlay{position:absolute;inset:0;}
   }
 
+  /* ---------- Nachkalkulation / Auftragskosten ---------- */
+  .ak-back{border:none;background:transparent;color:var(--accent);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0;margin-bottom:6px;}
+  .ak-head{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin-bottom:14px;}
+  .ak-head h2{font-family:var(--disp);font-size:19px;margin:0;}
+  .ak-head .ak-sub{font-size:12.5px;color:var(--text-muted);margin-top:2px;}
+  .ak-head-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+  .ak-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .ak-kpi{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:11px 13px;}
+  .ak-kpi .k-label{font-size:11px;color:var(--text-muted);font-weight:600;}
+  .ak-kpi .k-val{font-size:18px;font-weight:700;font-family:var(--disp);margin-top:3px;}
+  .ak-kpi .k-sub{font-size:11px;color:var(--text-muted);margin-top:2px;}
+  .ak-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
+  .ak-card h3{font-family:var(--disp);font-size:14px;margin:0 0 4px;}
+  .ak-hint{font-size:11.5px;color:var(--text-muted);margin-bottom:10px;}
+  .ak-scroll{overflow-x:auto;}
+  .ak-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:540px;}
+  .ak-table th{text-align:right;font-size:11px;color:var(--text-muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  .ak-table td{padding:7px 8px;border-bottom:1px solid var(--panel-alt);text-align:right;white-space:nowrap;}
+  .ak-table th:first-child,.ak-table td:first-child{text-align:left;}
+  .ak-table td:first-child{white-space:normal;font-weight:600;}
+  .ak-table tr.ak-total td{font-weight:700;border-top:2px solid var(--border);border-bottom:none;}
+  .ak-over{color:var(--danger);font-weight:700;}
+  .ak-under{color:var(--success);font-weight:700;}
+  .ak-bar{height:6px;border-radius:3px;background:var(--panel-alt);overflow:hidden;min-width:70px;}
+  .ak-bar>i{display:block;height:100%;background:var(--accent);}
+  .ak-bar.over>i{background:var(--danger);}
+  .ak-nk-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;}
+  .ak-nk-inputs .field{margin-bottom:0;}
+  .ak-note{font-size:11.5px;color:var(--text-muted);margin-top:8px;}
+  @media (max-width:720px){
+    .ak-card{padding:12px;} .ak-head h2{font-size:17px;}
+    .ak-table{min-width:0 !important;font-size:12px;}
+    .ak-table.ak-wide{min-width:560px !important;}
+    .ak-table th,.ak-table td{padding:6px 4px;}
+    .ak-table td{white-space:normal;}
+  }
+
   /* ---------- Handy-Ansicht ---------- */
   .nav-toggle{display:none;border:1px solid var(--border);background:var(--panel);color:var(--text);width:38px;height:36px;border-radius:7px;font-size:19px;line-height:1;cursor:pointer;flex:none;}
   #nav-backdrop{display:none;}
@@ -1289,6 +1326,7 @@
         <button type="button" class="side-section-head" data-toggle="projekt"><span class="side-arrow">▸</span>Projektmanagement</button>
         <div class="side-section-body">
           <button class="side-item sub" data-view="table">Übersicht</button>
+          <button class="side-item sub" data-view="auftragskosten">Nachkalkulation</button>
           <button class="side-item sub" data-view="kunden">Kunden</button>
           <button class="side-item sub" data-view="staff">Personalplanung</button>
           <button class="side-item sub" data-view="lager">Artikel</button>
@@ -1632,6 +1670,27 @@
         <tbody id="overview-tbody"></tbody>
       </table>
     </div>
+  </div>
+
+  <div id="auftragskosten-page" style="display:none;">
+    <div id="ak-list-view">
+      <div class="table-toolbar">
+        <input type="text" id="ak-search" placeholder="Auftragsnummer oder Kunde suchen…" autocomplete="off">
+        <button type="button" class="ready-filter-btn" data-ak-filter="offen">Offen</button>
+        <button type="button" class="ready-filter-btn" data-ak-filter="abgeschlossen">Abgeschlossen</button>
+        <button type="button" class="ready-filter-btn" data-ak-filter="alle">Alle</button>
+      </div>
+      <div class="table-scroll">
+        <table class="overview-table" id="ak-table">
+          <thead><tr>
+            <th>Auftrag</th><th>Kunde</th><th>Auftragswert</th><th>Std. Plan</th><th>Std. Ist</th><th>Kosten Ist</th><th>Ergebnis</th>
+          </tr></thead>
+          <tbody id="ak-tbody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Auftrag anklicken: Zeiten pro Kostenart, Material/Fremdleistungen, Fakturierung und Nachkalkulation. Kosten Ist = gestempelte Stunden × Ansatz der Kostenart + Material (Lager zu Einkaufspreis) + Kreditorenrechnungen auf den Auftrag.</div>
+    </div>
+    <div id="ak-detail-view" style="display:none;"></div>
   </div>
 
   <div id="kunden-page" style="display:none;">
@@ -2640,7 +2699,7 @@ onAuthStateChanged(auth, async user => {
 // Blendet Reiter je nach Rolle ein/aus: Mitarbeiter sehen nur Stempeluhr, Lager, Personal;
 // Admin/Produktionsleitung sieht weiterhin alles.
 function applyRoleVisibility(){
-  var adminOnlyTabs = ["table","verwaltung","einstellungen","saldo"];
+  var adminOnlyTabs = ["table","verwaltung","einstellungen","saldo","auftragskosten"];
   var buchhaltungOnlyTabs = ["buchhaltung"];
   document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
     var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
@@ -2829,6 +2888,7 @@ function subscribeAllTime(){
     state.allTime = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     if(state.view === "zeit") renderZeitOverview();
     if(state.view === "ferien") renderFerienPage();
+    if(state.view === "auftragskosten") renderAuftragskostenPage();
     scheduleAutoBookUeberstunden();
     scheduleAutoBookFerienanspruch();
   }, err => { console.error(err); });
@@ -2898,7 +2958,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null,
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
   // ---- Buchhaltung ----
   rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], lohnimporte: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
   buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
@@ -3030,6 +3090,7 @@ var HEADER_INFO = {
   table: ["Übersicht", "Übersicht für die Produktionsleitung"],
   kunden: ["Kunden", "Kundenstamm für Aufträge"],
   staff: ["Personalplanung", "Mitarbeiter den Aufträgen zuteilen"],
+  auftragskosten: ["Nachkalkulation", "Soll/Ist pro Auftrag und Kostenart"],
   lager: ["Artikelsammlung", "Lagerbestand und Artikel"],
   verwaltung: ["Verwaltung", "Nutzerkonten und Mitarbeiter verwalten"],
   buchhaltung: ["Buchhaltung", "Debitoren, Kreditoren und Stammdaten"]
@@ -3047,6 +3108,8 @@ function render(){
   var isEinstellungen = state.view === "einstellungen";
   var isVerwaltung = state.view === "verwaltung";
   var isBuchhaltung = state.view === "buchhaltung";
+  var isAK = state.view === "auftragskosten";
+  $("#auftragskosten-page").style.display = isAK ? "block" : "none";
   $("#table-page").style.display = isTable ? "block" : "none";
   $("#kunden-page").style.display = isKunden ? "block" : "none";
   $("#staff-page").style.display = isStaff ? "block" : "none";
@@ -3065,7 +3128,7 @@ function render(){
     document.querySelectorAll(".overlay").forEach(o=>o.remove());
   }
   lastRenderedView = state.view;
-  var hideToolbar = (isKunden || isStaff || isLager || isZeit || isFerien || isSaldo || isEinstellungen || isVerwaltung || isBuchhaltung);
+  var hideToolbar = (isKunden || isStaff || isLager || isZeit || isFerien || isSaldo || isEinstellungen || isVerwaltung || isBuchhaltung || isAK);
   $("#filter-chips").style.display = hideToolbar ? "none" : "inline-flex";
   $("#add-btn").style.display = hideToolbar ? "none" : "inline-block";
   if(isTable){ renderTable(); return; }
@@ -3078,6 +3141,7 @@ function render(){
   if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); renderKostenstellenPanel(); return; }
   if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
   if(isBuchhaltung){ renderBuchhaltungPage(); return; }
+  if(isAK){ renderAuftragskostenPage(); return; }
 }
 function renderHeader(){
   document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
@@ -5985,6 +6049,298 @@ $("#bh-camt-upload").addEventListener("change", async e=>{
     console.error(err);
     resultEl.innerHTML = '<div style="color:var(--danger);">Verarbeitung fehlgeschlagen: ' + escapeHtml(err.message||"") + '</div>';
   }
+});
+
+/* ---------- Nachkalkulation / Auftragskosten ---------- */
+// Pro Auftrag: Stunden Plan/Ist je Kostenart, Material + Kreditorenrechnungen, Fakturierung und
+// Nachkalkulation (Selbstkosten mit Zuschlägen, Ergebnis, Marge). Alles aus bestehenden Daten.
+function akFmtH(h){ return (Number(h)||0).toFixed(2); }
+function akSigned(n, fmt){ var v = Number(n)||0; return (v>0.005?"+":"") + fmt(v); }
+function akOverClass(diff){ return diff > 0.005 ? "ak-over" : (diff < -0.005 ? "ak-under" : ""); } // mehr Aufwand als Plan = rot
+function akResultClass(v){ return v > 0.005 ? "ak-under" : (v < -0.005 ? "ak-over" : ""); }       // positives Ergebnis = grün
+
+// Alle gestempelten Zeiten in einem Durchgang pro Auftrag summieren (Kommen/Gehen-Paare je Mitarbeiter).
+function computeIstProAuftrag(){
+  var map = {}, byUid = {};
+  (state.allTime||[]).forEach(function(t){ (byUid[t.uid] = byUid[t.uid] || []).push(t); });
+  Object.keys(byUid).forEach(function(uid){
+    var entries = byUid[uid].slice().sort(function(a,b){ return a.timestamp - b.timestamp; });
+    var open = null;
+    entries.forEach(function(e){
+      if(e.type === "kommen"){ open = e; }
+      else if(e.type === "gehen"){
+        if(open && open.orderId){
+          var ms = e.timestamp - open.timestamp;
+          if(ms > 0){
+            var r = map[open.orderId] = map[open.orderId] || { totalMs: 0, byKa: {}, byUid: {} };
+            var key = (open.kostenartIdx != null) ? open.kostenartIdx : "none";
+            r.byKa[key] = (r.byKa[key]||0) + ms; r.totalMs += ms; r.byUid[uid] = (r.byUid[uid]||0) + ms;
+          }
+        }
+        open = null;
+      }
+    });
+  });
+  return map;
+}
+// Alle Kennzahlen eines Auftrags (Arbeit, Material/Fremd, Fakturierung).
+function akFigures(order, istMap){
+  var ist = istMap[order.id] || { totalMs: 0, byKa: {}, byUid: {} };
+  var kas = Array.isArray(order.kostenarten) ? order.kostenarten : [];
+  var planH = 0, planChf = 0;
+  kas.forEach(function(k){ var h = parseFloat(k.stunden)||0; planH += h; planChf += h*(parseFloat(k.ansatz)||0); });
+  var avgAnsatz = planH > 0 ? planChf/planH : 0;
+  var rows = kas.map(function(k, idx){
+    var ph = parseFloat(k.stunden)||0, an = parseFloat(k.ansatz)||0, ih = (ist.byKa[idx]||0)/3600000;
+    return { name: k.bezeichnung||"", planH: ph, ansatz: an, planChf: ph*an, istH: ih, istChf: ih*an };
+  });
+  var ohneH = (ist.byKa["none"]||0)/3600000;
+  if(ohneH > 0) rows.push({ name: "Ohne Kostenart", planH: 0, ansatz: avgAnsatz, planChf: 0, istH: ohneH, istChf: ohneH*avgAnsatz, ohne: true });
+  var istH = 0, arbeitIst = 0;
+  rows.forEach(function(r){ istH += r.istH; arbeitIst += r.istChf; });
+  var artikel = (Array.isArray(order.artikelPositionen) ? order.artikelPositionen : []).map(function(a){
+    var menge = parseFloat(a.menge)||0, ek = parseFloat(a.einkaufspreis)||0;
+    return { bezeichnung: a.bezeichnung||"", menge: menge, ek: ek, betrag: menge*ek };
+  });
+  var artikelEk = artikel.reduce(function(s,a){ return s + a.betrag; }, 0);
+  var passt = function(r){ return r.orderId === order.id || (r.orderNumber && r.orderNumber === order.orderNumber); };
+  var kred = (state.lieferantenrechnungen||[]).filter(passt);
+  var kredNetto = kred.reduce(function(s,k){ return s + (Number(k.betrag)||0); }, 0);
+  var rech = (state.rechnungen||[]).filter(passt);
+  var fakt = rech.reduce(function(s,r){ return s + (Number(r.betrag)||0); }, 0);
+  var faktBezahlt = rech.filter(function(r){ return r.status==="bezahlt"; }).reduce(function(s,r){ return s + (Number(r.betrag)||0); }, 0);
+  var uids = Object.keys(ist.byUid).map(function(uid){ return { uid: uid, h: ist.byUid[uid]/3600000 }; }).sort(function(a,b){ return b.h - a.h; });
+  return {
+    rows: rows, planH: planH, planChf: planChf, istH: istH, arbeitIst: arbeitIst, uids: uids,
+    artikel: artikel, artikelEk: artikelEk, kred: kred, kredNetto: kredNetto,
+    matPlan: parseFloat(order.materialPlan)||0, matIst: artikelEk + kredNetto,
+    rech: rech, fakt: fakt, faktBezahlt: faktBezahlt, auftragswert: parseFloat(order.auftragswert)||0,
+    kostenIst: arbeitIst + artikelEk + kredNetto
+  };
+}
+function akNkDefaults(order){
+  var s = order.nachkalkulation || {};
+  return {
+    umsatz: s.umsatz != null ? s.umsatz : (parseFloat(order.auftragswert)||0),
+    zm: s.zm||0, za: s.za||0, gewinn: s.gewinn||0, definitiv: !!s.definitiv
+  };
+}
+function akNkCompute(fig, nk){
+  var zm = Number(nk.zm)||0, za = Number(nk.za)||0, g = Number(nk.gewinn)||0, umsatz = Number(nk.umsatz)||0;
+  var plan = { arbeit: fig.planChf, mat: fig.matPlan }, ist = { arbeit: fig.arbeitIst, mat: fig.matIst };
+  var calc = function(x){
+    var zuA = x.arbeit*za/100, zuM = x.mat*zm/100, sk = x.arbeit + x.mat + zuA + zuM;
+    return { arbeit: x.arbeit, mat: x.mat, zuA: zuA, zuM: zuM, sk: sk, ergebnis: umsatz - sk, marge: umsatz>0 ? (umsatz - sk)/umsatz*100 : 0, vk: sk*(1+g/100) };
+  };
+  return { plan: calc(plan), ist: calc(ist), umsatz: umsatz, zm: zm, za: za, g: g };
+}
+function akRowsHtml(cells){ return '<tr>' + cells.join("") + '</tr>'; }
+function akNkResultHtml(fig, nk){
+  var c = akNkCompute(fig, nk);
+  var chf = function(v){ return formatCHF(v); };
+  var line = function(label, p, i, opts){
+    opts = opts || {};
+    var d = i - p;
+    var cls = opts.result ? akResultClass(d) : akOverClass(d);
+    return '<tr' + (opts.total?' class="ak-total"':'') + '><td>' + label + '</td><td>' + (opts.fmt||chf)(p) + '</td><td>' + (opts.fmt||chf)(i) + '</td><td class="' + cls + '">' + akSigned(d, opts.fmt||chf) + '</td></tr>';
+  };
+  var html = '<div class="ak-scroll"><table class="ak-table" style="min-width:420px;"><thead><tr><th>Position (CHF)</th><th>Plan</th><th>Ist</th><th>Differenz</th></tr></thead><tbody>' +
+    line('Arbeit (Kostenarten)', c.plan.arbeit, c.ist.arbeit) +
+    line('Material &amp; Fremdleistungen', c.plan.mat, c.ist.mat) +
+    (c.za ? line('Zuschlag Arbeit ' + c.za + ' %', c.plan.zuA, c.ist.zuA) : '') +
+    (c.zm ? line('Zuschlag Material ' + c.zm + ' %', c.plan.zuM, c.ist.zuM) : '') +
+    line('Selbstkosten', c.plan.sk, c.ist.sk, { total: true }) +
+    '<tr><td>Umsatz</td><td>' + chf(c.umsatz) + '</td><td>' + chf(c.umsatz) + '</td><td></td></tr>' +
+    line('Ergebnis (Umsatz − Selbstkosten)', c.plan.ergebnis, c.ist.ergebnis, { total: true, result: true }) +
+    line('Marge in %', c.plan.marge, c.ist.marge, { result: true, fmt: function(v){ return (Number(v)||0).toFixed(1) + ' %'; } }) +
+    (c.g ? line('Kalkulierter Verkaufspreis bei ' + c.g + ' % Gewinn', c.plan.vk, c.ist.vk) : '') +
+    '</tbody></table></div>';
+  return html;
+}
+function akArbeitHtml(fig, noBar){
+  if(fig.rows.length === 0) return '<div class="ak-hint">Noch keine Kostenarten (Plan) erfasst und noch keine Stunden gebucht.</div>';
+  var body = fig.rows.map(function(r){
+    var dh = r.istH - r.planH, dc = r.istChf - r.planChf;
+    var over = r.planH > 0 ? r.istH > r.planH : r.istH > 0;
+    var pct = r.planH > 0 ? Math.min(100, r.istH/r.planH*100) : (r.istH > 0 ? 100 : 0);
+    return '<tr><td>' + escapeHtml(r.name) + '</td><td>' + akFmtH(r.planH) + '</td><td>' + akFmtH(r.istH) + '</td>' +
+      '<td class="' + (r.planH>0?akOverClass(dh):'') + '">' + akSigned(dh, akFmtH) + '</td>' +
+      (noBar ? '' : '<td><div class="ak-bar' + (over?' over':'') + '"><i style="width:' + pct.toFixed(0) + '%"></i></div></td>') +
+      '<td>' + formatCHF(r.ansatz) + '</td><td>' + formatCHF(r.planChf) + '</td><td>' + formatCHF(r.istChf) + '</td>' +
+      '<td class="' + akOverClass(dc) + '">' + akSigned(dc, formatCHF) + '</td></tr>';
+  }).join("");
+  var dH = fig.istH - fig.planH, dC = fig.arbeitIst - fig.planChf;
+  return '<div class="ak-scroll"><table class="ak-table ak-wide"><thead><tr><th>Kostenart</th><th>Std. Plan</th><th>Std. Ist</th><th>Diff. Std.</th>' + (noBar ? '' : '<th>Auslastung</th>') + '<th>Ansatz</th><th>Plan CHF</th><th>Ist CHF</th><th>Diff. CHF</th></tr></thead><tbody>' + body +
+    '<tr class="ak-total"><td>Total</td><td>' + akFmtH(fig.planH) + '</td><td>' + akFmtH(fig.istH) + '</td><td class="' + akOverClass(dH) + '">' + akSigned(dH, akFmtH) + '</td>' + (noBar ? '' : '<td></td>') + '<td></td><td>' + formatCHF(fig.planChf) + '</td><td>' + formatCHF(fig.arbeitIst) + '</td><td class="' + akOverClass(dC) + '">' + akSigned(dC, formatCHF) + '</td></tr>' +
+    '</tbody></table></div>';
+}
+function akMitarbeiterHtml(fig){
+  if(fig.uids.length === 0) return '<div class="ak-hint">Noch keine Stunden auf diesen Auftrag gestempelt.</div>';
+  var nameOf = function(uid){
+    var emp = state.staff.find(function(s){ return s.uid === uid; });
+    if(emp) return emp.name;
+    var p = (state.profiles||[]).find(function(x){ return x.uid === uid || x.id === uid; });
+    return (p && (p.name || p.displayName)) || "Unbekannt";
+  };
+  return '<div class="ak-scroll"><table class="ak-table" style="min-width:260px;"><thead><tr><th>Mitarbeiter</th><th>Std. gebucht</th></tr></thead><tbody>' +
+    fig.uids.map(function(u){ return '<tr><td>' + escapeHtml(nameOf(u.uid)) + '</td><td>' + akFmtH(u.h) + '</td></tr>'; }).join("") + '</tbody></table></div>';
+}
+function akMaterialHtml(fig){
+  var statusLbl = function(s){ return s==="bezahlt" ? "Bezahlt" : (s==="freigegeben" ? "Freigegeben" : "Offen"); };
+  var rows = '';
+  fig.artikel.forEach(function(a){
+    rows += '<tr><td>' + escapeHtml(a.bezeichnung) + ' <span style="color:var(--text-muted);font-weight:400;">(' + a.menge + ' × ' + formatCHF(a.ek) + ')</span></td><td>Lager</td><td>–</td><td>' + formatCHF(a.betrag) + '</td></tr>';
+  });
+  fig.kred.forEach(function(k){
+    rows += '<tr><td>' + escapeHtml(k.lieferant||"") + (k.rechnungsnummer ? ' <span style="color:var(--text-muted);font-weight:400;">(' + escapeHtml(k.rechnungsnummer) + ')</span>' : '') + '</td><td>Kreditor</td><td>' + statusLbl(k.status) + '</td><td>' + formatCHF(Number(k.betrag)||0) + '</td></tr>';
+  });
+  if(!rows) rows = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Noch kein Material oder keine Kreditorenrechnung auf diesen Auftrag gebucht.</td></tr>';
+  var d = fig.matIst - fig.matPlan;
+  return '<div class="ak-scroll"><table class="ak-table" style="min-width:420px;"><thead><tr><th>Position</th><th>Quelle</th><th>Status</th><th>Betrag netto</th></tr></thead><tbody>' + rows +
+    '<tr class="ak-total"><td>Material &amp; Fremdleistungen Ist</td><td></td><td></td><td>' + formatCHF(fig.matIst) + '</td></tr>' +
+    '<tr><td>Plan (Material Plan im Auftrag)</td><td></td><td></td><td>' + formatCHF(fig.matPlan) + '</td></tr>' +
+    '<tr><td>Differenz</td><td></td><td></td><td class="' + akOverClass(d) + '">' + akSigned(d, formatCHF) + '</td></tr>' +
+    '</tbody></table></div>';
+}
+function akFakturaHtml(fig){
+  var rows = fig.rech.map(function(r){
+    return '<tr><td>' + escapeHtml(r.nummer||"") + '</td><td>' + (r.typ==="akonto"?"Akonto":"Schlussrechnung") + '</td><td>' + escapeHtml(r.datum||"") + '</td><td>' + (r.status==="bezahlt"?"Bezahlt":"Offen") + '</td><td>' + formatCHF(Number(r.betrag)||0) + '</td></tr>';
+  }).join("");
+  if(!rows) rows = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Noch keine Rechnung auf diesen Auftrag erstellt.</td></tr>';
+  return '<div class="ak-scroll"><table class="ak-table" style="min-width:440px;"><thead><tr><th>Rechnung</th><th>Typ</th><th>Datum</th><th>Status</th><th>Betrag netto</th></tr></thead><tbody>' + rows +
+    '<tr class="ak-total"><td>Fakturiert</td><td></td><td></td><td></td><td>' + formatCHF(fig.fakt) + '</td></tr>' +
+    '<tr><td>Noch nicht fakturiert (Auftragswert − fakturiert)</td><td></td><td></td><td></td><td>' + formatCHF(fig.auftragswert - fig.fakt) + '</td></tr>' +
+    '</tbody></table></div>';
+}
+
+function renderAuftragskostenPage(){
+  var active = document.activeElement;
+  if(active && active.closest && active.closest("#ak-detail-view") && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return; // nicht beim Tippen neu aufbauen
+  var order = state.akOrderId ? state.orders.find(function(o){ return o.id === state.akOrderId; }) : null;
+  if(state.akOrderId && !order) state.akOrderId = null;
+  $("#ak-list-view").style.display = order ? "none" : "block";
+  $("#ak-detail-view").style.display = order ? "block" : "none";
+  if(order) renderAuftragskostenDetail(order); else renderAuftragskostenList();
+}
+function renderAuftragskostenList(){
+  document.querySelectorAll("#ak-list-view [data-ak-filter]").forEach(function(b){ b.classList.toggle("active", b.dataset.akFilter === state.akFilter); });
+  var search = ($("#ak-search").value||"").trim().toLowerCase();
+  var istMap = computeIstProAuftrag();
+  var rows = state.orders.filter(function(o){
+    if(state.akFilter === "offen" && o.completed) return false;
+    if(state.akFilter === "abgeschlossen" && !o.completed) return false;
+    if(search && !((o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search) || (o.description||"").toLowerCase().includes(search))) return false;
+    return true;
+  }).sort(function(a,b){ return (b.orderNumber||"").localeCompare(a.orderNumber||"", undefined, {numeric:true}); });
+  var tbody = $("#ak-tbody");
+  if(rows.length === 0){ tbody.innerHTML = '<tr class="ov-empty-row"><td colspan="7">Keine Aufträge gefunden.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(function(o){
+    var f = akFigures(o, istMap);
+    var ergebnis = f.auftragswert - f.kostenIst;
+    var ergCell = f.auftragswert > 0 ? ('<span class="' + akResultClass(ergebnis) + '">CHF ' + formatCHF(ergebnis) + ' (' + (ergebnis/f.auftragswert*100).toFixed(0) + ' %)</span>') : '–';
+    return '<tr data-ak-open="' + o.id + '">' +
+      '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber||"") + (o.completed ? ' <span style="font-weight:400;color:var(--text-muted);font-size:11px;">abgeschlossen</span>' : '') + '</td>' +
+      '<td data-label="Kunde"><span class="ov-customer">' + escapeHtml(orderDisplayNameSafe(o)) + '</span>' + (o.description ? '<div class="ov-desc">' + escapeHtml(o.description) + '</div>' : '') + '</td>' +
+      '<td data-label="Auftragswert">' + (f.auftragswert > 0 ? 'CHF ' + formatCHF(f.auftragswert) : '–') + '</td>' +
+      '<td data-label="Std. Plan">' + akFmtH(f.planH) + '</td>' +
+      '<td data-label="Std. Ist"><span class="' + (f.planH>0 ? akOverClass(f.istH - f.planH) : '') + '">' + akFmtH(f.istH) + '</span></td>' +
+      '<td data-label="Kosten Ist">CHF ' + formatCHF(f.kostenIst) + '</td>' +
+      '<td data-label="Ergebnis">' + ergCell + '</td></tr>';
+  }).join("");
+}
+function renderAuftragskostenDetail(order){
+  var fig = akFigures(order, computeIstProAuftrag());
+  var nk = state.akNk;
+  var ergebnis = fig.auftragswert - fig.kostenIst;
+  var saved = order.nachkalkulation;
+  var kpi = function(label, val, sub, cls){ return '<div class="ak-kpi"><div class="k-label">' + label + '</div><div class="k-val ' + (cls||'') + '">' + val + '</div>' + (sub ? '<div class="k-sub">' + sub + '</div>' : '') + '</div>'; };
+  $("#ak-detail-view").innerHTML =
+    '<button type="button" class="ak-back" data-ak-back>← Zurück zur Auftragsliste</button>' +
+    '<div class="ak-head"><div><h2>Auftrag ' + escapeHtml(order.orderNumber||"") + ' · ' + escapeHtml(orderDisplayNameSafe(order)) + '</h2>' +
+      '<div class="ak-sub">' + escapeHtml(order.description||"") + (order.completed ? ' · abgeschlossen' : '') + '</div></div>' +
+      '<div class="ak-head-actions"><button type="button" class="btn" data-ak-edit>Auftrag bearbeiten</button><button type="button" class="btn" data-ak-print>Drucken / PDF</button></div></div>' +
+    '<div class="ak-kpis">' +
+      kpi('Auftragswert', 'CHF ' + formatCHF(fig.auftragswert), 'Fakturiert CHF ' + formatCHF(fig.fakt)) +
+      kpi('Stunden Ist / Plan', akFmtH(fig.istH) + ' / ' + akFmtH(fig.planH), 'Std.', fig.planH>0 ? akOverClass(fig.istH - fig.planH) : '') +
+      kpi('Kosten Ist', 'CHF ' + formatCHF(fig.kostenIst), 'Arbeit ' + formatCHF(fig.arbeitIst) + ' · Material/Fremd ' + formatCHF(fig.matIst)) +
+      kpi('Ergebnis (ohne Zuschläge)', 'CHF ' + formatCHF(ergebnis), fig.auftragswert>0 ? ((ergebnis/fig.auftragswert*100).toFixed(1) + ' % vom Auftragswert') : '', akResultClass(ergebnis)) +
+    '</div>' +
+    '<div class="ak-card"><h3>Arbeit pro Kostenart</h3><div class="ak-hint">Gestempelte Stunden aus der Zeiterfassung gegen die Plankalkulation des Auftrags. Ist CHF = Std. Ist × Ansatz der Kostenart.</div>' + akArbeitHtml(fig) + '</div>' +
+    '<div class="ak-card"><h3>Wer hat gebucht?</h3>' + akMitarbeiterHtml(fig) + '</div>' +
+    '<div class="ak-card"><h3>Material &amp; Fremdleistungen</h3><div class="ak-hint">Artikel aus dem Lager zum Einkaufspreis plus Kreditorenrechnungen, die auf diesen Auftrag gebucht sind (netto).</div>' + akMaterialHtml(fig) + '</div>' +
+    '<div class="ak-card"><h3>Fakturierung</h3>' + akFakturaHtml(fig) + '</div>' +
+    '<div class="ak-card"><h3>Nachkalkulation</h3><div class="ak-hint">Selbstkosten aus den Ist-Kosten, optional mit Zuschlägen (Gemeinkosten). Das Ergebnis vergleicht Plan und Ist bei gleichem Umsatz.</div>' +
+      '<div class="ak-nk-inputs">' +
+        '<div class="field"><label for="ak-nk-umsatz">Umsatz (CHF)</label><input type="number" id="ak-nk-umsatz" step="0.01" value="' + (nk.umsatz||0) + '"></div>' +
+        '<div class="field"><label for="ak-nk-zm">Zuschlag Material (%)</label><input type="number" id="ak-nk-zm" step="0.1" value="' + (nk.zm||0) + '"></div>' +
+        '<div class="field"><label for="ak-nk-za">Zuschlag Arbeit (%)</label><input type="number" id="ak-nk-za" step="0.1" value="' + (nk.za||0) + '"></div>' +
+        '<div class="field"><label for="ak-nk-gewinn">Ziel-Gewinn (%)</label><input type="number" id="ak-nk-gewinn" step="0.1" value="' + (nk.gewinn||0) + '"></div>' +
+      '</div>' +
+      '<div id="ak-nk-result">' + akNkResultHtml(fig, nk) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;">' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="ak-nk-definitiv"' + (nk.definitiv?' checked':'') + ' style="width:auto;"> Definitiv (abgeschlossen)</label>' +
+        '<button type="button" class="btn primary" data-ak-save>Nachkalkulation speichern</button></div>' +
+      '<div class="ak-note">' + (saved && saved.datum ? ('Zuletzt gespeichert am ' + escapeHtml(saved.datum) + (saved.von ? ' von ' + escapeHtml(saved.von) : '') + ' · Ergebnis Ist CHF ' + formatCHF(saved.ergebnisIst) + (saved.definitiv ? ' · definitiv' : '')) : 'Noch nicht gespeichert.') + '</div>' +
+    '</div>';
+}
+function akReadNkInputs(){
+  return {
+    umsatz: parseFloat($("#ak-nk-umsatz").value)||0, zm: parseFloat($("#ak-nk-zm").value)||0,
+    za: parseFloat($("#ak-nk-za").value)||0, gewinn: parseFloat($("#ak-nk-gewinn").value)||0,
+    definitiv: $("#ak-nk-definitiv").checked
+  };
+}
+function akPrintHtml(order, fig, nk){
+  var style = '<style>body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;margin:18px;}h1{font-size:18px;margin:0 0 2px;}h2{font-size:14px;margin:18px 0 6px;}' +
+    '.sub{color:#555;margin-bottom:10px;}table{width:100%;border-collapse:collapse;}th,td{padding:5px 7px;border-bottom:1px solid #ddd;text-align:right;}th:first-child,td:first-child{text-align:left;}' +
+    'tr.ak-total td{font-weight:700;border-top:2px solid #333;}.ak-over{color:#b00020;font-weight:700;}.ak-under{color:#1c7a34;font-weight:700;}</style>';
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Nachkalkulation ' + escapeHtml(order.orderNumber||"") + '</title>' + style + '</head><body>' +
+    '<h1>Nachkalkulation Auftrag ' + escapeHtml(order.orderNumber||"") + '</h1><div class="sub">' + escapeHtml(orderDisplayNameSafe(order)) + (order.description ? ' · ' + escapeHtml(order.description) : '') + ' · Stand ' + escapeHtml(toISO(new Date())) + (nk.definitiv ? ' · definitiv' : '') + '</div>' +
+    '<h2>Arbeit pro Kostenart</h2>' + akArbeitHtml(fig, true) +
+    '<h2>Material &amp; Fremdleistungen</h2>' + akMaterialHtml(fig) +
+    '<h2>Fakturierung</h2>' + akFakturaHtml(fig) +
+    '<h2>Nachkalkulation</h2>' + akNkResultHtml(fig, nk) + '</body></html>';
+}
+$("#ak-search").addEventListener("input", renderAuftragskostenList);
+$("#auftragskosten-page").addEventListener("click", async function(e){
+  var f = e.target.closest("[data-ak-filter]");
+  if(f){ state.akFilter = f.dataset.akFilter; renderAuftragskostenPage(); return; }
+  var row = e.target.closest("tr[data-ak-open]");
+  if(row){
+    var o = state.orders.find(function(x){ return x.id === row.dataset.akOpen; });
+    if(o){ state.akOrderId = o.id; state.akNk = akNkDefaults(o); renderAuftragskostenPage(); window.scrollTo(0,0); }
+    return;
+  }
+  if(e.target.closest("[data-ak-back]")){ state.akOrderId = null; renderAuftragskostenPage(); window.scrollTo(0,0); return; }
+  var order = state.akOrderId ? state.orders.find(function(x){ return x.id === state.akOrderId; }) : null;
+  if(!order) return;
+  if(e.target.closest("[data-ak-edit]")){ openModal(order, null); return; }
+  if(e.target.closest("[data-ak-print]")){
+    state.akNk = akReadNkInputs();
+    printHtmlDocument(akPrintHtml(order, akFigures(order, computeIstProAuftrag()), state.akNk));
+    return;
+  }
+  if(e.target.closest("[data-ak-save]")){
+    var nk = akReadNkInputs(); state.akNk = nk;
+    var fig = akFigures(order, computeIstProAuftrag());
+    var c = akNkCompute(fig, nk);
+    try{
+      await updateDoc(doc(db, COLLECTION, order.id), { nachkalkulation: {
+        umsatz: nk.umsatz, zm: nk.zm, za: nk.za, gewinn: nk.gewinn, definitiv: nk.definitiv,
+        stundenIst: fig.istH, arbeitIst: fig.arbeitIst, materialIst: fig.matIst, selbstkostenIst: c.ist.sk,
+        ergebnisIst: c.ist.ergebnis, margeIst: c.ist.marge, datum: toISO(new Date()), von: state.currentName || ""
+      }});
+      toast("Nachkalkulation gespeichert.");
+    }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+  }
+});
+// Live-Neuberechnung beim Tippen — nur der Ergebnisblock wird aktualisiert, das Formular bleibt stehen.
+$("#ak-detail-view").addEventListener("input", function(e){
+  if(!e.target.closest(".ak-nk-inputs")) return;
+  var order = state.orders.find(function(x){ return x.id === state.akOrderId; });
+  if(!order) return;
+  state.akNk = akReadNkInputs();
+  $("#ak-nk-result").innerHTML = akNkResultHtml(akFigures(order, computeIstProAuftrag()), state.akNk);
 });
 
 /* ---- Lohnimport (ABACUS) ---- */
