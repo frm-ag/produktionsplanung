@@ -161,8 +161,41 @@
     #qr-bill-overlay{position:absolute;inset:0;}
   }
 
+  /* ---------- Handy-Ansicht ---------- */
+  .nav-toggle{display:none;border:1px solid var(--border);background:var(--panel);color:var(--text);width:38px;height:36px;border-radius:7px;font-size:19px;line-height:1;cursor:pointer;flex:none;}
+  #nav-backdrop{display:none;}
+  .staff-mobile{display:none;}
   @media (max-width:860px){
-    #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:50;box-shadow:2px 0 12px rgba(0,0,0,.08);}
+    /* Menü links: auf dem Handy standardmässig ausgeblendet, per Hamburger-Button als Drawer einblendbar */
+    #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:60;width:260px;flex:none;box-shadow:2px 0 12px rgba(0,0,0,.08);transform:translateX(-105%);transition:transform .2s ease;}
+    body.nav-open #sidebar{transform:none;}
+    body.nav-open #nav-backdrop{display:block;position:fixed;inset:0;background:rgba(20,25,28,.45);z-index:55;}
+    .nav-toggle{display:inline-flex;align-items:center;justify-content:center;}
+    #main-content{padding:10px 12px 60px;width:100%;}
+    header{gap:8px;padding:10px 0;}
+    .brand h1{font-size:17px;}
+  }
+  @media (max-width:720px){
+    /* Wochenplan (Personalplanung): statt breiter Tabelle ein Tag nach dem anderen mit Tag-Tabs */
+    #staff-seed-btn{display:none !important;}
+    .staff-toolbar .nav-label{min-width:0;flex:1;font-size:13px;}
+    .staff-layout .staff-grid-scroll{overflow-x:visible;}
+    .staff-grid-scroll #staff-grid{min-width:0;border:none;background:transparent;border-radius:0;overflow:visible;}
+    #staff-grid .staff-grid-header, #staff-grid .staff-row{display:none;}
+    .staff-mobile{display:block;}
+    .staff-mobile-tabs{display:flex;gap:6px;margin-bottom:12px;}
+    .staff-mobile-tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;border-radius:8px;padding:7px 2px;cursor:pointer;}
+    .staff-mobile-tab .smt-name{font-size:12.5px;font-weight:700;}
+    .staff-mobile-tab .smt-date{font-size:10.5px;}
+    .staff-mobile-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+    .staff-mobile-tab.is-today:not(.active){border-color:var(--warn);color:var(--text);}
+    .staff-mobile-card{background:var(--panel);border:1px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden;}
+    .staff-mobile-name{padding:9px 11px;font-size:13.5px;font-weight:600;background:var(--panel-alt);border-bottom:1px solid var(--border);}
+    .staff-mobile-name .staff-name-group{display:flex;align-items:center;gap:8px;}
+    .staff-mobile-card .staff-cell{border-left:none;padding:8px 10px;min-height:44px;}
+    .staff-mobile-card .assign-chip{font-size:12.5px;padding:8px 10px;}
+    .staff-mobile-card .assign-chip .a-type{font-size:10.5px;}
+    .staff-mobile-card .staff-cell-add{padding:9px;font-size:16px;}
   }
 
   .nav-group{display:inline-flex;align-items:center;gap:8px;}
@@ -1233,6 +1266,7 @@
 
 <div class="hazard-strip" id="topStrip" style="display:none;"></div>
 <div id="app">
+  <div id="nav-backdrop"></div>
   <aside id="sidebar">
     <div class="sidebar-brand">
       <h1>PRODUKTION<span>.PLAN</span></h1>
@@ -1276,6 +1310,7 @@
 
   <div id="main-content">
   <header>
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Menü öffnen">☰</button>
     <div class="brand">
       <h1 id="header-title">Übersicht</h1>
       <div class="sub" id="header-sub">Übersicht für die Produktionsleitung</div>
@@ -2863,7 +2898,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "",
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null,
   // ---- Buchhaltung ----
   rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], lohnimporte: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
   buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
@@ -5013,41 +5048,71 @@ function renderStaffGrid(){
   html += '</div>';
   var canEdit = !!state.isAdmin;
   var meEmp = state.staff.find(s=>s.uid === state.currentUid) || null;
-  var todayIso = todayISO();
   var myTodayEntries = meEmp ? zeitTodayEntries(state.myTime) : [];
   var myStatus = meEmp ? zeitCurrentStatus(myTodayEntries) : "off";
   var myLastKommen = meEmp ? myTodayEntries.slice().reverse().find(e=>e.type==="kommen") : null;
+  // Zelleninhalt (Abwesenheit + Einsätze + "+") — wird von der Desktop-Tabelle UND der
+  // Handy-Tagesansicht genutzt, damit beide dasselbe Markup und damit dieselben Klick-Handler haben.
+  var cellHtml = function(emp, iso){
+    var out = '<div class="staff-cell" data-employee-id="' + emp.id + '" data-date="' + iso + '">';
+    var absence = absenceForDay(emp.id, iso);
+    var assigns = state.assignments.filter(a=>a.employeeId===emp.id && a.date===iso);
+    if(absence){
+      out += '<div class="absence-banner absence-' + absence.type + '" data-absence-id="' + absence.id + '">' + absenceFullLabel(absence) + '</div>';
+    }
+    assigns.forEach(a=>{
+      var o = state.orders.find(x=>x.id===a.orderId);
+      var typ = a.type || "werkstatt";
+      var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
+      // Anstempeln geht auf jeden eigenen Einsatz, unabhängig vom Wochentag der Spalte (nicht
+      // nur auf den heutigen) — gebucht wird dabei ohnehin immer mit dem aktuellen Zeitstempel.
+      var isMinePunchable = meEmp && emp.id===meEmp.id;
+      var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
+      var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
+      out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
+    });
+    if(canEdit) out += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
+    out += '</div>';
+    return out;
+  };
   state.staff.forEach(emp=>{
     html += '<div class="staff-row">';
     html += '<div class="staff-row-name"' + (canEdit?' draggable="true"':'') + ' data-staff-id="' + emp.id + '">';
     html += '<div class="staff-name-line"><span class="staff-name-group">' + (canEdit?'<span class="staff-drag-handle">⠿</span>':'') + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span>' + (canEdit?('<button type="button" class="staff-remove" data-staff-id="' + emp.id + '" title="Mitarbeiter entfernen">✕</button>'):'') + '</div>';
     html += '</div>';
-    days.forEach(d=>{
-      var iso = toISO(d);
-      var absence = absenceForDay(emp.id, iso);
-      var assigns = state.assignments.filter(a=>a.employeeId===emp.id && a.date===iso);
-      html += '<div class="staff-cell" data-employee-id="' + emp.id + '" data-date="' + iso + '">';
-      if(absence){
-        html += '<div class="absence-banner absence-' + absence.type + '" data-absence-id="' + absence.id + '">' + absenceFullLabel(absence) + '</div>';
-      }
-      assigns.forEach(a=>{
-        var o = state.orders.find(x=>x.id===a.orderId);
-        var typ = a.type || "werkstatt";
-        var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
-        // Anstempeln geht auf jeden eigenen Einsatz, unabhängig vom Wochentag der Spalte (nicht
-        // nur auf den heutigen) — gebucht wird dabei ohnehin immer mit dem aktuellen Zeitstempel.
-        var isMinePunchable = meEmp && emp.id===meEmp.id;
-        var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
-        var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
-        html += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
-      });
-      if(canEdit) html += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
-      html += '</div>';
-    });
+    days.forEach(d=>{ html += cellHtml(emp, toISO(d)); });
     html += '</div>';
   });
+
+  // ---- Handy-Ansicht: ein Tag nach dem anderen (Tag-Tabs), alle Mitarbeiter als Karten ----
+  var dayIsos = days.map(toISO);
+  var todayIso2 = todayISO();
+  if(dayIsos.indexOf(state.staffMobileDay) === -1){
+    state.staffMobileDay = dayIsos.indexOf(todayIso2) !== -1 ? todayIso2 : dayIsos[0];
+  }
+  html += '<div class="staff-mobile">';
+  html += '<div class="staff-mobile-tabs">';
+  days.forEach(d=>{
+    var iso = toISO(d);
+    html += '<button type="button" class="staff-mobile-tab' + (iso===state.staffMobileDay?' active':'') + (iso===todayIso2?' is-today':'') + '" data-mobile-day="' + iso + '"><span class="smt-name">' + d.toLocaleDateString("de-CH",{weekday:"short"}) + '</span><span class="smt-date">' + fmtShort(iso) + '</span></button>';
+  });
+  html += '</div>';
+  state.staff.forEach(emp=>{
+    html += '<div class="staff-mobile-card">';
+    html += '<div class="staff-mobile-name"><span class="staff-name-group">' + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span></div>';
+    html += cellHtml(emp, state.staffMobileDay);
+    html += '</div>';
+  });
+  html += '</div>';
   grid.innerHTML = html;
 }
+// Tag-Tabs der Handy-Ansicht (Delegation auf #staff-grid, damit sie bei jedem Re-Render weiter funktionieren)
+$("#staff-grid").addEventListener("click", e=>{
+  var tab = e.target.closest(".staff-mobile-tab[data-mobile-day]");
+  if(!tab) return;
+  state.staffMobileDay = tab.dataset.mobileDay;
+  renderStaffGrid();
+});
 
 $("#staff-nav-prev").addEventListener("click", ()=>{ var d=fromISO(state.staffRefDate); d.setDate(d.getDate()-7); state.staffRefDate=toISO(d); renderStaffPage(); });
 $("#staff-nav-next").addEventListener("click", ()=>{ var d=fromISO(state.staffRefDate); d.setDate(d.getDate()+7); state.staffRefDate=toISO(d); renderStaffPage(); });
@@ -6866,8 +6931,11 @@ $("#sidebar-nav").addEventListener("click", e=>{
   if(!b) return;
   if(b.dataset.buchhaltungTab) state.buchhaltungTab = b.dataset.buchhaltungTab;
   state.view = b.dataset.view;
+  document.body.classList.remove("nav-open"); // Handy: Drawer nach Auswahl wieder schliessen
   render();
 });
+$("#nav-toggle").addEventListener("click", ()=> document.body.classList.toggle("nav-open"));
+$("#nav-backdrop").addEventListener("click", ()=> document.body.classList.remove("nav-open"));
 $("#bh-tabbar").addEventListener("click", e=>{
   var b = e.target.closest("button[data-bh-tab]"); if(!b) return;
   state.buchhaltungTab = b.dataset.bhTab;
