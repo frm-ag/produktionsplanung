@@ -2698,6 +2698,8 @@ onAuthStateChanged(auth, async user => {
 
 // Blendet Reiter je nach Rolle ein/aus: Mitarbeiter sehen nur Stempeluhr, Lager, Personal;
 // Admin/Produktionsleitung sieht weiterhin alles.
+// Buchhaltung vorübergehend ausgeblendet. Zum Wiedereinblenden auf true setzen.
+var BUCHHALTUNG_AKTIV = false;
 function applyRoleVisibility(){
   var adminOnlyTabs = ["table","verwaltung","einstellungen","saldo","auftragskosten"];
   var buchhaltungOnlyTabs = ["buchhaltung"];
@@ -2708,11 +2710,12 @@ function applyRoleVisibility(){
     b.style.display = hidden ? "none" : "flex";
   });
   var buchhaltungSection = document.querySelector('.side-section[data-section="buchhaltung"]');
-  if(buchhaltungSection) buchhaltungSection.style.display = state.isBuchhaltung ? "" : "none";
+  if(buchhaltungSection) buchhaltungSection.style.display = (BUCHHALTUNG_AKTIV && state.isBuchhaltung) ? "" : "none";
   // Falls ein Mitarbeiter gerade auf einer für ihn ausgeblendeten Ansicht steht, auf die Stempeluhr wechseln.
   if((!state.isAdmin && adminOnlyTabs.indexOf(state.view) !== -1) || (!state.isBuchhaltung && buchhaltungOnlyTabs.indexOf(state.view) !== -1)){
     state.view = "zeit";
   }
+  if(!BUCHHALTUNG_AKTIV && state.view === "buchhaltung") state.view = "zeit";
   if(state.isBuchhaltung) subscribeBuchhaltung();
   render();
 }
