@@ -199,8 +199,9 @@
   }
 
   /* ---------- Handy-Ansicht ---------- */
-  .nav-toggle{display:none;border:1px solid var(--border);background:var(--panel);color:var(--text);width:38px;height:36px;border-radius:7px;font-size:19px;line-height:1;cursor:pointer;flex:none;}
+  .nav-toggle{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--panel);color:var(--text);width:38px;height:36px;border-radius:7px;font-size:19px;line-height:1;cursor:pointer;flex:none;}
   #nav-backdrop{display:none;}
+  @media (min-width:861px){ body.nav-hidden #sidebar{display:none;} }
   .staff-mobile{display:none;}
   @media (max-width:860px){
     /* Menü links: auf dem Handy standardmässig ausgeblendet, per Hamburger-Button als Drawer einblendbar */
@@ -7293,7 +7294,16 @@ $("#sidebar-nav").addEventListener("click", e=>{
   document.body.classList.remove("nav-open"); // Handy: Drawer nach Auswahl wieder schliessen
   render();
 });
-$("#nav-toggle").addEventListener("click", ()=> document.body.classList.toggle("nav-open"));
+// Desktop: Menü links komplett aus-/einblenden (Vollbild), Wahl wird gemerkt. Handy: Drawer.
+try{ if(localStorage.getItem("navHidden")==="1") document.body.classList.add("nav-hidden"); }catch(e){}
+$("#nav-toggle").addEventListener("click", ()=>{
+  if(window.innerWidth > 860){
+    var h = document.body.classList.toggle("nav-hidden");
+    try{ localStorage.setItem("navHidden", h ? "1" : "0"); }catch(e){}
+  } else {
+    document.body.classList.toggle("nav-open");
+  }
+});
 $("#nav-backdrop").addEventListener("click", ()=> document.body.classList.remove("nav-open"));
 $("#bh-tabbar").addEventListener("click", e=>{
   var b = e.target.closest("button[data-bh-tab]"); if(!b) return;
