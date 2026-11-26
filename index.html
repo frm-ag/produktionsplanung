@@ -596,6 +596,7 @@
   .assign-chip .a-punch-live{font-size:9.5px;font-weight:700;color:var(--success);margin-top:1px;}
   .staff-empty-note{font-size:12px;color:var(--text-muted);padding:20px 10px;text-align:center;}
   .table-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .table-toolbar select{font:inherit;font-size:13px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .table-toolbar #table-search{flex:1;min-width:180px;font:inherit;font-size:13px;padding:8px 11px;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);}
   .ready-filter-btn{border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:12px;padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;}
   .ready-filter-btn.active{background:var(--success);border-color:var(--success);color:#fff;}
@@ -1664,6 +1665,17 @@
   <div id="table-page" style="display:none;">
     <div class="table-toolbar">
       <input type="text" id="table-search" placeholder="Auftragsnummer, Objekt oder Kunde suchen…" autocomplete="off">
+      <select id="table-filter-abt" title="Abteilung"></select>
+      <select id="table-filter-status" title="Status">
+        <option value="alle">Status: alle</option>
+        <option value="offen">In Fabrikation</option>
+        <option value="abgeschlossen">Abgeschlossen</option>
+      </select>
+      <select id="table-filter-material" title="Material">
+        <option value="alle">Material: alle</option>
+        <option value="fehlt">Material fehlt noch</option>
+        <option value="ueberfaellig">Lieferung überfällig</option>
+      </select>
     </div>
     <div class="table-scroll">
       <table class="overview-table" id="overview-table">
@@ -3325,6 +3337,25 @@ function fehlendesMaterialHtml(o){
 function renderTable(){
   var rows = filteredOrders().slice();
   var search = state.tableSearch.trim().toLowerCase();
+  // Filter-Auswahlen (Abteilung / Status / Material)
+  var abtSel = $("#table-filter-abt");
+  var abtSig = abteilungenList().map(a=>a.key + ":" + a.name).join("|");
+  if(abtSel.dataset.sig !== abtSig){
+    abtSel.innerHTML = '<option value="alle">Abteilung: alle</option>' + abteilungenList().map(a=>'<option value="' + escapeHtml(a.key) + '">' + escapeHtml(a.name) + '</option>').join("");
+    abtSel.dataset.sig = abtSig;
+  }
+  abtSel.value = state.filter;
+  $("#table-filter-status").value = state.tableStatus || "alle";
+  $("#table-filter-material").value = state.tableMaterial || "alle";
+  if(state.tableStatus === "offen") rows = rows.filter(o=>!o.completed);
+  if(state.tableStatus === "abgeschlossen") rows = rows.filter(o=>!!o.completed);
+  if(state.tableMaterial === "fehlt" || state.tableMaterial === "ueberfaellig"){
+    var heuteIso = todayISO();
+    rows = rows.filter(o=>{
+      var offen = (Array.isArray(o.materialLieferungen) ? o.materialLieferungen : []).filter(x=>!x.geliefert);
+      return state.tableMaterial === "fehlt" ? offen.length>0 : offen.some(x=>x.date && x.date < heuteIso);
+    });
+  }
   if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search) || (o.description||"").toLowerCase().includes(search));
   var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
   rows.sort((a,b)=>{
@@ -3355,6 +3386,9 @@ function renderTable(){
   tbody.innerHTML = html;
 }
 $("#table-search").addEventListener("input", e=>{ state.tableSearch = e.target.value; renderTable(); });
+$("#table-filter-abt").addEventListener("change", e=>{ state.filter = e.target.value; render(); });
+$("#table-filter-status").addEventListener("change", e=>{ state.tableStatus = e.target.value; renderTable(); });
+$("#table-filter-material").addEventListener("change", e=>{ state.tableMaterial = e.target.value; renderTable(); });
 $("#overview-table thead").addEventListener("click", e=>{
   var th = e.target.closest("th[data-sort]"); if(!th) return;
   var field = th.dataset.sort;
