@@ -581,6 +581,7 @@
   }
   .assign-chip .a-edit-btn{position:absolute;top:2px;right:2px;border:none;background:rgba(255,255,255,.6);color:var(--text-muted);font-size:10px;width:17px;height:17px;border-radius:4px;cursor:pointer;line-height:1;}
   .legacy-hidden{display:none !important;}
+  #mitarbeiter-edit-table th:nth-child(6), #mitarbeiter-edit-table td:nth-child(6), #mitarbeiter-edit-table th:nth-child(7), #mitarbeiter-edit-table td:nth-child(7){display:none;}
   .assign-chip .a-map{text-decoration:none;font-size:12px;margin-left:4px;}
   .assign-chip .a-edit-btn:hover{background:#fff;color:var(--text);}
   .assign-chip.type-werkstatt{background:#e3ebf3;border-left-color:var(--accent);}
@@ -1964,7 +1965,7 @@
     <div class="table-scroll">
       <table class="overview-table" id="mitarbeiter-edit-table">
         <thead>
-          <tr><th>Name</th><th></th><th>Konto</th><th>Login</th><th></th><th>Feriensaldo</th><th>Anpassen</th><th></th></tr>
+          <tr><th>Name</th><th></th><th>Konto</th><th>Login</th><th></th><th class="fs-col">Feriensaldo</th><th class="fs-col">Anpassen</th><th></th></tr>
         </thead>
         <tbody id="mitarbeiter-edit-tbody"></tbody>
       </table>
@@ -2283,9 +2284,9 @@
       </div>
       <div class="field-row">
         <div class="field"><label for="ma-austritt">Austritt</label><input type="date" id="ma-austritt"></div>
-        <div class="field"><label for="ma-ferienanspruch">Ferienanspruch (Std./Jahr)</label><input type="number" id="ma-ferienanspruch" step="1" min="0" placeholder="z. B. 210"></div>
+        <div class="field legacy-hidden"><label for="ma-ferienanspruch">Ferienanspruch (Std./Jahr)</label><input type="number" id="ma-ferienanspruch" step="1" min="0" placeholder="z. B. 210"></div>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin:-6px 0 10px;">Wird automatisch einmal pro Kalenderjahr dem Feriensaldo gutgeschrieben (unter Verwaltung) — keine manuelle Eingabe dort mehr nötig.</div>
+      <div class="legacy-hidden" style="font-size:11px;color:var(--text-muted);margin:-6px 0 10px;">Wird automatisch einmal pro Kalenderjahr dem Feriensaldo gutgeschrieben (unter Verwaltung) — keine manuelle Eingabe dort mehr nötig.</div>
       <div class="field"><label for="ma-anmerkung">Anmerkung</label><textarea id="ma-anmerkung" rows="2" style="width:100%;font:inherit;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></textarea></div>
       <div class="modal-actions">
         <div style="display:flex;gap:8px;margin-left:auto;">
@@ -2783,6 +2784,8 @@ var BUCHHALTUNG_AKTIV = false;
 // ausgeblendet — läuft aktuell über ein separates Programm. Zum Wiedereinblenden auf true setzen.
 var STEMPEL_AKTIV = false;
 var STEMPEL_VIEWS = ["zeit","saldo"];
+// Feriensaldo (Ansicht, Gutschrift, Abbuchung bei Ferien/Betriebsferien) vorübergehend ausgeschaltet.
+var FERIENSALDO_AKTIV = false;
 // Nachkalkulation vorübergehend ausgeblendet. Zum Wiedereinblenden auf true setzen.
 var NACHKALK_AKTIV = false;
 var START_VIEW = STEMPEL_AKTIV ? "zeit" : "staff";
@@ -3231,7 +3234,7 @@ function todoProgress(o){
 
 var HEADER_INFO = {
   zeit: ["Zeiterfassung", "Kommen, Pausen und Gehen erfassen"],
-  ferien: ["Ferienplaner", "Abwesenheiten und Feriensaldo"],
+  ferien: ["Ferienplaner", "Abwesenheiten"],
   einstellungen: ["Einstellungen", "Zeitmodelle, Feiertage und Kostenarten verwalten"],
   table: ["Übersicht", "Übersicht für die Produktionsleitung"],
   kunden: ["Kunden", "Kundenstamm für Aufträge"],
@@ -4112,6 +4115,7 @@ async function autoBookFerienanspruch(){
 }
 var ferienanspruchAutoBookTimer = null;
 function scheduleAutoBookFerienanspruch(){
+  if(!FERIENSALDO_AKTIV) return;
   if(!state.isAdmin) return;
   clearTimeout(ferienanspruchAutoBookTimer);
   ferienanspruchAutoBookTimer = setTimeout(autoBookFerienanspruch, 900);
@@ -4205,7 +4209,7 @@ $("#absence-form").addEventListener("submit", async e=>{
       // Alte Saldo-Buchung zurückbuchen, bevor die neue angewendet wird.
       if(old){
         if(old.type === "ferien" && typeof old.hours === "number"){
-          await updateDoc(doc(db, STAFF_COLLECTION, old.employeeId), { ferienSaldo: increment(old.hours) });
+          if(FERIENSALDO_AKTIV) await updateDoc(doc(db, STAFF_COLLECTION, old.employeeId), { ferienSaldo: increment(old.hours) });
         }
         if(old.type === "kompensation" && typeof old.hours === "number"){
           await updateDoc(doc(db, STAFF_COLLECTION, old.employeeId), { ueberstundenSaldo: increment(old.hours) });
@@ -4216,7 +4220,7 @@ $("#absence-form").addEventListener("submit", async e=>{
         hours: hours, partial: mode==="stunden"
       });
       if(type === "ferien" && emp){
-        await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
+        if(FERIENSALDO_AKTIV) await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
       }
       if(type === "kompensation" && emp){
         await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ueberstundenSaldo: increment(-hours) });
@@ -4229,7 +4233,7 @@ $("#absence-form").addEventListener("submit", async e=>{
         hours: hours, partial: mode==="stunden", createdAt: Date.now()
       });
       if(type === "ferien" && emp){
-        await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
+        if(FERIENSALDO_AKTIV) await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ferienSaldo: increment(-hours) });
       }
       if(type === "kompensation" && emp){
         await updateDoc(doc(db, STAFF_COLLECTION, employeeId), { ueberstundenSaldo: increment(-hours) });
@@ -4248,7 +4252,7 @@ async function deleteAbsence(absenceId){
   try{
     await deleteDoc(doc(db, ABSENCES_COLLECTION, absenceId));
     if(abs.type === "ferien" && typeof abs.hours === "number"){
-      await updateDoc(doc(db, STAFF_COLLECTION, abs.employeeId), { ferienSaldo: increment(abs.hours) });
+      if(FERIENSALDO_AKTIV) await updateDoc(doc(db, STAFF_COLLECTION, abs.employeeId), { ferienSaldo: increment(abs.hours) });
     }
     if(abs.type === "kompensation" && typeof abs.hours === "number"){
       await updateDoc(doc(db, STAFF_COLLECTION, abs.employeeId), { ueberstundenSaldo: increment(abs.hours) });
@@ -4410,7 +4414,7 @@ $("#betriebsferien-add-form").addEventListener("submit", async e=>{
     var hours = computeAbsenceHours(emp, startDate, endDate, null, hoursPerDay);
     if(hours > 0){
       bookedHoursByEmployee[emp.id] = hours;
-      try{ await updateDoc(doc(db, STAFF_COLLECTION, emp.id), { [saldoField]: increment(-hours) }); }
+      try{ if(FERIENSALDO_AKTIV) await updateDoc(doc(db, STAFF_COLLECTION, emp.id), { [saldoField]: increment(-hours) }); }
       catch(err){ console.error(err); toast("Saldo-Abzug für " + emp.name + " fehlgeschlagen: " + (err.code || err.message)); }
     }
   }
