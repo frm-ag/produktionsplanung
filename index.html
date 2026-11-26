@@ -575,6 +575,8 @@
     padding:4px 6px;font-size:10.5px;cursor:pointer;line-height:1.3;position:relative;
   }
   .assign-chip .a-edit-btn{position:absolute;top:2px;right:2px;border:none;background:rgba(255,255,255,.6);color:var(--text-muted);font-size:10px;width:17px;height:17px;border-radius:4px;cursor:pointer;line-height:1;}
+  .legacy-hidden{display:none !important;}
+  .assign-chip .a-map{text-decoration:none;font-size:12px;margin-left:4px;}
   .assign-chip .a-edit-btn:hover{background:#fff;color:var(--text);}
   .assign-chip.type-werkstatt{background:#e3ebf3;border-left-color:var(--accent);}
   .assign-chip.type-montage{background:#efe6f5;border-left-color:#7b4fa0;}
@@ -2114,7 +2116,7 @@
           <option value="reparatur">Reparatur</option>
         </select>
       </div>
-      <div class="field" id="assign-kostenart-field" style="display:none;">
+      <div class="field legacy-hidden" id="assign-kostenart-field" style="display:none;">
         <label for="assign-kostenart">Kostenart (optional)</label>
         <select id="assign-kostenart"><option value="">— keine —</option></select>
       </div>
@@ -2122,7 +2124,7 @@
         <label for="assign-hours">Dauer (Stunden)</label>
         <input type="number" id="assign-hours" min="0.5" step="0.5" value="8" required>
       </div>
-      <div class="field" id="assign-artikel-field" style="display:none;">
+      <div class="field legacy-hidden" id="assign-artikel-field" style="display:none;">
         <label>Material auf diesen Auftrag buchen (aus Artikel-Katalog)</label>
         <div class="materials-box">
           <div id="assign-artikel-list"></div>
@@ -2130,6 +2132,15 @@
           <button type="button" class="add-material-btn" id="assign-add-artikel-btn">+ Artikel hinzufügen</button>
           <div id="assign-artikel-total" style="font-size:12px;color:var(--text-muted);text-align:right;margin-top:6px;"></div>
         </div>
+      </div>
+      <div class="field">
+        <label for="assign-lieferadresse">Lieferadresse</label>
+        <input type="text" id="assign-lieferadresse" placeholder="Strasse Nr., PLZ Ort" autocomplete="off">
+        <a id="assign-maps-link" href="#" target="_blank" rel="noopener" style="display:none;font-size:12.5px;margin-top:4px;">📍 In Google Maps öffnen</a>
+      </div>
+      <div class="field">
+        <label for="assign-notiz">Notizen</label>
+        <textarea id="assign-notiz" rows="3" placeholder="Notizen zum Einsatz…" style="width:100%;resize:vertical;font:inherit;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);"></textarea>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn danger" id="assign-delete-btn" style="display:none;">Entfernen</button>
@@ -2333,8 +2344,8 @@
     </div>
     <form id="order-form">
       <div class="field materials-box" style="margin-bottom:14px;">
-        <label for="voka-import-input">VOKA-Kalkulation importieren (optional)</label>
-        <input type="file" id="voka-import-input" accept=".xlsx,.xlsm,.xls">
+        <label for="voka-import-input">Laufblatt (PDF) importieren (optional)</label>
+        <input type="file" id="voka-import-input" accept=".pdf,application/pdf">
         <small class="week-hint" id="voka-import-status"></small>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0 10px;"><input type="checkbox" id="f-intern" style="width:auto;"> Interner Auftrag (kein Kunde, z. B. Schulung, EDV, Büro, Betriebsunterhalt)</label>
@@ -2369,7 +2380,7 @@
         <div class="field"><label for="f-auftragswert">Auftragswert (CHF)</label><input type="number" id="f-auftragswert" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field"><label for="f-materialplan">Material Plan (CHF)</label><input type="number" id="f-materialplan" min="0" step="0.01" placeholder="0.00"></div>
       </div>
-      <div class="field">
+      <div class="field" style="display:none;">
         <label>Kostenarten (Plankalkulation)</label>
         <div class="materials-box">
           <div id="kostenarten-list"></div>
@@ -3316,6 +3327,7 @@ function populateOrderDatalist(selector){
 }
 function updateZeitPunchKostenartField(order, locked){
   var field = $("#zeit-punch-kostenart-field");
+  if(true){ field.style.display = "none"; return; } // Kostenarten werden aktuell nicht mehr verwendet
   var sel = $("#zeit-punch-kostenart");
   var kas = order && Array.isArray(order.kostenarten) ? order.kostenarten.filter(k=>k.bezeichnung) : [];
   if(kas.length===0){ field.style.display = "none"; sel.innerHTML = '<option value="">— keine —</option>'; return; }
@@ -5137,7 +5149,7 @@ function renderStaffGrid(){
       var isMinePunchable = meEmp && emp.id===meEmp.id;
       var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
       var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
-      out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
+      out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.' + (a.lieferadresse?' <a class="a-map" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" title="' + escapeHtml(a.lieferadresse) + ' – in Google Maps öffnen">📍</a>':'') + (a.notiz?' <span title="' + escapeHtml(a.notiz) + '">📝</span>':'') + '</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
     });
     if(canEdit) out += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
     out += '</div>';
@@ -6489,6 +6501,7 @@ $("#staff-seed-btn").addEventListener("click", async ()=>{
 });
 
 $("#staff-grid").addEventListener("click", async e=>{
+  if(e.target.closest(".a-map")) return; // Google-Maps-Link: normal öffnen, kein Einstempeln/Modal
   var editBtn = e.target.closest(".a-edit-btn");
   if(editBtn && state.isAdmin){ openAssignModal(null, null, editBtn.dataset.assignId); return; }
   var punchChip = e.target.closest(".assign-chip[data-punchable='1']");
@@ -6603,6 +6616,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-type").value = a.type || "werkstatt";
     populateAssignKostenartSelect(o, a.kostenartIdx!=null?a.kostenartIdx:"");
     $("#assign-hours").value = a.hours || 8;
+    $("#assign-lieferadresse").value = a.lieferadresse || ""; $("#assign-notiz").value = a.notiz || "";
     $("#assign-delete-btn").style.display = "inline-block";
     $("#assign-artikel-field").style.display = o ? "block" : "none";
   }else if(orderId){
@@ -6618,6 +6632,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-type").value = defaultType;
     populateAssignKostenartSelect(o2, "");
     $("#assign-hours").value = 8;
+    $("#assign-lieferadresse").value = ""; $("#assign-notiz").value = "";
     $("#assign-delete-btn").style.display = "none";
     $("#assign-artikel-field").style.display = o2 ? "block" : "none";
   }else{
@@ -6634,13 +6649,22 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-type").value = "werkstatt";
     populateAssignKostenartSelect(null, "");
     $("#assign-hours").value = 8;
+    $("#assign-lieferadresse").value = ""; $("#assign-notiz").value = "";
     $("#assign-delete-btn").style.display = "none";
     $("#assign-artikel-field").style.display = "none";
   }
+  updateAssignMapsLink();
   renderAssignArtikelRows();
   assignBackdrop.classList.add("open");
   setTimeout(()=>{ var f = orderId||assignId ? "#assign-hours" : "#assign-order-search"; $(f).focus(); },30);
 }
+function updateAssignMapsLink(){
+  var v = $("#assign-lieferadresse").value.trim(), a = $("#assign-maps-link");
+  if(!v){ a.style.display = "none"; a.removeAttribute("href"); return; }
+  a.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(v);
+  a.style.display = "inline-block";
+}
+$("#assign-lieferadresse").addEventListener("input", updateAssignMapsLink);
 function closeAssignModal(){ assignBackdrop.classList.remove("open"); state.editingAssignId=null; state.pendingOrderId=null; }
 function populateAssignOrderList(){
   var open = state.orders.filter(o=>!o.completed).slice().sort((a,b)=> (a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
@@ -6674,6 +6698,8 @@ $("#assign-form").addEventListener("submit", async e=>{
   }
   var hours = parseFloat($("#assign-hours").value) || 0;
   var typ = $("#assign-type").value;
+  var lieferadresse = $("#assign-lieferadresse").value.trim();
+  var notiz = $("#assign-notiz").value.trim();
   var kaVal = $("#assign-kostenart").value;
   var kostenartIdx = kaVal === "" ? null : parseInt(kaVal, 10);
   var relevantOrder = state.editingAssignId ? state.orders.find(x=>x.id===state.assignments.find(a=>a.id===state.editingAssignId).orderId) : state.orders.find(x=>x.id===state.pendingOrderId);
@@ -6686,10 +6712,10 @@ $("#assign-form").addEventListener("submit", async e=>{
     .filter(function(a){ return a.bezeichnung.length>0; });
   try{
     if(state.editingAssignId){
-      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId), { hours: hours, type: typ, kostenartIdx: kostenartIdx, kostenartBezeichnung: kostenartBezeichnung });
+      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, state.editingAssignId), { hours: hours, type: typ, lieferadresse: lieferadresse, notiz: notiz });
     }else{
       await addDoc(collection(db, ASSIGNMENTS_COLLECTION), {
-        orderId: state.pendingOrderId, employeeId: state.assignEmployeeId, date: state.assignDate, hours: hours, type: typ, kostenartIdx: kostenartIdx, kostenartBezeichnung: kostenartBezeichnung, createdAt: Date.now()
+        orderId: state.pendingOrderId, employeeId: state.assignEmployeeId, date: state.assignDate, hours: hours, type: typ, lieferadresse: lieferadresse, notiz: notiz, createdAt: Date.now()
       });
     }
     // Im Einsatz-Modal erfasste Artikel werden auf den Auftrag angehängt (bestehende
@@ -6961,93 +6987,95 @@ $("#todos-list").addEventListener("change", e=>{
   }
 });
 
-/* ---------- VOKA-Excel-Import ---------- */
-// Liest eine aus VOKA exportierte Kalkulations-Excel (Tabs "Budget_Zusammenzug"/"ERP_Zusammenzug",
-// "Arbeit", "Warengruppen") und füllt daraus Auftragsnummer, Kunde, BKP, Auftragswert,
-// Kostenarten (Plan-Std/Ansatz) und Material-Plan vor. Die Felder bleiben danach normal
-// editierbar — der Import ist eine Vorausfüllung, keine automatische Buchung.
-
-function vokaCellStr(row, idx){ return row && row[idx]!=null ? String(row[idx]).trim() : ""; }
-function vokaCellNum(row, idx){ var n = parseFloat(row ? row[idx] : null); return isNaN(n) ? 0 : n; }
-
-function parseVokaWorkbook(wb){
-  var result = { orderNumber:"", description:"", bkp:"", kundeFirma:"", kundeStrasse:"", kundePlz:"", kundeOrt:"", auftragswert:0, kostenarten:[], materialPlan:0 };
-
-  var headerSheet = wb.Sheets["Budget_Zusammenzug"] || wb.Sheets["ERP_Zusammenzug"];
-  if(headerSheet){
-    var rows = XLSX.utils.sheet_to_json(headerSheet, { header:1, defval:"" });
-    var kundeRaw = vokaCellStr(rows[3], 1);
-    var objektRaw = vokaCellStr(rows[4], 1);
-    result.bkp = vokaCellStr(rows[5], 1);
-
-    if(kundeRaw){
-      // Erwartetes Format: "Firma, Strasse X, PLZ Ort"
-      var m3 = kundeRaw.match(/^(.*?),\s*(.*?),\s*(\d{4})\s+(.+)$/);
-      if(m3){
-        result.kundeFirma = m3[1].trim(); result.kundeStrasse = m3[2].trim();
-        result.kundePlz = m3[3].trim(); result.kundeOrt = m3[4].trim();
-      }else{
-        // Fallback: "Firma, PLZ Ort" (ohne separate Strasse)
-        var parts = kundeRaw.split(",").map(function(s){return s.trim();}).filter(Boolean);
-        result.kundeFirma = parts[0] || kundeRaw;
-        var last = parts[parts.length-1] || "";
-        var m2 = last.match(/^(\d{4})\s+(.+)$/);
-        if(m2){ result.kundePlz = m2[1]; result.kundeOrt = m2[2]; }
-        if(parts.length > 2) result.kundeStrasse = parts[1];
+/* ---------- Laufblatt-PDF-Import (Contria ERP) ---------- */
+// Liest das aus Contria ERP erzeugte "Laufblatt" (PDF mit Textebene, kein OCR nötig) und
+// liefert Projekt-Nr., Objekt, Adresse Bauherrschaft, Sachbearbeiter, Telefon, Mobil, E-Mail.
+// Die Labels sind im PDF mehrfach übereinander gedruckt (in Bruchstücken, z. B. "T" + "Telefon:" +
+// "elefon:"). Darum wird ein Label erkannt, wenn irgendein Teil links (x < 150) damit beginnt.
+// Die Werte liegen in der Spalte rechts davon (x >= 150, linke Blatthälfte).
+function parseLaufblattItems(items){
+  // items: [{ s, x, y }] — y wie in PDF (oben = grösser)
+  var lines = [];
+  items.slice().sort(function(a,b){ return b.y - a.y || a.x - b.x; }).forEach(function(it){
+    if(!it.s.trim()) return;
+    var line = lines.find(function(l){ return Math.abs(l.y - it.y) <= 3; });
+    if(!line){ line = { y: it.y, parts: [] }; lines.push(line); }
+    line.parts.push({ s: it.s.trim(), x: it.x });
+  });
+  lines.sort(function(a,b){ return b.y - a.y; });
+  lines.forEach(function(l){ l.parts.sort(function(a,b){ return a.x - b.x; }); });
+  var COL_SPLIT = 295;   // linke Hälfte (Bauherrschaft/Kopf) < 295 <= rechte Hälfte (Architekt)
+  var VAL_X = 150;       // Werte beginnen rechts der Labels
+  function leftText(l, minX){ return l.parts.filter(function(p){ return p.x < COL_SPLIT && p.x >= (minX||0); }).map(function(p){ return p.s; }).join(" ").replace(/\s+/g," ").trim(); }
+  function hasLabel(l, lbl){ return l.parts.some(function(p){ return p.x < VAL_X && p.s.toLowerCase().indexOf(lbl) === 0; }); }
+  function wert(labelStart){
+    var l = lines.find(function(l){ return hasLabel(l, labelStart); });
+    if(!l) return "";
+    return leftText(l, VAL_X);
+  }
+  var res = { orderNumber:"", objekt:"", arbeitsgattung:"", firma:"", strasse:"", plz:"", ort:"", sachbearbeiter:"", telefon:"", mobil:"", email:"", bemerkungen:"" };
+  var all = lines.map(function(l){ return l.parts.map(function(p){ return p.s; }).join(" "); }).join("\n");
+  var mNr = /Projekt\s*Nr\.?\s*[:\-]?\s*([A-Za-z0-9\-\/]+)/i.exec(all);
+  if(mNr) res.orderNumber = mNr[1];
+  res.objekt = wert("objekt:");
+  res.arbeitsgattung = wert("arbeitsgattung:");
+  res.sachbearbeiter = wert("sachbearbeiter:");
+  res.telefon = wert("telefon:");
+  res.mobil = wert("mobil 1:") || wert("mobil 2:");
+  res.email = wert("email:");
+  // Adresse Bauherrschaft: Zeilen zwischen der Überschrift und "Sachbearbeiter" (nur linke Hälfte)
+  var iHead = lines.findIndex(function(l){ return hasLabel(l, 'adresse bauherrschaft'); });
+  var iEnd = lines.findIndex(function(l, i){ return i > iHead && hasLabel(l, 'sachbearbeiter'); });
+  if(iHead > -1 && iEnd > iHead){
+    var addr = lines.slice(iHead + 1, iEnd).map(function(l){ return leftText(l, 0); }).filter(Boolean);
+    if(addr.length){
+      res.firma = addr[0];
+      var last = addr[addr.length - 1];
+      var mP = /^(?:CH-)?(\d{4})\s+(.+)$/.exec(last);
+      if(mP && addr.length >= 2){
+        res.plz = mP[1]; res.ort = mP[2];
+        if(addr.length >= 3) res.strasse = addr[addr.length - 2];
+      }else if(addr.length >= 2){
+        res.strasse = addr[1];
       }
     }
-
-    if(objektRaw){
-      var dashIdx = objektRaw.indexOf(" - ");
-      var numPart = dashIdx>-1 ? objektRaw.slice(0,dashIdx) : objektRaw;
-      result.description = dashIdx>-1 ? objektRaw.slice(dashIdx+3).trim() : "";
-      var tokens = numPart.split("/").map(function(s){return s.trim();}).filter(Boolean);
-      var candidates = tokens.filter(function(t){return /^\d{4,6}$/.test(t);}).sort(function(a,b){return b.length-a.length;});
-      result.orderNumber = candidates[0] || tokens[tokens.length-1] || "";
-    }
-
-    for(var r=0;r<rows.length;r++){
-      if(vokaCellStr(rows[r], 0).replace(/:$/,"") === "Total Umsatz"){ result.auftragswert = vokaCellNum(rows[r], 4); break; }
-    }
   }
-
-  var arbeitSheet = wb.Sheets["Arbeit"];
-  if(arbeitSheet){
-    var arows = XLSX.utils.sheet_to_json(arbeitSheet, { header:1, defval:"" });
-    for(var i=8;i<arows.length;i++){
-      var name = vokaCellStr(arows[i], 0);
-      if(!name) continue;
-      var std = vokaCellNum(arows[i], 1), ansatz = vokaCellNum(arows[i], 2), betrag = vokaCellNum(arows[i], 3);
-      if(std<=0 && betrag<=0) continue;
-      result.kostenarten.push({ bezeichnung: name, stunden: std, ansatz: ansatz });
-    }
+  // Bemerkungen / Besprechungsnotizen: Text unterhalb der Überschrift (ohne Fusszeile)
+  var iBem = lines.findIndex(function(l){ return hasLabel(l, 'bemerkungen'); });
+  if(iBem > -1){
+    res.bemerkungen = lines.slice(iBem + 1).filter(function(l){ return l.y > 60 && !/generated by|^\d+\s*\/\s*\d+$/i.test(l.parts.map(function(p){return p.s;}).join(" ")); })
+      .map(function(l){ return l.parts.map(function(p){ return p.s; }).join(" "); }).join("\n").trim();
   }
-
-  var wgSheet = wb.Sheets["Warengruppen"];
-  if(wgSheet){
-    var wrows = XLSX.utils.sheet_to_json(wgSheet, { header:1, defval:"" });
-    var sum = 0;
-    for(var j=8;j<wrows.length;j++) sum += vokaCellNum(wrows[j], 5);
-    result.materialPlan = Math.round(sum*100)/100;
-  }
-  return result;
+  return res;
+}
+async function parseLaufblattPdf(file){
+  ensurePdfWorker();
+  var buf = await file.arrayBuffer();
+  var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  var page = await pdf.getPage(1);
+  var tc = await page.getTextContent();
+  var items = tc.items.map(function(it){ return { s: it.str, x: it.transform[4], y: it.transform[5] }; });
+  var res = parseLaufblattItems(items);
+  if(!res.orderNumber && !res.objekt) throw new Error("Das ist kein Laufblatt (keine Projekt-Nr. / kein Objekt gefunden).");
+  return res;
 }
 
 $("#voka-import-input").addEventListener("change", async e=>{
   var file = e.target.files[0]; if(!file) return;
   var statusEl = $("#voka-import-status");
-  statusEl.textContent = "Lese Datei…";
+  statusEl.textContent = "Lese Laufblatt…";
   try{
-    var buf = await file.arrayBuffer();
-    var wb = XLSX.read(buf, { type:"array" });
-    var parsed = parseVokaWorkbook(wb);
+    var parsed = await parseLaufblattPdf(file);
     if(parsed.orderNumber) $("#f-orderNumber").value = parsed.orderNumber;
-    if(parsed.description) $("#f-description").value = parsed.description;
-    if(parsed.bkp) $("#f-bkp").value = parsed.bkp;
-    if(parsed.auftragswert) $("#f-auftragswert").value = parsed.auftragswert;
-    if(parsed.materialPlan) $("#f-materialplan").value = parsed.materialPlan;
-    if(parsed.kundeFirma){
-      var existing = state.kunden.find(k=>(k.firma||"").trim().toLowerCase() === parsed.kundeFirma.trim().toLowerCase());
+    if(parsed.objekt) $("#f-description").value = parsed.objekt;
+    var gat = (parsed.arbeitsgattung||"").toLowerCase();
+    if(/alu/.test(gat)) $("#f-workshop").value = "aluminium";
+    else if(/stahl|metall/.test(gat)) $("#f-workshop").value = "stahl";
+    else if(/repar/.test(gat)) $("#f-workshop").value = "reparaturen";
+    state.importKunde = { telefon: parsed.telefon || parsed.mobil || "", email: parsed.email || "" };
+    if(parsed.firma){
+      $("#f-intern").checked = false; $("#f-kunde-field").style.display = ""; $("#f-kunde").required = true;
+      var existing = state.kunden.find(k=>(k.firma||"").trim().toLowerCase() === parsed.firma.trim().toLowerCase());
       if(existing){
         populateKundeSelect(existing.id);
         $("#f-kunde-new-box").style.display = "none";
@@ -7055,18 +7083,15 @@ $("#voka-import-input").addEventListener("change", async e=>{
         populateKundeSelect(null);
         $("#f-kunde").value = "__new__";
         $("#f-kunde-new-box").style.display = "block";
-        $("#f-kunde-firma").value = parsed.kundeFirma;
-        $("#f-kunde-strasse").value = parsed.kundeStrasse;
-        $("#f-kunde-plz").value = parsed.kundePlz;
-        $("#f-kunde-ort").value = parsed.kundeOrt;
+        $("#f-kunde-firma").value = parsed.firma;
+        $("#f-kunde-strasse").value = parsed.strasse;
+        $("#f-kunde-plz").value = parsed.plz;
+        $("#f-kunde-ort").value = parsed.ort;
+        $("#f-kunde-kontakt").value = parsed.sachbearbeiter;
       }
     }
-    if(parsed.kostenarten.length>0){
-      state.modalKostenarten = parsed.kostenarten.map(function(k){ return { bezeichnung:k.bezeichnung, stunden: Math.round(k.stunden*100)/100, ansatz: Math.round(k.ansatz*100)/100 }; });
-      renderKostenartenRows();
-    }
-    statusEl.textContent = "Importiert — bitte Angaben prüfen (Werkstatt, Termine, Status sind nicht in der Excel enthalten).";
-    toast("VOKA-Kalkulation importiert — bitte prüfen.");
+    statusEl.textContent = "Importiert — bitte Angaben prüfen (Werkstatt, Termine, Auftragswert sind nicht im Laufblatt enthalten).";
+    toast("Laufblatt importiert — bitte prüfen.");
   }catch(err){
     console.error(err);
     statusEl.textContent = "";
@@ -7118,6 +7143,7 @@ function openModal(order, prefillDate){
   $("#f-materialplan").value = (order && order.materialPlan) ? order.materialPlan : "";
   $("#voka-import-status").textContent = "";
   $("#voka-import-input").value = "";
+  state.importKunde = null;
   state.modalKostenarten = order ? JSON.parse(JSON.stringify(Array.isArray(order.kostenarten)?order.kostenarten:[])) : [];
   renderKostenartenRows();
   state.modalArtikel = order ? JSON.parse(JSON.stringify(Array.isArray(order.artikelPositionen)?order.artikelPositionen:[])) : [];
@@ -7221,9 +7247,10 @@ form.addEventListener("submit", async e=>{
         plz: $("#f-kunde-plz").value.trim(),
         ort: $("#f-kunde-ort").value.trim(),
         kontakt: $("#f-kunde-kontakt").value.trim(),
-        telefon: "", email: "",
+        telefon: (state.importKunde && state.importKunde.telefon) || "", email: (state.importKunde && state.importKunde.email) || "",
         createdAt: Date.now()
       };
+      state.importKunde = null;
       var newKundeRef = await addDoc(collection(db, KUNDEN_COLLECTION), kundePayload);
       kundeId = newKundeRef.id;
       customer = firma;
