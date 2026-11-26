@@ -2201,7 +2201,7 @@
         <textarea id="assign-notiz" rows="3" placeholder="Notizen zum Einsatz…" style="width:100%;resize:vertical;font:inherit;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);"></textarea>
       </div>
       <div class="field" id="assign-fotos-field">
-        <label>Fotos zum Auftrag</label>
+        <label>Fotos &amp; PDFs zum Auftrag</label>
         <div id="assign-fotos"></div>
       </div>
       <div class="modal-actions">
@@ -7058,9 +7058,19 @@ function openFotoLightbox(f){
     lb.addEventListener("click", function(e){ if(e.target === lb || e.target.closest("[data-lb-close]")) lb.classList.remove("open"); });
   }
   var canDelete = state.isAdmin || (f.createdByUid && f.createdByUid === state.currentUid);
-  lb.innerHTML = '<img src="' + f.dataUrl + '" alt="Foto"><div style="color:#cfd8de;font-size:12px;">' + escapeHtml(f.createdByName||"") + (f.createdAt ? ' · ' + new Date(f.createdAt).toLocaleString("de-CH") : '') + '</div>' +
-    '<div style="display:flex;gap:8px;"><button type="button" class="btn" data-lb-close>Schliessen</button>' + (canDelete ? '<button type="button" class="btn danger" id="foto-delete-btn">Löschen</button>' : '') + '</div>';
+  var isPdfF = f.kind === "pdf";
+  lb.innerHTML = (isPdfF ? '<div style="color:#fff;font-size:42px;">📄</div><div style="color:#fff;font-size:14px;word-break:break-all;text-align:center;">' + escapeHtml(f.name||"PDF") + '</div>' : '<img src="' + f.dataUrl + '" alt="Foto">') + '<div style="color:#cfd8de;font-size:12px;">' + escapeHtml(f.createdByName||"") + (f.createdAt ? ' · ' + new Date(f.createdAt).toLocaleString("de-CH") : '') + '</div>' +
+    '<div style="display:flex;gap:8px;"><button type="button" class="btn" data-lb-close>Schliessen</button>' + (isPdfF ? '<button type="button" class="btn primary" id="foto-open-btn">PDF öffnen</button>' : '') + (canDelete ? '<button type="button" class="btn danger" id="foto-delete-btn">Löschen</button>' : '') + '</div>';
   lb.classList.add("open");
+  var opn = lb.querySelector("#foto-open-btn");
+  if(opn) opn.addEventListener("click", function(e){
+    e.stopPropagation();
+    try{
+      var b64 = f.dataUrl.split(",")[1], bin = atob(b64), arr = new Uint8Array(bin.length);
+      for(var k=0;k<bin.length;k++) arr[k] = bin.charCodeAt(k);
+      window.open(URL.createObjectURL(new Blob([arr], {type:"application/pdf"})), "_blank");
+    }catch(err){ console.error(err); toast("PDF konnte nicht geöffnet werden."); }
+  });
   var del = lb.querySelector("#foto-delete-btn");
   if(del) del.addEventListener("click", async function(e){
     e.stopPropagation();
@@ -7075,23 +7085,31 @@ function mountFotos(box, orderId){
   if(!orderId){ box.innerHTML = ""; return; }
   box.innerHTML = '<div class="foto-actions">' +
     '<button type="button" class="btn foto-cam-btn">📷 Foto aufnehmen</button>' +
-    '<button type="button" class="btn foto-pick-btn">🖼 Bild hochladen</button></div>' +
+    '<button type="button" class="btn foto-pick-btn">🖼 Bild / 📄 PDF hochladen</button></div>' +
     '<input type="file" class="foto-cam" accept="image/*" capture="environment" style="display:none;">' +
-    '<input type="file" class="foto-pick" accept="image/*" multiple style="display:none;">' +
+    '<input type="file" class="foto-pick" accept="image/*,application/pdf,.pdf" multiple style="display:none;">' +
     '<div class="foto-status" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;"></div><div class="foto-grid"></div>';
   var fotos = [];
   var grid = box.querySelector(".foto-grid"), status = box.querySelector(".foto-status");
   function renderGrid(){
-    grid.innerHTML = fotos.map(function(f,i){ return '<img src="' + f.dataUrl + '" data-foto-idx="' + i + '" alt="Foto">'; }).join("");
+    grid.innerHTML = fotos.map(function(f,i){
+      if(f.kind === "pdf") return '<div data-foto-idx="' + i + '" style="aspect-ratio:1;border:1px solid var(--border);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;text-align:center;font-size:10.5px;overflow:hidden;background:var(--surface-2,#f3f5f7);"><div style="font-size:26px;">📄</div><div style="word-break:break-all;max-height:3.2em;overflow:hidden;">' + escapeHtml(f.name||"PDF") + '</div></div>';
+      return '<img src="' + f.dataUrl + '" data-foto-idx="' + i + '" alt="Foto">';
+    }).join("");
   }
-  grid.addEventListener("click", function(e){ var im = e.target.closest("img[data-foto-idx]"); if(im) openFotoLightbox(fotos[Number(im.dataset.fotoIdx)]); });
+  grid.addEventListener("click", function(e){ var im = e.target.closest("[data-foto-idx]"); if(im) openFotoLightbox(fotos[Number(im.dataset.fotoIdx)]); });
   async function addFiles(fileList){
     var files = Array.prototype.slice.call(fileList || []);
     for(var i=0;i<files.length;i++){
       status.textContent = "Speichere Foto " + (i+1) + " von " + files.length + "…";
       try{
-        var dataUrl = await compressFotoFile(files[i]);
-        await addDoc(collection(db, FOTOS_COLLECTION), { orderId: orderId, dataUrl: dataUrl, createdAt: Date.now(), createdByUid: state.currentUid || "", createdByName: state.currentName || "" });
+        var isPdf = files[i].type === "application/pdf" || /\.pdf$/i.test(files[i].name);
+        var dataUrl;
+        if(isPdf){
+          if(files[i].size > 700000){ toast("PDF zu gross (max. ca. 700 KB): " + files[i].name); continue; }
+          dataUrl = await new Promise(function(res, rej){ var r = new FileReader(); r.onload = function(){ res(r.result); }; r.onerror = rej; r.readAsDataURL(files[i]); });
+        }else{ dataUrl = await compressFotoFile(files[i]); }
+        await addDoc(collection(db, FOTOS_COLLECTION), { orderId: orderId, dataUrl: dataUrl, kind: isPdf ? "pdf" : "image", name: files[i].name || "", createdAt: Date.now(), createdByUid: state.currentUid || "", createdByName: state.currentName || "" });
       }catch(err){ console.error(err); toast("Foto speichern fehlgeschlagen: " + (err && err.code ? err.code : (err.message||err))); }
     }
     status.textContent = "";
