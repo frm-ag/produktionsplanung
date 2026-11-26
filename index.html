@@ -2712,22 +2712,28 @@ onAuthStateChanged(auth, async user => {
 // Admin/Produktionsleitung sieht weiterhin alles.
 // Buchhaltung vorübergehend ausgeblendet. Zum Wiedereinblenden auf true setzen.
 var BUCHHALTUNG_AKTIV = false;
+// Stempelsystem (Zeiterfassung, Stunden-/Feriensaldo, Einstempeln über den Wochenplan) vorübergehend
+// ausgeblendet — läuft aktuell über ein separates Programm. Zum Wiedereinblenden auf true setzen.
+var STEMPEL_AKTIV = false;
+var STEMPEL_VIEWS = ["zeit","saldo"];
+var START_VIEW = STEMPEL_AKTIV ? "zeit" : "staff";
 function applyRoleVisibility(){
   var adminOnlyTabs = ["table","verwaltung","einstellungen","saldo","auftragskosten"];
   var buchhaltungOnlyTabs = ["buchhaltung"];
   document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
     var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
     var isBuchhaltungOnly = buchhaltungOnlyTabs.indexOf(b.dataset.view) !== -1;
-    var hidden = (isAdminOnly && !state.isAdmin) || (isBuchhaltungOnly && !state.isBuchhaltung);
+    var hidden = (isAdminOnly && !state.isAdmin) || (isBuchhaltungOnly && !state.isBuchhaltung) || (!STEMPEL_AKTIV && STEMPEL_VIEWS.indexOf(b.dataset.view) !== -1);
     b.style.display = hidden ? "none" : "flex";
   });
   var buchhaltungSection = document.querySelector('.side-section[data-section="buchhaltung"]');
   if(buchhaltungSection) buchhaltungSection.style.display = (BUCHHALTUNG_AKTIV && state.isBuchhaltung) ? "" : "none";
   // Falls ein Mitarbeiter gerade auf einer für ihn ausgeblendeten Ansicht steht, auf die Stempeluhr wechseln.
   if((!state.isAdmin && adminOnlyTabs.indexOf(state.view) !== -1) || (!state.isBuchhaltung && buchhaltungOnlyTabs.indexOf(state.view) !== -1)){
-    state.view = "zeit";
+    state.view = START_VIEW;
   }
-  if(!BUCHHALTUNG_AKTIV && state.view === "buchhaltung") state.view = "zeit";
+  if(!BUCHHALTUNG_AKTIV && state.view === "buchhaltung") state.view = START_VIEW;
+  if(!STEMPEL_AKTIV && STEMPEL_VIEWS.indexOf(state.view) !== -1) state.view = START_VIEW;
   if(state.isBuchhaltung) subscribeBuchhaltung();
   render();
 }
@@ -2973,7 +2979,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "zeit", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "staff", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
   // ---- Buchhaltung ----
   rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], lohnimporte: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
   buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
@@ -5146,7 +5152,7 @@ function renderStaffGrid(){
       var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
       // Anstempeln geht auf jeden eigenen Einsatz, unabhängig vom Wochentag der Spalte (nicht
       // nur auf den heutigen) — gebucht wird dabei ohnehin immer mit dem aktuellen Zeitstempel.
-      var isMinePunchable = meEmp && emp.id===meEmp.id;
+      var isMinePunchable = STEMPEL_AKTIV && meEmp && emp.id===meEmp.id;
       var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
       var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
       out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.' + (a.lieferadresse?' <a class="a-map" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" title="' + escapeHtml(a.lieferadresse) + ' – in Google Maps öffnen">📍</a>':'') + (a.notiz?' <span title="' + escapeHtml(a.notiz) + '">📝</span>':'') + '</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
