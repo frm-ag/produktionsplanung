@@ -653,8 +653,8 @@
       flex:none;padding-top:1px;
     }
     .overview-table td.ov-orderno{font-size:14px;}
-    .overview-table td[data-label="Kunde"]{flex-direction:column;align-items:flex-start;gap:2px;}
-    .overview-table td[data-label="Kunde"]::before{padding-top:0;}
+    .overview-table td[data-label="Objekt / Kunde"]{flex-direction:column;align-items:flex-start;gap:2px;}
+    .overview-table td[data-label="Objekt / Kunde"]::before{padding-top:0;}
     .overview-table td[data-label="Material"]{flex-direction:column;align-items:flex-start;gap:4px;}
   }
   .week-hint{display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;}
@@ -1657,14 +1657,14 @@
 
   <div id="table-page" style="display:none;">
     <div class="table-toolbar">
-      <input type="text" id="table-search" placeholder="Auftragsnummer oder Kunde suchen…" autocomplete="off">
+      <input type="text" id="table-search" placeholder="Auftragsnummer, Objekt oder Kunde suchen…" autocomplete="off">
     </div>
     <div class="table-scroll">
       <table class="overview-table" id="overview-table">
         <thead>
           <tr>
             <th data-sort="orderNumber">Auftrag</th>
-            <th data-sort="customer">Kunde</th>
+            <th data-sort="description">Objekt / Kunde</th>
             <th data-sort="workshop">Werkstatt</th>
             <th data-sort="auftragswert">Auftragswert</th>
             <th data-sort="completed">Status</th>
@@ -2351,10 +2351,11 @@
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0 10px;"><input type="checkbox" id="f-intern" style="width:auto;"> Interner Auftrag (kein Kunde, z. B. Schulung, EDV, Büro, Betriebsunterhalt)</label>
       <div class="field-row">
         <div class="field"><label for="f-orderNumber">Auftragsnummer</label><input id="f-orderNumber" required placeholder="z. B. 26246"></div>
-        <div class="field" id="f-kunde-field">
-          <label for="f-kunde">Kunde</label>
-          <select id="f-kunde" required></select>
-        </div>
+        <div class="field"><label for="f-description">Objekt / Beschreibung</label><input id="f-description" placeholder="z. B. Eingang Tunnel, ohne Schloss"></div>
+      </div>
+      <div class="field" id="f-kunde-field">
+        <label for="f-kunde">Kunde</label>
+        <select id="f-kunde" required></select>
       </div>
       <div id="f-kunde-new-box" class="materials-box" style="display:none;margin-bottom:10px;">
         <div class="field"><label for="f-kunde-firma">Firma / Name</label><input id="f-kunde-firma" placeholder="z. B. Eng Portmann Partner"></div>
@@ -2365,7 +2366,6 @@
         </div>
         <div class="field"><label for="f-kunde-kontakt">Ansprechpartner (optional)</label><input id="f-kunde-kontakt"></div>
       </div>
-      <div class="field"><label for="f-description">Objekt / Beschreibung</label><input id="f-description" placeholder="z. B. Eingang Tunnel, ohne Schloss"></div>
       <div class="field"><label for="f-bkp">BKP (optional)</label><input id="f-bkp" placeholder="z. B. 221.8 Pfosten-Riegel Wintergarten"></div>
       <div class="field-row">
         <div class="field">
@@ -3186,7 +3186,7 @@ function kundeName(kundeId, fallback){ var k = state.kunden.find(x=>x.id===kunde
 function renderTable(){
   var rows = filteredOrders().slice();
   var search = state.tableSearch.trim().toLowerCase();
-  if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search));
+  if(search) rows = rows.filter(o=> (o.orderNumber||"").toLowerCase().includes(search) || (o.customer||"").toLowerCase().includes(search) || (o.description||"").toLowerCase().includes(search));
   var f = state.tableSort.field, dir = state.tableSort.dir === "asc" ? 1 : -1;
   rows.sort((a,b)=>{
     var av = (a[f]||"").toString(), bv = (b[f]||"").toString();
@@ -3207,7 +3207,7 @@ function renderTable(){
   rows.forEach(o=>{
     html += '<tr class="' + (o.completed?"row-completed":"") + '" data-id="' + o.id + '">';
     html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
-    html += '<td data-label="Kunde"><div class="ov-customer">' + (o.intern?'<span class="tag" style="background:#eef;color:#447;margin-right:5px;">Intern</span>':'') + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(o.description) + '</div>':'') + '</td>';
+    html += '<td data-label="Objekt / Kunde"><div class="ov-customer">' + (o.intern?'<span class="tag" style="background:#eef;color:#447;margin-right:5px;">Intern</span>':'') + escapeHtml(o.description || kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>':'') + '</td>';
     html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
     html += '<td data-label="Auftragswert">' + fmtChf(o.auftragswert) + '</td>';
     html += '<td data-label="Status"><span class="tag ' + (o.completed?"status-abgeschlossen":"status-fabrikation") + '">' + statusLabel(o.completed) + '</span></td>';
