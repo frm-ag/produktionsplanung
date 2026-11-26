@@ -581,6 +581,13 @@
   }
   .assign-chip .a-edit-btn{position:absolute;top:2px;right:2px;border:none;background:rgba(255,255,255,.6);color:var(--text-muted);font-size:10px;width:17px;height:17px;border-radius:4px;cursor:pointer;line-height:1;}
   .legacy-hidden{display:none !important;}
+  .foto-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .foto-actions .btn{flex:1;min-width:130px;}
+  .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;margin-top:8px;}
+  .foto-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border);}
+  #foto-lightbox{position:fixed;inset:0;z-index:2000;background:rgba(10,14,18,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:10px;}
+  #foto-lightbox.open{display:flex;}
+  #foto-lightbox img{max-width:100%;max-height:78vh;border-radius:8px;}
   #mitarbeiter-edit-table th:nth-child(6), #mitarbeiter-edit-table td:nth-child(6), #mitarbeiter-edit-table th:nth-child(7), #mitarbeiter-edit-table td:nth-child(7){display:none;}
   .assign-chip .a-map{text-decoration:none;font-size:12px;margin-left:4px;}
   .assign-chip .a-edit-btn:hover{background:#fff;color:var(--text);}
@@ -2140,6 +2147,7 @@
   <div class="modal" style="max-width:380px;">
     <h3 id="av-title">Einsatz</h3>
     <div id="av-body" style="font-size:13.5px;line-height:1.5;"></div>
+    <div id="av-fotos" style="margin-top:12px;"></div>
     <div class="modal-actions">
       <div style="display:flex;gap:8px;margin-left:auto;">
         <button type="button" class="btn" id="av-close-btn">Schliessen</button>
@@ -2191,6 +2199,10 @@
       <div class="field">
         <label for="assign-notiz">Notizen</label>
         <textarea id="assign-notiz" rows="3" placeholder="Notizen zum Einsatz…" style="width:100%;resize:vertical;font:inherit;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);"></textarea>
+      </div>
+      <div class="field" id="assign-fotos-field">
+        <label>Fotos zum Auftrag</label>
+        <div id="assign-fotos"></div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn danger" id="assign-delete-btn" style="display:none;">Entfernen</button>
@@ -2489,7 +2501,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, increment, runTransaction
+  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, increment, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -2526,6 +2538,7 @@ const KUNDEN_COLLECTION = "kunden";
 const KOSTENARTEN_STAMM_COLLECTION = "kostenarten";
 const KOSTENSTELLEN_COLLECTION = "kostenstellen";
 const EINSATZARTEN_COLLECTION = "einsatzarten";
+const FOTOS_COLLECTION = "auftragsfotos";
 const ABTEILUNGEN_COLLECTION = "abteilungen";
 const DEFAULT_ABTEILUNGEN = [
   { key:"stahl", name:"Stahl", color:"#2f6690" },
@@ -6999,11 +7012,98 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-artikel-field").style.display = "none";
   }
   if(!$("#assign-type").value) $("#assign-type").selectedIndex = 0;
+  var fotoOrderId = assignId ? ((state.assignments.find(x=>x.id===assignId)||{}).orderId || null) : (orderId || null);
+  mountFotos($("#assign-fotos"), fotoOrderId);
+  $("#assign-fotos-field").style.display = fotoOrderId ? "" : "none";
   updateAssignMapsLink();
   renderAssignArtikelRows();
   assignBackdrop.classList.add("open");
   setTimeout(()=>{ var f = orderId||assignId ? "#assign-hours" : "#assign-order-search"; $(f).focus(); },30);
 }
+/* ---------- Fotos zum Auftrag (aufnehmen oder hochladen; als verkleinerte JPEGs in Firestore) ---------- */
+var fotoUnsub = null;
+function unmountFotos(){ if(fotoUnsub){ fotoUnsub(); fotoUnsub = null; } }
+function compressFotoFile(file){
+  return new Promise((resolve, reject)=>{
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      try{
+        var attempts = [[1400,.72],[1100,.65],[900,.55],[700,.5]], out = "";
+        for(var i=0;i<attempts.length;i++){
+          var max = attempts[i][0], q = attempts[i][1];
+          var sc = Math.min(1, max / Math.max(img.width, img.height));
+          var c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(img.width*sc)); c.height = Math.max(1, Math.round(img.height*sc));
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          out = c.toDataURL("image/jpeg", q);
+          if(out.length < 750000) break;
+        }
+        URL.revokeObjectURL(url);
+        out.length < 950000 ? resolve(out) : reject(new Error("Bild zu gross"));
+      }catch(e){ reject(e); }
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error("Bild konnte nicht gelesen werden")); };
+    img.src = url;
+  });
+}
+function openFotoLightbox(f){
+  var lb = $("#foto-lightbox");
+  if(!lb){
+    lb = document.createElement("div"); lb.id = "foto-lightbox";
+    document.body.appendChild(lb);
+    lb.addEventListener("click", function(e){ if(e.target === lb || e.target.closest("[data-lb-close]")) lb.classList.remove("open"); });
+  }
+  var canDelete = state.isAdmin || (f.createdByUid && f.createdByUid === state.currentUid);
+  lb.innerHTML = '<img src="' + f.dataUrl + '" alt="Foto"><div style="color:#cfd8de;font-size:12px;">' + escapeHtml(f.createdByName||"") + (f.createdAt ? ' · ' + new Date(f.createdAt).toLocaleString("de-CH") : '') + '</div>' +
+    '<div style="display:flex;gap:8px;"><button type="button" class="btn" data-lb-close>Schliessen</button>' + (canDelete ? '<button type="button" class="btn danger" id="foto-delete-btn">Löschen</button>' : '') + '</div>';
+  lb.classList.add("open");
+  var del = lb.querySelector("#foto-delete-btn");
+  if(del) del.addEventListener("click", async function(e){
+    e.stopPropagation();
+    if(!(await showConfirm("Dieses Foto löschen?"))) return;
+    try{ await deleteDoc(doc(db, FOTOS_COLLECTION, f.id)); lb.classList.remove("open"); toast("Foto gelöscht."); }
+    catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+  });
+}
+function mountFotos(box, orderId){
+  unmountFotos();
+  if(!box) return;
+  if(!orderId){ box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="foto-actions">' +
+    '<button type="button" class="btn foto-cam-btn">📷 Foto aufnehmen</button>' +
+    '<button type="button" class="btn foto-pick-btn">🖼 Bild hochladen</button></div>' +
+    '<input type="file" class="foto-cam" accept="image/*" capture="environment" style="display:none;">' +
+    '<input type="file" class="foto-pick" accept="image/*" multiple style="display:none;">' +
+    '<div class="foto-status" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;"></div><div class="foto-grid"></div>';
+  var fotos = [];
+  var grid = box.querySelector(".foto-grid"), status = box.querySelector(".foto-status");
+  function renderGrid(){
+    grid.innerHTML = fotos.map(function(f,i){ return '<img src="' + f.dataUrl + '" data-foto-idx="' + i + '" alt="Foto">'; }).join("");
+  }
+  grid.addEventListener("click", function(e){ var im = e.target.closest("img[data-foto-idx]"); if(im) openFotoLightbox(fotos[Number(im.dataset.fotoIdx)]); });
+  async function addFiles(fileList){
+    var files = Array.prototype.slice.call(fileList || []);
+    for(var i=0;i<files.length;i++){
+      status.textContent = "Speichere Foto " + (i+1) + " von " + files.length + "…";
+      try{
+        var dataUrl = await compressFotoFile(files[i]);
+        await addDoc(collection(db, FOTOS_COLLECTION), { orderId: orderId, dataUrl: dataUrl, createdAt: Date.now(), createdByUid: state.currentUid || "", createdByName: state.currentName || "" });
+      }catch(err){ console.error(err); toast("Foto speichern fehlgeschlagen: " + (err && err.code ? err.code : (err.message||err))); }
+    }
+    status.textContent = "";
+  }
+  var cam = box.querySelector(".foto-cam"), pick = box.querySelector(".foto-pick");
+  box.querySelector(".foto-cam-btn").addEventListener("click", function(){ cam.click(); });
+  box.querySelector(".foto-pick-btn").addEventListener("click", function(){ pick.click(); });
+  cam.addEventListener("change", async function(){ await addFiles(cam.files); cam.value = ""; });
+  pick.addEventListener("change", async function(){ await addFiles(pick.files); pick.value = ""; });
+  fotoUnsub = onSnapshot(query(collection(db, FOTOS_COLLECTION), where("orderId","==",orderId)), function(snap){
+    fotos = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); });
+    renderGrid();
+  }, function(err){ console.error(err); status.textContent = "Fotos konnten nicht geladen werden (Firestore-Regel für 'auftragsfotos' gesetzt?)"; });
+}
+
 // Nur-Lesen-Ansicht eines Einsatzes (für Mitarbeiter ohne Bearbeitungsrechte)
 function openAssignViewModal(assignId){
   var a = state.assignments.find(x=>x.id===assignId); if(!a) return;
@@ -7023,10 +7123,11 @@ function openAssignViewModal(assignId){
   }
   if(!a.lieferadresse && !a.notiz) h += '<div style="color:var(--text-muted);">Keine Lieferadresse oder Notizen erfasst.</div>';
   $("#av-body").innerHTML = h;
+  mountFotos($("#av-fotos"), a.orderId);
   $("#assign-view-backdrop").classList.add("open");
 }
-$("#av-close-btn").addEventListener("click", ()=> $("#assign-view-backdrop").classList.remove("open"));
-$("#assign-view-backdrop").addEventListener("click", e=>{ if(e.target.id==="assign-view-backdrop") e.target.classList.remove("open"); });
+$("#av-close-btn").addEventListener("click", ()=>{ unmountFotos(); $("#assign-view-backdrop").classList.remove("open"); });
+$("#assign-view-backdrop").addEventListener("click", e=>{ if(e.target.id==="assign-view-backdrop"){ unmountFotos(); e.target.classList.remove("open"); } });
 function updateAssignMapsLink(){
   var v = $("#assign-lieferadresse").value.trim(), a = $("#assign-maps-link");
   if(!v){ a.style.display = "none"; a.removeAttribute("href"); return; }
@@ -7034,7 +7135,7 @@ function updateAssignMapsLink(){
   a.style.display = "inline-block";
 }
 $("#assign-lieferadresse").addEventListener("input", updateAssignMapsLink);
-function closeAssignModal(){ assignBackdrop.classList.remove("open"); state.editingAssignId=null; state.pendingOrderId=null; }
+function closeAssignModal(){ unmountFotos(); assignBackdrop.classList.remove("open"); state.editingAssignId=null; state.pendingOrderId=null; }
 function populateAssignOrderList(){
   var open = state.orders.filter(o=>!o.completed).slice().sort((a,b)=> (a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
   $("#assign-order-list").innerHTML = open.map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(o.description||o.customer) + '">').join("");
