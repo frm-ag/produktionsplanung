@@ -227,6 +227,11 @@
     .staff-mobile-tab .smt-date{font-size:10.5px;}
     .staff-mobile-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
     .staff-mobile-tab.is-today:not(.active){border-color:var(--warn);color:var(--text);}
+    .staff-mobile-modes{display:flex;gap:6px;margin-bottom:10px;}
+    .staff-mobile-mode{flex:1;border:1px solid var(--border);background:var(--panel);color:var(--text-muted);font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:8px 4px;cursor:pointer;}
+    .staff-mobile-mode.active{background:var(--text);border-color:var(--text);color:#fff;}
+    .staff-mobile-dayh{font-size:12.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin:14px 2px 6px;}
+    .staff-mobile-dayh.is-today{color:var(--accent);}
     .staff-mobile-card{background:var(--panel);border:1px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden;}
     .staff-mobile-name{padding:9px 11px;font-size:13.5px;font-weight:600;background:var(--panel-alt);border-bottom:1px solid var(--border);}
     .staff-mobile-name .staff-name-group{display:flex;align-items:center;gap:8px;}
@@ -5191,24 +5196,54 @@ function renderStaffGrid(){
   if(dayIsos.indexOf(state.staffMobileDay) === -1){
     state.staffMobileDay = dayIsos.indexOf(todayIso2) !== -1 ? todayIso2 : dayIsos[0];
   }
+  if(!state.staffMobileMode) state.staffMobileMode = (!canEdit && meEmp) ? "meine" : "tag";
+  var mMode = state.staffMobileMode;
   html += '<div class="staff-mobile">';
-  html += '<div class="staff-mobile-tabs">';
-  days.forEach(d=>{
-    var iso = toISO(d);
-    html += '<button type="button" class="staff-mobile-tab' + (iso===state.staffMobileDay?' active':'') + (iso===todayIso2?' is-today':'') + '" data-mobile-day="' + iso + '"><span class="smt-name">' + d.toLocaleDateString("de-CH",{weekday:"short"}) + '</span><span class="smt-date">' + fmtShort(iso) + '</span></button>';
-  });
-  html += '</div>';
-  state.staff.forEach(emp=>{
-    html += '<div class="staff-mobile-card">';
-    html += '<div class="staff-mobile-name"><span class="staff-name-group">' + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span></div>';
-    html += cellHtml(emp, state.staffMobileDay);
+  html += '<div class="staff-mobile-modes">' +
+    [["tag","Tag"],["woche","Woche (alle)"],["meine","Meine"]].map(function(m){ return '<button type="button" class="staff-mobile-mode' + (mMode===m[0]?' active':'') + '" data-mobile-mode="' + m[0] + '">' + m[1] + '</button>'; }).join("") + '</div>';
+  if(mMode === "tag"){
+    html += '<div class="staff-mobile-tabs">';
+    days.forEach(d=>{
+      var iso = toISO(d);
+      html += '<button type="button" class="staff-mobile-tab' + (iso===state.staffMobileDay?' active':'') + (iso===todayIso2?' is-today':'') + '" data-mobile-day="' + iso + '"><span class="smt-name">' + d.toLocaleDateString("de-CH",{weekday:"short"}) + '</span><span class="smt-date">' + fmtShort(iso) + '</span></button>';
+    });
     html += '</div>';
-  });
+    state.staff.forEach(emp=>{
+      html += '<div class="staff-mobile-card">';
+      html += '<div class="staff-mobile-name"><span class="staff-name-group">' + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span></div>';
+      html += cellHtml(emp, state.staffMobileDay);
+      html += '</div>';
+    });
+  }else{
+    // Wochenübersicht: pro Tag nur Mitarbeiter mit Einsatz/Abwesenheit; "Meine" = nur eigener Plan
+    var listEmps = mMode === "meine" ? (meEmp ? [meEmp] : []) : state.staff;
+    if(mMode === "meine" && !meEmp){
+      html += '<div class="staff-empty-note">Dein Benutzer ist keinem Mitarbeiter in der Personalplanung zugeordnet.</div>';
+    }else{
+      var anyShown = false;
+      days.forEach(d=>{
+        var iso = toISO(d);
+        var cards = listEmps.filter(emp=> absenceForDay(emp.id, iso) || state.assignments.some(a=>a.employeeId===emp.id && a.date===iso));
+        if(cards.length===0) return;
+        anyShown = true;
+        html += '<div class="staff-mobile-dayh' + (iso===todayIso2?' is-today':'') + '">' + d.toLocaleDateString("de-CH",{weekday:"long"}) + ' ' + fmtShort(iso) + '</div>';
+        cards.forEach(emp=>{
+          html += '<div class="staff-mobile-card">';
+          if(mMode !== "meine") html += '<div class="staff-mobile-name"><span class="staff-name-group">' + staffAvatarHtml(emp, "staff-avatar-sm") + '<span>' + escapeHtml(emp.name) + '</span></span></div>';
+          html += cellHtml(emp, iso);
+          html += '</div>';
+        });
+      });
+      if(!anyShown) html += '<div class="staff-empty-note">In dieser Woche ist nichts eingeplant.</div>';
+    }
+  }
   html += '</div>';
   grid.innerHTML = html;
 }
 // Tag-Tabs der Handy-Ansicht (Delegation auf #staff-grid, damit sie bei jedem Re-Render weiter funktionieren)
 $("#staff-grid").addEventListener("click", e=>{
+  var modeBtn = e.target.closest(".staff-mobile-mode[data-mobile-mode]");
+  if(modeBtn){ state.staffMobileMode = modeBtn.dataset.mobileMode; renderStaffGrid(); return; }
   var tab = e.target.closest(".staff-mobile-tab[data-mobile-day]");
   if(!tab) return;
   state.staffMobileDay = tab.dataset.mobileDay;
