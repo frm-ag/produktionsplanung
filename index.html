@@ -2800,6 +2800,8 @@ var STEMPEL_VIEWS = ["zeit","saldo"];
 var FERIENSALDO_AKTIV = false;
 // Nachkalkulation vorübergehend ausgeblendet. Zum Wiedereinblenden auf true setzen.
 var NACHKALK_AKTIV = false;
+// Artikel (Lager) vorübergehend ausgeblendet. Zum Wiedereinblenden auf true setzen.
+var ARTIKEL_AKTIV = false;
 var START_VIEW = STEMPEL_AKTIV ? "zeit" : "staff";
 function applyRoleVisibility(){
   var adminOnlyTabs = ["table","verwaltung","einstellungen","saldo","auftragskosten"];
@@ -2807,7 +2809,7 @@ function applyRoleVisibility(){
   document.querySelectorAll("#sidebar .side-item[data-view]").forEach(b=>{
     var isAdminOnly = adminOnlyTabs.indexOf(b.dataset.view) !== -1;
     var isBuchhaltungOnly = buchhaltungOnlyTabs.indexOf(b.dataset.view) !== -1;
-    var hidden = (isAdminOnly && !state.isAdmin) || (isBuchhaltungOnly && !state.isBuchhaltung) || (!STEMPEL_AKTIV && STEMPEL_VIEWS.indexOf(b.dataset.view) !== -1) || (!NACHKALK_AKTIV && b.dataset.view === "auftragskosten");
+    var hidden = (isAdminOnly && !state.isAdmin) || (isBuchhaltungOnly && !state.isBuchhaltung) || (!STEMPEL_AKTIV && STEMPEL_VIEWS.indexOf(b.dataset.view) !== -1) || (!NACHKALK_AKTIV && b.dataset.view === "auftragskosten") || (!ARTIKEL_AKTIV && b.dataset.view === "lager");
     // Mitarbeiter (keine Admins) sehen nur noch die Personalplanung
     if(!state.isAdmin && b.dataset.view !== "staff") hidden = true;
     b.style.display = hidden ? "none" : "flex";
@@ -2827,6 +2829,7 @@ function applyRoleVisibility(){
   if(!BUCHHALTUNG_AKTIV && state.view === "buchhaltung") state.view = START_VIEW;
   if(!STEMPEL_AKTIV && STEMPEL_VIEWS.indexOf(state.view) !== -1) state.view = START_VIEW;
   if(!NACHKALK_AKTIV && state.view === "auftragskosten") state.view = START_VIEW;
+  if(!ARTIKEL_AKTIV && state.view === "lager") state.view = START_VIEW;
   if(!state.isAdmin && state.view !== "staff") state.view = "staff";
   if(state.isBuchhaltung) subscribeBuchhaltung();
   render();
