@@ -1848,6 +1848,7 @@
       <input type="color" id="abt-color" value="#3a8f6e" style="width:42px;height:34px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">
       <button type="submit" class="btn primary">+ Abteilung</button>
     </form>
+    <div style="display:none;"><!-- Zeitmodelle vorübergehend ausgeblendet -->
     <h2 class="zeit-h2" style="margin-top:0;">Zeitmodelle</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Pro Tag die Arbeitsblöcke eintragen, z. B. <code>07:00-11:00 13:00-16:00</code> (mehrere Blöcke mit Leerzeichen trennen). Leer lassen = kein Soll an diesem Tag.</div>
     <div class="table-scroll">
@@ -1869,6 +1870,7 @@
       <input type="text" id="zm-so" placeholder="So" class="zm-time-input" value="">
       <button type="submit" class="btn primary">+ Zeitmodell</button>
     </form>
+    </div>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Betriebsferien (für alle Mitarbeiter)</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Eine Betriebsferien-Periode gilt automatisch für alle Mitarbeiter als Abwesenheit (erscheint im Ferienplaner) und bucht direkt beim Anlegen die entsprechenden Stunden ab — ohne das für jeden Mitarbeiter einzeln eintragen zu müssen. Verrechnung wahlweise ab Feriensaldo oder ab Kompensation (Überstunden-Saldo), für alle Mitarbeiter dieser Periode gleich.</div>
@@ -1968,6 +1970,7 @@
       </table>
     </div>
 
+    <div style="display:none;"><!-- Zeitmodell je Mitarbeiter vorübergehend ausgeblendet -->
     <h2 class="zeit-h2" style="margin-top:22px;">Zeitmodell je Mitarbeiter</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Weist jedem Mitarbeiter sein Zeitmodell zu (Zeitmodelle selbst werden in Einstellungen verwaltet). Bestimmt die Soll-Stunden für Überstunden-Berechnung und Monatsrapport.</div>
     <div class="table-scroll">
@@ -1977,6 +1980,7 @@
         </thead>
         <tbody id="verwaltung-zeitmodell-tbody"></tbody>
       </table>
+    </div>
     </div>
 
     <h2 class="zeit-h2" style="margin-top:22px;">Terminserien (z. B. Berufsschule für Lehrlinge)</h2>
