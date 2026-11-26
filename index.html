@@ -1670,7 +1670,7 @@
           <tr>
             <th data-sort="orderNumber">Auftrag</th>
             <th data-sort="description">Objekt / Kunde</th>
-            <th data-sort="workshop">Werkstatt</th>
+            <th data-sort="workshop">Abteilung</th>
             <th>Fehlendes Material</th>
             <th data-sort="completed">Status</th>
           </tr>
@@ -1832,6 +1832,22 @@
   </div>
 
   <div id="einstellungen-page" style="display:none;">
+    <h2 class="zeit-h2" style="margin-top:0;">Einsatz-Arten</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Arten für Einsätze in der Personalplanung (z. B. Werkstatt, Montage). Name und Farbe lassen sich ändern, eigene Arten hinzufügen oder löschen. Bereits eingetragene Einsätze behalten ihre Art.</div>
+    <div id="arten-list" style="max-width:520px;margin-bottom:10px;"></div>
+    <form id="art-add-form" style="display:flex;gap:8px;align-items:center;max-width:520px;margin-bottom:28px;">
+      <input type="text" id="art-name" placeholder="Neue Art, z. B. Planung" required style="flex:1;">
+      <input type="color" id="art-color" value="#3a8f6e" style="width:42px;height:34px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">
+      <button type="submit" class="btn primary">+ Art</button>
+    </form>
+    <h2 class="zeit-h2" style="margin-top:0;">Abteilungen</h2>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Abteilungen für Aufträge (z. B. Stahl, Aluminium). Name und Farbe lassen sich ändern, eigene Abteilungen hinzufügen oder löschen. Bereits erfasste Aufträge behalten ihre Abteilung.</div>
+    <div id="abt-list" style="max-width:520px;margin-bottom:10px;"></div>
+    <form id="abt-add-form" style="display:flex;gap:8px;align-items:center;max-width:520px;margin-bottom:28px;">
+      <input type="text" id="abt-name" placeholder="Neue Abteilung, z. B. Schlosserei" required style="flex:1;">
+      <input type="color" id="abt-color" value="#3a8f6e" style="width:42px;height:34px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">
+      <button type="submit" class="btn primary">+ Abteilung</button>
+    </form>
     <h2 class="zeit-h2" style="margin-top:0;">Zeitmodelle</h2>
     <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px;">Pro Tag die Arbeitsblöcke eintragen, z. B. <code>07:00-11:00 13:00-16:00</code> (mehrere Blöcke mit Leerzeichen trennen). Leer lassen = kein Soll an diesem Tag.</div>
     <div class="table-scroll">
@@ -2386,7 +2402,7 @@
       <div class="field legacy-hidden"><label for="f-bkp">BKP (optional)</label><input id="f-bkp" placeholder="z. B. 221.8 Pfosten-Riegel Wintergarten"></div>
       <div class="field-row">
         <div class="field">
-          <label for="f-workshop">Werkstatt</label>
+          <label for="f-workshop">Abteilung</label>
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
         </div>
         <div class="field" style="justify-content:flex-end;">
@@ -2492,6 +2508,19 @@ const TERMINSERIEN_COLLECTION = "terminserien";
 const KUNDEN_COLLECTION = "kunden";
 const KOSTENARTEN_STAMM_COLLECTION = "kostenarten";
 const KOSTENSTELLEN_COLLECTION = "kostenstellen";
+const EINSATZARTEN_COLLECTION = "einsatzarten";
+const ABTEILUNGEN_COLLECTION = "abteilungen";
+const DEFAULT_ABTEILUNGEN = [
+  { key:"stahl", name:"Stahl", color:"#2f6690" },
+  { key:"aluminium", name:"Aluminium", color:"#5b6b75" },
+  { key:"reparaturen", name:"Reparaturen", color:"#8e6b1f" }
+];
+// Standard-Arten (werden beim ersten Öffnen als bearbeitbare Liste angelegt)
+const DEFAULT_ARTEN = [
+  { key:"werkstatt", name:"Werkstatt", color:"#2f6690" },
+  { key:"montage", name:"Montage", color:"#7b4fa0" },
+  { key:"reparatur", name:"Reparatur", color:"#8e6b1f" }
+];
 // Artikel-Katalog: dieselbe Collection wie im Artikel-Reiter (Modul "mat-lager"), hier nur
 // lesend abonniert, um sie auf einen Auftrag buchen zu können.
 const ARTICLES_COLLECTION = "articles";
@@ -2655,6 +2684,10 @@ let unsubTerminserien = null;
 let unsubKunden = null;
 let unsubKostenartenStamm = null;
 let unsubKostenstellen = null;
+let unsubEinsatzarten = null;
+let artenSeeded = false;
+let unsubAbteilungen = null;
+let abtSeeded = false;
 let unsubArtikelStamm = null;
 let unsubRechnungen = null;
 let unsubLieferantenrechnungen = null;
@@ -2694,6 +2727,8 @@ onAuthStateChanged(auth, async user => {
     if(unsubKunden) unsubKunden();
     if(unsubKostenartenStamm) unsubKostenartenStamm();
     if(unsubKostenstellen) unsubKostenstellen();
+    if(unsubEinsatzarten){ unsubEinsatzarten(); unsubEinsatzarten = null; } if(unsubAbteilungen){ unsubAbteilungen(); unsubAbteilungen = null; }
+    artenSeeded = false; abtSeeded = false;
     if(unsubArtikelStamm) unsubArtikelStamm();
     subscribeOrders();
     subscribeStaff();
@@ -2707,6 +2742,8 @@ onAuthStateChanged(auth, async user => {
     subscribeKunden();
     subscribeKostenartenStamm();
     subscribeKostenstellen();
+    subscribeEinsatzarten();
+    subscribeAbteilungen();
     subscribeArtikelStamm();
     if(state.isAdmin){ subscribeAllTime(); subscribeProfiles(); }
     else{ if(unsubAllTime){ unsubAllTime(); unsubAllTime=null; } if(unsubProfiles2){ unsubProfiles2(); unsubProfiles2=null; } }
@@ -2725,6 +2762,8 @@ onAuthStateChanged(auth, async user => {
     if(unsubKunden) unsubKunden();
     if(unsubKostenartenStamm) unsubKostenartenStamm();
     if(unsubKostenstellen) unsubKostenstellen();
+    if(unsubEinsatzarten){ unsubEinsatzarten(); unsubEinsatzarten = null; } if(unsubAbteilungen){ unsubAbteilungen(); unsubAbteilungen = null; }
+    artenSeeded = false; abtSeeded = false;
     if(unsubArtikelStamm) unsubArtikelStamm();
     $('#login-screen').style.display = 'flex';
     $('#topStrip').style.display = 'none';
@@ -2878,6 +2917,52 @@ function subscribeKostenartenStamm(){
   }, err => { console.error(err); });
 }
 
+/* Einsatz-Arten (Werkstatt, Montage, … — in den Einstellungen verwaltbar) */
+function einsatzartenList(){
+  return state.einsatzarten.length ? state.einsatzarten : DEFAULT_ARTEN;
+}
+function artByKey(key){ return einsatzartenList().find(a=>a.key===key) || DEFAULT_ARTEN.find(a=>a.key===key) || null; }
+function artLabel(key){ var a = artByKey(key); return a ? a.name : (key ? key.charAt(0).toUpperCase() + key.slice(1) : "Werkstatt"); }
+function hexToRgba(hex, alpha){
+  var m = /^#?([0-9a-f]{6})$/i.exec(hex||""); if(!m) return "";
+  var n = parseInt(m[1],16); return "rgba(" + (n>>16&255) + "," + (n>>8&255) + "," + (n&255) + "," + alpha + ")";
+}
+function artChipStyle(key){
+  var a = artByKey(key); if(!a || !a.color) return "";
+  return ' style="background:' + hexToRgba(a.color,.14) + ';border-left-color:' + a.color + ';"';
+}
+function subscribeEinsatzarten(){
+  unsubEinsatzarten = onSnapshot(collection(db, EINSATZARTEN_COLLECTION), snap => {
+    state.einsatzarten = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(a=>a.key && a.name)
+      .sort((a,b)=> (a.sortOrder||0)-(b.sortOrder||0) || (a.createdAt||0)-(b.createdAt||0));
+    if(snap.empty && state.isAdmin && !artenSeeded){
+      artenSeeded = true;
+      DEFAULT_ARTEN.forEach((a,i)=> addDoc(collection(db, EINSATZARTEN_COLLECTION), { key:a.key, name:a.name, color:a.color, sortOrder:i*10, createdAt:Date.now()+i }).catch(e=>console.error(e)));
+    }
+    render();
+  }, err => { console.error(err); });
+}
+
+/* Abteilungen (früher "Werkstatt": Stahl, Aluminium, Reparaturen — in den Einstellungen verwaltbar) */
+function abteilungenList(){ return state.abteilungen.length ? state.abteilungen : DEFAULT_ABTEILUNGEN; }
+function abtByKey(key){ return abteilungenList().find(a=>a.key===key) || DEFAULT_ABTEILUNGEN.find(a=>a.key===key) || null; }
+function abtLabel(key){ var a = abtByKey(key); return a ? a.name : (key ? key.charAt(0).toUpperCase() + key.slice(1) : "–"); }
+function abtTagStyle(key){
+  var a = abtByKey(key); if(!a || !a.color) return "";
+  return ' style="background:' + hexToRgba(a.color,.16) + ';color:' + a.color + ';"';
+}
+function subscribeAbteilungen(){
+  unsubAbteilungen = onSnapshot(collection(db, ABTEILUNGEN_COLLECTION), snap => {
+    state.abteilungen = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(a=>a.key && a.name)
+      .sort((a,b)=> (a.sortOrder||0)-(b.sortOrder||0) || (a.createdAt||0)-(b.createdAt||0));
+    if(snap.empty && state.isAdmin && !abtSeeded){
+      abtSeeded = true;
+      DEFAULT_ABTEILUNGEN.forEach((a,i)=> addDoc(collection(db, ABTEILUNGEN_COLLECTION), { key:a.key, name:a.name, color:a.color, sortOrder:i*10, createdAt:Date.now()+i }).catch(e=>console.error(e)));
+    }
+    render();
+  }, err => { console.error(err); });
+}
+
 function subscribeKostenstellen(){
   const q = query(collection(db, KOSTENSTELLEN_COLLECTION), orderBy('bezeichnung'));
   unsubKostenstellen = onSnapshot(q, snap => {
@@ -3015,7 +3100,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "staff", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], modalLieferungen: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "staff", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], modalLieferungen: [], einsatzarten: [], abteilungen: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
   // ---- Buchhaltung ----
   rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], lohnimporte: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
   buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
@@ -3195,7 +3280,7 @@ function render(){
   if(isZeit){ renderZeitPage(); return; }
   if(isFerien){ renderFerienPage(); return; }
   if(isSaldo){ renderFerienSaldoPanel(); return; }
-  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); renderKostenstellenPanel(); return; }
+  if(isEinstellungen){ renderZeitmodellePanel(); renderBetriebsferienPanel(); renderFeiertagePanel(); renderKostenartenStammPanel(); renderKostenstellenPanel(); renderArtenPanel(); renderAbteilungenPanel(); return; }
   if(isVerwaltung){ renderVerwaltungZeitmodellPanel(); renderTerminserienPanel(); renderMitarbeiterEditPanel(); return; }
   if(isBuchhaltung){ renderBuchhaltungPage(); return; }
   if(isAK){ renderAuftragskostenPage(); return; }
@@ -3205,13 +3290,15 @@ function renderHeader(){
     var active = b.dataset.view===state.view && (!b.dataset.buchhaltungTab || b.dataset.buchhaltungTab===state.buchhaltungTab);
     b.classList.toggle("active", active);
   });
+  var chipsHtml = '<button data-filter="alle">Alle</button>' + abteilungenList().map(a=>'<button data-filter="' + escapeHtml(a.key) + '">' + escapeHtml(a.name) + '</button>').join("");
+  if($("#filter-chips").dataset.sig !== chipsHtml){ $("#filter-chips").innerHTML = chipsHtml; $("#filter-chips").dataset.sig = chipsHtml; }
   document.querySelectorAll("#filter-chips button").forEach(b=>b.classList.toggle("active", b.dataset.filter===state.filter));
   var info = HEADER_INFO[state.view] || ["PRODUKTION.PLAN", ""];
   var titleEl = $("#header-title"), subEl = $("#header-sub");
   if(titleEl) titleEl.textContent = info[0];
   if(subEl) subEl.textContent = info[1];
 }
-function workshopLabel(w){ return w==="aluminium" ? "Aluminium" : (w==="reparaturen" ? "Reparaturen" : "Stahl"); }
+function workshopLabel(w){ return abtLabel(w); }
 function statusLabel(completed){ return completed ? "Abgeschlossen" : "In Fabrikation"; }
 function fmtChf(n){ var v = typeof n==="number" ? n : parseFloat(n)||0; return v.toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2}) + " Fr."; }
 function kundeName(kundeId, fallback){ var k = state.kunden.find(x=>x.id===kundeId); return k ? k.firma : (fallback||""); }
@@ -3253,7 +3340,7 @@ function renderTable(){
     html += '<tr class="' + (o.completed?"row-completed":"") + '" data-id="' + o.id + '">';
     html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
     html += '<td data-label="Objekt / Kunde"><div class="ov-customer">' + (o.intern?'<span class="tag" style="background:#eef;color:#447;margin-right:5px;">Intern</span>':'') + escapeHtml(o.description || kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>':'') + '</td>';
-    html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
+    html += '<td data-label="Abteilung"><span class="tag"' + abtTagStyle(o.workshop) + '>' + escapeHtml(abtLabel(o.workshop)) + '</span></td>';
     html += '<td data-label="Fehlendes Material">' + fehlendesMaterialHtml(o) + '</td>';
     html += '<td data-label="Status"><span class="tag ' + (o.completed?"status-abgeschlossen":"status-fabrikation") + '">' + statusLabel(o.completed) + '</span></td>';
     html += '</tr>';
@@ -4499,6 +4586,100 @@ $("#kostenarten-stamm-tbody").addEventListener("click", async e=>{
   }
 });
 
+/* ---- Einsatz-Arten verwalten ---- */
+function renderArtenPanel(){
+  var box = $("#arten-list"); if(!box) return;
+  if(box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return; // nicht während des Tippens neu zeichnen
+  if(state.einsatzarten.length===0){
+    if(state.isAdmin && !artenSeeded){ artenSeeded = true; DEFAULT_ARTEN.forEach((a,i)=> addDoc(collection(db, EINSATZARTEN_COLLECTION), { key:a.key, name:a.name, color:a.color, sortOrder:i*10, createdAt:Date.now()+i }).catch(e=>console.error(e))); }
+    box.innerHTML = '<div style="color:var(--text-muted);font-size:12.5px;">Standard-Arten werden angelegt…</div>'; return;
+  }
+  box.innerHTML = state.einsatzarten.map(a=>
+    '<div class="art-row" data-art-id="' + a.id + '" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+    '<input type="color" class="art-color" value="' + escapeHtml(a.color||"#2f6690") + '" style="width:42px;height:34px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">' +
+    '<input type="text" class="art-name" value="' + escapeHtml(a.name) + '" style="flex:1;">' +
+    '<button type="button" class="art-delete" title="Art löschen" style="border:1px solid var(--border);background:var(--panel);border-radius:6px;width:34px;height:34px;cursor:pointer;">✕</button></div>'
+  ).join("");
+}
+$("#arten-list").addEventListener("change", async e=>{
+  var row = e.target.closest(".art-row"); if(!row) return;
+  try{
+    if(e.target.classList.contains("art-color")) await updateDoc(doc(db, EINSATZARTEN_COLLECTION, row.dataset.artId), { color: e.target.value });
+    if(e.target.classList.contains("art-name")){
+      var nm = e.target.value.trim(); if(!nm){ toast("Name darf nicht leer sein."); renderArtenPanel(); return; }
+      await updateDoc(doc(db, EINSATZARTEN_COLLECTION, row.dataset.artId), { name: nm });
+    }
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+$("#arten-list").addEventListener("click", async e=>{
+  var btn = e.target.closest(".art-delete"); if(!btn) return;
+  var id = btn.closest(".art-row").dataset.artId;
+  var a = state.einsatzarten.find(x=>x.id===id); if(!a) return;
+  if(state.einsatzarten.length<=1){ toast("Mindestens eine Art muss bleiben."); return; }
+  var used = state.assignments.filter(x=>(x.type||"werkstatt")===a.key).length;
+  if(!(await showConfirm('Art "' + a.name + '" löschen?' + (used ? ' ' + used + ' bestehende Einsätze behalten sie, sie lässt sich danach aber nicht mehr neu wählen.' : '')))) return;
+  try{ await deleteDoc(doc(db, EINSATZARTEN_COLLECTION, id)); }catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+});
+$("#art-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var name = $("#art-name").value.trim(); if(!name) return;
+  if(state.einsatzarten.length===0){ toast("Standard-Arten werden noch angelegt – bitte kurz warten."); return; }
+  var key = name.toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || ("art-" + Date.now());
+  if(state.einsatzarten.some(a=>a.key===key)) key = key + "-" + Date.now().toString(36);
+  try{
+    var maxSort = state.einsatzarten.reduce((m,a)=>Math.max(m,a.sortOrder||0),0);
+    await addDoc(collection(db, EINSATZARTEN_COLLECTION), { key: key, name: name, color: $("#art-color").value, sortOrder: maxSort+10, createdAt: Date.now() });
+    $("#art-name").value = "";
+  }catch(err){ console.error(err); toast("Hinzufügen fehlgeschlagen (Firestore-Regel für 'einsatzarten' gesetzt?)"); }
+});
+
+/* ---- Abteilungen verwalten ---- */
+function renderAbteilungenPanel(){
+  var box = $("#abt-list"); if(!box) return;
+  if(box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  if(state.abteilungen.length===0){
+    if(state.isAdmin && !abtSeeded){ abtSeeded = true; DEFAULT_ABTEILUNGEN.forEach((a,i)=> addDoc(collection(db, ABTEILUNGEN_COLLECTION), { key:a.key, name:a.name, color:a.color, sortOrder:i*10, createdAt:Date.now()+i }).catch(e=>console.error(e))); }
+    box.innerHTML = '<div style="color:var(--text-muted);font-size:12.5px;">Standard-Abteilungen werden angelegt…</div>'; return;
+  }
+  box.innerHTML = state.abteilungen.map(a=>
+    '<div class="abt-row" data-abt-id="' + a.id + '" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+    '<input type="color" class="abt-color" value="' + escapeHtml(a.color||"#2f6690") + '" style="width:42px;height:34px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">' +
+    '<input type="text" class="abt-name" value="' + escapeHtml(a.name) + '" style="flex:1;">' +
+    '<button type="button" class="abt-delete" title="Abteilung löschen" style="border:1px solid var(--border);background:var(--panel);border-radius:6px;width:34px;height:34px;cursor:pointer;">✕</button></div>'
+  ).join("");
+}
+$("#abt-list").addEventListener("change", async e=>{
+  var row = e.target.closest(".abt-row"); if(!row) return;
+  try{
+    if(e.target.classList.contains("abt-color")) await updateDoc(doc(db, ABTEILUNGEN_COLLECTION, row.dataset.abtId), { color: e.target.value });
+    if(e.target.classList.contains("abt-name")){
+      var nm = e.target.value.trim(); if(!nm){ toast("Name darf nicht leer sein."); renderAbteilungenPanel(); return; }
+      await updateDoc(doc(db, ABTEILUNGEN_COLLECTION, row.dataset.abtId), { name: nm });
+    }
+  }catch(err){ console.error(err); toast("Speichern fehlgeschlagen."); }
+});
+$("#abt-list").addEventListener("click", async e=>{
+  var btn = e.target.closest(".abt-delete"); if(!btn) return;
+  var id = btn.closest(".abt-row").dataset.abtId;
+  var a = state.abteilungen.find(x=>x.id===id); if(!a) return;
+  if(state.abteilungen.length<=1){ toast("Mindestens eine Abteilung muss bleiben."); return; }
+  var used = state.orders.filter(x=>x.workshop===a.key).length;
+  if(!(await showConfirm('Abteilung "' + a.name + '" löschen?' + (used ? ' ' + used + ' bestehende Aufträge behalten sie, sie lässt sich danach aber nicht mehr neu wählen.' : '')))) return;
+  try{ await deleteDoc(doc(db, ABTEILUNGEN_COLLECTION, id)); }catch(err){ console.error(err); toast("Löschen fehlgeschlagen."); }
+});
+$("#abt-add-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  var name = $("#abt-name").value.trim(); if(!name) return;
+  if(state.abteilungen.length===0){ toast("Standard-Abteilungen werden noch angelegt – bitte kurz warten."); return; }
+  var key = name.toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || ("abt-" + Date.now());
+  if(state.abteilungen.some(a=>a.key===key)) key = key + "-" + Date.now().toString(36);
+  try{
+    var maxSort = state.abteilungen.reduce((m,a)=>Math.max(m,a.sortOrder||0),0);
+    await addDoc(collection(db, ABTEILUNGEN_COLLECTION), { key: key, name: name, color: $("#abt-color").value, sortOrder: maxSort+10, createdAt: Date.now() });
+    $("#abt-name").value = "";
+  }catch(err){ console.error(err); toast("Hinzufügen fehlgeschlagen (Firestore-Regel für 'abteilungen' gesetzt?)"); }
+});
+
 /* ---- Kostenstellen: einfacher Stamm (Nummer + Bezeichnung) zur internen Zuordnung. ---- */
 function renderKostenstellenPanel(){
   var tbody = $("#kostenstellen-tbody");
@@ -5197,13 +5378,13 @@ function renderStaffGrid(){
     assigns.forEach(a=>{
       var o = state.orders.find(x=>x.id===a.orderId);
       var typ = a.type || "werkstatt";
-      var typLabel = typ==="montage" ? "Montage" : (typ==="reparatur" ? "Reparatur" : "Werkstatt");
+      var typLabel = artLabel(typ);
       // Anstempeln geht auf jeden eigenen Einsatz, unabhängig vom Wochentag der Spalte (nicht
       // nur auf den heutigen) — gebucht wird dabei ohnehin immer mit dem aktuellen Zeitstempel.
       var isMinePunchable = STEMPEL_AKTIV && meEmp && emp.id===meEmp.id;
       var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
       var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
-      out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?(o.description||o.customer):"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.' + (a.lieferadresse?' <a class="a-map" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" title="' + escapeHtml(a.lieferadresse) + ' – in Google Maps öffnen">📍</a>':'') + (a.notiz?' <span title="' + escapeHtml(a.notiz) + '">📝</span>':'') + '</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
+      out += '<div class="' + chipClass + '"' + artChipStyle(typ) + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?(o.description||o.customer):"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.' + (a.lieferadresse?' <a class="a-map" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" title="' + escapeHtml(a.lieferadresse) + ' – in Google Maps öffnen">📍</a>':'') + (a.notiz?' <span title="' + escapeHtml(a.notiz) + '">📝</span>':'') + '</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
     });
     if(canEdit) out += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
     out += '</div>';
@@ -6714,8 +6895,14 @@ function populateAssignKostenartSelect(order, selectedValue){
   field.style.display = "block";
   sel.innerHTML = '<option value="">— keine —</option>' + kas.map((k,i)=>'<option value="' + i + '"' + (String(i)===String(selectedValue)?' selected':'') + '>' + escapeHtml(k.bezeichnung) + '</option>').join("");
 }
+function populateAssignTypeSelect(extraKey){
+  var arten = einsatzartenList().slice();
+  if(extraKey && !arten.some(a=>a.key===extraKey)) arten.push({ key: extraKey, name: artLabel(extraKey) });
+  $("#assign-type").innerHTML = arten.map(a=>'<option value="' + escapeHtml(a.key) + '">' + escapeHtml(a.name) + '</option>').join("");
+}
 function openAssignModal(orderId, cellInfo, assignId){
   state.modalAssignArtikel = [];
+  populateAssignTypeSelect(assignId ? (state.assignments.find(x=>x.id===assignId)||{}).type : null);
   if(assignId){
     var a = state.assignments.find(x=>x.id===assignId);
     if(!a) return;
@@ -6766,6 +6953,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     $("#assign-delete-btn").style.display = "none";
     $("#assign-artikel-field").style.display = "none";
   }
+  if(!$("#assign-type").value) $("#assign-type").selectedIndex = 0;
   updateAssignMapsLink();
   renderAssignArtikelRows();
   assignBackdrop.classList.add("open");
@@ -6776,7 +6964,7 @@ function openAssignViewModal(assignId){
   var a = state.assignments.find(x=>x.id===assignId); if(!a) return;
   var o = state.orders.find(x=>x.id===a.orderId);
   var emp = state.staff.find(x=>x.id===a.employeeId);
-  var typLbl = a.type==="montage" ? "Montage" : (a.type==="reparatur" ? "Reparatur" : "Werkstatt");
+  var typLbl = artLabel(a.type || "werkstatt");
   var h = '';
   h += '<div style="font-weight:700;margin-bottom:2px;">' + escapeHtml(o?o.orderNumber:"?") + (o && o.description ? ' · ' + escapeHtml(o.description) : '') + '</div>';
   if(o && o.customer) h += '<div style="color:var(--text-muted);margin-bottom:8px;">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>';
@@ -7239,9 +7427,8 @@ $("#voka-import-input").addEventListener("change", async e=>{
     if(parsed.orderNumber) $("#f-orderNumber").value = parsed.orderNumber;
     if(parsed.objekt) $("#f-description").value = parsed.objekt;
     var gat = (parsed.arbeitsgattung||"").toLowerCase();
-    if(/alu/.test(gat)) $("#f-workshop").value = "aluminium";
-    else if(/stahl|metall/.test(gat)) $("#f-workshop").value = "stahl";
-    else if(/repar/.test(gat)) $("#f-workshop").value = "reparaturen";
+    var gatMatch = abteilungenList().find(a=> gat && (gat.indexOf(a.name.toLowerCase()) !== -1 || a.name.toLowerCase().indexOf(gat) !== -1));
+    if(gatMatch) $("#f-workshop").value = gatMatch.key;
     state.importKunde = { telefon: parsed.telefon || parsed.mobil || "", email: parsed.email || "" };
     if(parsed.firma){
       $("#f-intern").checked = false; $("#f-kunde-field").style.display = ""; $("#f-kunde").required = true;
@@ -7260,7 +7447,7 @@ $("#voka-import-input").addEventListener("change", async e=>{
         $("#f-kunde-kontakt").value = parsed.sachbearbeiter;
       }
     }
-    statusEl.textContent = "Importiert — bitte Angaben prüfen (Werkstatt, Termine, Auftragswert sind nicht im Laufblatt enthalten).";
+    statusEl.textContent = "Importiert — bitte Angaben prüfen (Abteilung, Termine, Auftragswert sind nicht im Laufblatt enthalten).";
     toast("Laufblatt importiert — bitte prüfen.");
   }catch(err){
     console.error(err);
@@ -7307,7 +7494,11 @@ function openModal(order, prefillDate){
   $("#f-kunde-firma").value = ""; $("#f-kunde-strasse").value = ""; $("#f-kunde-plz").value = ""; $("#f-kunde-ort").value = ""; $("#f-kunde-kontakt").value = "";
   $("#f-description").value = order ? (order.description||"") : "";
   $("#f-bkp").value = order ? (order.bkp||"") : "";
-  $("#f-workshop").value = order ? order.workshop : "stahl";
+  var wsKeys = abteilungenList().map(a=>({key:a.key,name:a.name}));
+  if(order && order.workshop && !wsKeys.some(a=>a.key===order.workshop)) wsKeys.push({ key: order.workshop, name: abtLabel(order.workshop) });
+  $("#f-workshop").innerHTML = wsKeys.map(a=>'<option value="' + escapeHtml(a.key) + '">' + escapeHtml(a.name) + '</option>').join("");
+  $("#f-workshop").value = order && order.workshop ? order.workshop : wsKeys[0].key;
+  if(!$("#f-workshop").value) $("#f-workshop").selectedIndex = 0;
   $("#f-abgeschlossen").checked = order ? !!order.completed : false;
   $("#f-auftragswert").value = (order && order.auftragswert) ? order.auftragswert : "";
   $("#f-materialplan").value = (order && order.materialPlan) ? order.materialPlan : "";
