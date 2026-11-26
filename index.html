@@ -2355,7 +2355,7 @@
 <div class="modal-backdrop" id="modal-backdrop">
   <div class="modal" style="max-width:760px;">
     <h3 id="modal-title">Neuer Auftrag</h3>
-    <div id="order-ist-stunden-box" class="materials-box" style="display:none;margin-bottom:14px;">
+    <div id="order-ist-stunden-box" class="materials-box legacy-hidden" style="display:none;margin-bottom:14px;">
       <label style="margin-bottom:6px;display:block;">Ist-Stunden (gestempelt)</label>
       <div id="order-ist-stunden-content" style="font-size:12.5px;"></div>
     </div>
@@ -2383,7 +2383,7 @@
         </div>
         <div class="field"><label for="f-kunde-kontakt">Ansprechpartner (optional)</label><input id="f-kunde-kontakt"></div>
       </div>
-      <div class="field"><label for="f-bkp">BKP (optional)</label><input id="f-bkp" placeholder="z. B. 221.8 Pfosten-Riegel Wintergarten"></div>
+      <div class="field legacy-hidden"><label for="f-bkp">BKP (optional)</label><input id="f-bkp" placeholder="z. B. 221.8 Pfosten-Riegel Wintergarten"></div>
       <div class="field-row">
         <div class="field">
           <label for="f-workshop">Werkstatt</label>
@@ -2393,7 +2393,7 @@
           <label style="display:flex;align-items:center;gap:8px;margin-bottom:0;"><input type="checkbox" id="f-abgeschlossen" style="width:auto;"> Abgeschlossen</label>
         </div>
       </div>
-      <div class="field-row">
+      <div class="field-row legacy-hidden">
         <div class="field"><label for="f-auftragswert">Auftragswert (CHF)</label><input type="number" id="f-auftragswert" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field"><label for="f-materialplan">Material Plan (CHF)</label><input type="number" id="f-materialplan" min="0" step="0.01" placeholder="0.00"></div>
       </div>
@@ -2406,6 +2406,13 @@
         </div>
       </div>
       <div class="field">
+        <label>Liefertermine Material</label>
+        <div class="todos-box">
+          <div id="liefer-list"></div>
+          <button type="button" class="add-todo-btn" id="add-liefer-btn">+ Lieferung hinzufügen</button>
+        </div>
+      </div>
+      <div class="field legacy-hidden">
         <label>Artikel (aus Artikel-Katalog)</label>
         <div class="materials-box">
           <div id="artikel-list"></div>
@@ -3008,7 +3015,7 @@ function subscribeTerminserien(){
 
 /* ---------- App state & helpers ---------- */
 
-var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "staff", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
+var state = { orders: [], staff: [], assignments: [], myTime: [], allTime: [], profiles: [], absences: [], zeitmodelle: [], betriebsferien: [], feiertage: [], terminserien: [], kunden: [], kostenartenStamm: [], kostenstellen: [], artikelStamm: [], isAdmin: false, currentUid: null, currentName: "", view: "staff", filter: "alle", refDate: toISO(new Date()), staffRefDate: toISO(new Date()), ferienRefDate: toISO(new Date()), monatsrapportDate: toISO(new Date()), editingId: null, modalKostenarten: [], modalArtikel: [], modalAssignArtikel: [], modalTodos: [], modalLieferungen: [], tableSort: { field: "orderNumber", dir: "asc" }, tableSearch: "", assignEmployeeId: null, assignDate: null, editingAssignId: null, editingKundeId: null, zeitLastOrderText: "", zeitLastOrderId: "", staffMobileDay: null, akOrderId: null, akFilter: "offen", akNk: {},
   // ---- Buchhaltung ----
   rechnungen: [], lieferantenrechnungen: [], konten: [], buchungen: [], zahlungslaeufe: [], lohnimporte: [], buchhaltungTab: "debitoren", isBuchhaltung: false,
   buchhaltungSettings: { freigabeSchwelle: 5000, firma: "", strasse: "", plz: "", ort: "", iban: "" },
@@ -7045,6 +7052,40 @@ $("#assign-artikel-list").addEventListener("input", e=>{
   }
 });
 
+/* Liefertermine Material (z. B. Glas, Beschläge) */
+function renderLieferRows(){
+  var list = $("#liefer-list");
+  if(state.modalLieferungen.length===0){ list.innerHTML = '<div class="todos-empty">Noch keine Lieferung erfasst.</div>'; return; }
+  var html = "";
+  state.modalLieferungen.forEach((t,i)=>{
+    html += '<div class="todo-row" data-idx="' + i + '">' +
+      '<input type="checkbox" class="todo-done" title="Geliefert"' + (t.geliefert?" checked":"") + '>' +
+      '<input type="text" class="todo-text' + (t.geliefert?" done":"") + '" placeholder="z. B. Glas, Beschläge" value="' + escapeHtml(t.text) + '">' +
+      '<span class="todo-date-wrap"><input type="text" class="todo-date-display date-input" readonly placeholder="Liefertermin" value="' + (t.date ? isoToDisplay(t.date) : "") + '"><input type="hidden" class="todo-date" value="' + (t.date||"") + '"></span>' +
+      '<button type="button" class="todo-remove" aria-label="Lieferung entfernen">✕</button></div>';
+  });
+  list.innerHTML = html;
+}
+$("#add-liefer-btn").addEventListener("click", ()=>{ state.modalLieferungen.push({text:"",date:"",geliefert:false}); renderLieferRows(); });
+$("#liefer-list").addEventListener("click", e=>{
+  var btn = e.target.closest(".todo-remove"); if(!btn) return;
+  state.modalLieferungen.splice(Number(btn.closest(".todo-row").dataset.idx),1); renderLieferRows();
+});
+$("#liefer-list").addEventListener("input", e=>{
+  var row = e.target.closest(".todo-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalLieferungen[idx]) return;
+  if(e.target.classList.contains("todo-text")) state.modalLieferungen[idx].text = e.target.value;
+  if(e.target.classList.contains("todo-date")) state.modalLieferungen[idx].date = e.target.value;
+});
+$("#liefer-list").addEventListener("change", e=>{
+  var row = e.target.closest(".todo-row"); if(!row) return;
+  var idx = Number(row.dataset.idx); if(!state.modalLieferungen[idx]) return;
+  if(e.target.classList.contains("todo-done")){
+    state.modalLieferungen[idx].geliefert = e.target.checked;
+    e.target.nextElementSibling.classList.toggle("done", e.target.checked);
+  }
+});
+
 function renderTodoRows(){
   var list = $("#todos-list");
   if(state.modalTodos.length===0){ list.innerHTML = '<div class="todos-empty">Noch kein To-Do erfasst.</div>'; return; }
@@ -7240,6 +7281,8 @@ function openModal(order, prefillDate){
   renderKostenartenRows();
   state.modalArtikel = order ? JSON.parse(JSON.stringify(Array.isArray(order.artikelPositionen)?order.artikelPositionen:[])) : [];
   renderArtikelRows();
+  state.modalLieferungen = order && Array.isArray(order.materialLieferungen) ? JSON.parse(JSON.stringify(order.materialLieferungen)) : [];
+  renderLieferRows();
   state.modalTodos = order ? JSON.parse(JSON.stringify(orderTodos(order))) : [];
   renderTodoRows();
   $("#delete-btn").style.display = order ? "inline-block" : "none";
@@ -7365,6 +7408,7 @@ form.addEventListener("submit", async e=>{
       kostenarten: kostenarten,
       artikelPositionen: artikelPositionen,
       todos: todos,
+      materialLieferungen: state.modalLieferungen.map(l=>({ text:(l.text||"").trim(), date: l.date||"", geliefert: !!l.geliefert })).filter(l=>l.text.length>0 || l.date),
       updatedAt: Date.now()
     };
     if(state.editingId){
