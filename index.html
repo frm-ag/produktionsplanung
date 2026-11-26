@@ -5248,8 +5248,8 @@ function renderStaffGrid(){
     var savedId = ""; try{ savedId = localStorage.getItem("meineStaffId") || ""; }catch(err){}
     var meineEmp = state.staff.find(s=>s.id===savedId) || meEmp || null;
     var listEmps = mMode === "meine" ? (meineEmp ? [meineEmp] : []) : state.staff;
-    if(mMode === "meine"){
-      html += '<div style="margin-bottom:10px;font-size:12.5px;color:var(--text-muted);">' + (meEmp ? 'Angezeigt für:' : 'Dein Benutzer ist keinem Mitarbeiter zugeordnet. Wer bist du?') +
+    if(mMode === "meine" && !meineEmp){
+      html += '<div style="margin-bottom:10px;font-size:12.5px;color:var(--text-muted);">Dein Benutzer ist keinem Mitarbeiter zugeordnet. Wer bist du?' +
         '<select class="staff-mobile-me-select" style="margin-top:4px;width:100%;"><option value="">— bitte wählen —</option>' +
         state.staff.map(function(x){ return '<option value="' + x.id + '"' + (meineEmp && meineEmp.id===x.id?' selected':'') + '>' + escapeHtml(x.name) + '</option>'; }).join("") + '</select></div>';
     }
