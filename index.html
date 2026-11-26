@@ -2098,6 +2098,18 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="assign-view-backdrop">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="av-title">Einsatz</h3>
+    <div id="av-body" style="font-size:13.5px;line-height:1.5;"></div>
+    <div class="modal-actions">
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button type="button" class="btn" id="av-close-btn">Schliessen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="assign-modal-backdrop">
   <div class="modal" style="max-width:360px;">
     <h3 id="assign-modal-title">Einsatz eintragen</h3>
@@ -6515,7 +6527,11 @@ $("#staff-grid").addEventListener("click", async e=>{
   if(editBtn && state.isAdmin){ openAssignModal(null, null, editBtn.dataset.assignId); return; }
   var punchChip = e.target.closest(".assign-chip[data-punchable='1']");
   if(punchChip){ await punchFromAssignment(punchChip.dataset.assignId); return; }
-  if(!state.isAdmin) return;
+  if(!state.isAdmin){
+    var viewChip = e.target.closest(".assign-chip[data-assign-id]");
+    if(viewChip) openAssignViewModal(viewChip.dataset.assignId);
+    return;
+  }
   var rmBtn = e.target.closest(".staff-remove");
   if(rmBtn){
     if(!confirm("Diesen Mitarbeiter wirklich entfernen? Zugewiesene Einsätze bleiben als verwaiste Einträge bestehen.")) return;
@@ -6667,6 +6683,29 @@ function openAssignModal(orderId, cellInfo, assignId){
   assignBackdrop.classList.add("open");
   setTimeout(()=>{ var f = orderId||assignId ? "#assign-hours" : "#assign-order-search"; $(f).focus(); },30);
 }
+// Nur-Lesen-Ansicht eines Einsatzes (für Mitarbeiter ohne Bearbeitungsrechte)
+function openAssignViewModal(assignId){
+  var a = state.assignments.find(x=>x.id===assignId); if(!a) return;
+  var o = state.orders.find(x=>x.id===a.orderId);
+  var emp = state.staff.find(x=>x.id===a.employeeId);
+  var typLbl = a.type==="montage" ? "Montage" : (a.type==="reparatur" ? "Reparatur" : "Werkstatt");
+  var h = '';
+  h += '<div style="font-weight:700;margin-bottom:2px;">' + escapeHtml(o?o.orderNumber:"?") + (o && o.description ? ' · ' + escapeHtml(o.description) : '') + '</div>';
+  if(o && o.customer) h += '<div style="color:var(--text-muted);margin-bottom:8px;">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>';
+  h += '<div style="margin-bottom:10px;">' + escapeHtml(emp?emp.name:"?") + ' · ' + escapeHtml(fmtShort(a.date)) + ' · ' + escapeHtml(typLbl) + ' · ' + (a.hours||0) + ' Std.</div>';
+  if(a.lieferadresse){
+    h += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);">Lieferadresse</div><div>' + escapeHtml(a.lieferadresse) + '</div>' +
+      '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" target="_blank" rel="noopener" style="display:inline-block;margin:4px 0 10px;">📍 In Google Maps öffnen</a>';
+  }
+  if(a.notiz){
+    h += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);">Notizen</div><div style="white-space:pre-wrap;">' + escapeHtml(a.notiz) + '</div>';
+  }
+  if(!a.lieferadresse && !a.notiz) h += '<div style="color:var(--text-muted);">Keine Lieferadresse oder Notizen erfasst.</div>';
+  $("#av-body").innerHTML = h;
+  $("#assign-view-backdrop").classList.add("open");
+}
+$("#av-close-btn").addEventListener("click", ()=> $("#assign-view-backdrop").classList.remove("open"));
+$("#assign-view-backdrop").addEventListener("click", e=>{ if(e.target.id==="assign-view-backdrop") e.target.classList.remove("open"); });
 function updateAssignMapsLink(){
   var v = $("#assign-lieferadresse").value.trim(), a = $("#assign-maps-link");
   if(!v){ a.style.display = "none"; a.removeAttribute("href"); return; }
