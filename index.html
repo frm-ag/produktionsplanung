@@ -5484,10 +5484,13 @@ function renderStaffGrid(){
   }else{
     // Wochenübersicht: pro Tag nur Mitarbeiter mit Einsatz/Abwesenheit; "Meine" = nur eigener Plan
     // Ist der Benutzer keinem Mitarbeiter zugeordnet, kann er sich hier (pro Gerät) selbst auswählen.
-    var savedId = ""; try{ savedId = localStorage.getItem("meineStaffId") || ""; }catch(err){}
-    var meineEmp = state.staff.find(s=>s.id===savedId) || meEmp || null;
+    var lsKey = "meineStaffId_" + (state.currentUid || "");
+    var savedId = ""; try{ savedId = localStorage.getItem(lsKey) || ""; }catch(err){}
+    var nameEmp = null;
+    if(state.currentName){ var un = state.currentName.toLowerCase(); nameEmp = state.staff.find(s=>{ var n=(s.name||"").toLowerCase(); return n===un || n.split(/\s+/)[0]===un || un.split(/[.\s_]+/).every(function(t){ return t && n.indexOf(t)>-1; }); }) || null; }
+    var meineEmp = meEmp || state.staff.find(s=>s.id===savedId) || nameEmp || null;
     var listEmps = mMode === "meine" ? (meineEmp ? [meineEmp] : []) : state.staff;
-    if(mMode === "meine" && !meineEmp){
+    if(mMode === "meine" && !meEmp){
       html += '<div style="margin-bottom:10px;font-size:12.5px;color:var(--text-muted);">Dein Benutzer ist keinem Mitarbeiter zugeordnet. Wer bist du?' +
         '<select class="staff-mobile-me-select" style="margin-top:4px;width:100%;"><option value="">— bitte wählen —</option>' +
         state.staff.map(function(x){ return '<option value="' + x.id + '"' + (meineEmp && meineEmp.id===x.id?' selected':'') + '>' + escapeHtml(x.name) + '</option>'; }).join("") + '</select></div>';
@@ -5518,7 +5521,7 @@ function renderStaffGrid(){
 // Tag-Tabs der Handy-Ansicht (Delegation auf #staff-grid, damit sie bei jedem Re-Render weiter funktionieren)
 $("#staff-grid").addEventListener("change", e=>{
   var sel = e.target.closest(".staff-mobile-me-select"); if(!sel) return;
-  try{ localStorage.setItem("meineStaffId", sel.value); }catch(err){}
+  try{ localStorage.setItem("meineStaffId_" + (state.currentUid || ""), sel.value); }catch(err){}
   renderStaffGrid();
 });
 $("#staff-grid").addEventListener("click", e=>{
