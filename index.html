@@ -5244,9 +5244,20 @@ function renderStaffGrid(){
     });
   }else{
     // Wochenübersicht: pro Tag nur Mitarbeiter mit Einsatz/Abwesenheit; "Meine" = nur eigener Plan
-    var listEmps = mMode === "meine" ? (meEmp ? [meEmp] : []) : state.staff;
+    // Ist der Benutzer keinem Mitarbeiter zugeordnet, kann er sich hier (pro Gerät) selbst auswählen.
+    var meineEmp = meEmp;
+    if(!meineEmp){
+      var savedId = ""; try{ savedId = localStorage.getItem("meineStaffId") || ""; }catch(err){}
+      meineEmp = state.staff.find(s=>s.id===savedId) || null;
+    }
+    var listEmps = mMode === "meine" ? (meineEmp ? [meineEmp] : []) : state.staff;
     if(mMode === "meine" && !meEmp){
-      html += '<div class="staff-empty-note">Dein Benutzer ist keinem Mitarbeiter in der Personalplanung zugeordnet.</div>';
+      html += '<div class="staff-empty-note" style="margin-bottom:10px;">Dein Benutzer ist keinem Mitarbeiter zugeordnet. Wer bist du? ' +
+        '<select class="staff-mobile-me-select" style="margin-top:6px;width:100%;"><option value="">— bitte wählen —</option>' +
+        state.staff.map(function(x){ return '<option value="' + x.id + '"' + (meineEmp && meineEmp.id===x.id?' selected':'') + '>' + escapeHtml(x.name) + '</option>'; }).join("") + '</select></div>';
+    }
+    if(mMode === "meine" && !meineEmp){
+      /* noch keine Auswahl */
     }else{
       var anyShown = false;
       days.forEach(d=>{
@@ -5269,6 +5280,11 @@ function renderStaffGrid(){
   grid.innerHTML = html;
 }
 // Tag-Tabs der Handy-Ansicht (Delegation auf #staff-grid, damit sie bei jedem Re-Render weiter funktionieren)
+$("#staff-grid").addEventListener("change", e=>{
+  var sel = e.target.closest(".staff-mobile-me-select"); if(!sel) return;
+  try{ localStorage.setItem("meineStaffId", sel.value); }catch(err){}
+  renderStaffGrid();
+});
 $("#staff-grid").addEventListener("click", e=>{
   var modeBtn = e.target.closest(".staff-mobile-mode[data-mobile-mode]");
   if(modeBtn){ state.staffMobileMode = modeBtn.dataset.mobileMode; renderStaffGrid(); return; }
