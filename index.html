@@ -1671,7 +1671,7 @@
             <th data-sort="orderNumber">Auftrag</th>
             <th data-sort="description">Objekt / Kunde</th>
             <th data-sort="workshop">Werkstatt</th>
-            <th data-sort="auftragswert">Auftragswert</th>
+            <th>Fehlendes Material</th>
             <th data-sort="completed">Status</th>
           </tr>
         </thead>
@@ -3216,6 +3216,18 @@ function statusLabel(completed){ return completed ? "Abgeschlossen" : "In Fabrik
 function fmtChf(n){ var v = typeof n==="number" ? n : parseFloat(n)||0; return v.toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2}) + " Fr."; }
 function kundeName(kundeId, fallback){ var k = state.kunden.find(x=>x.id===kundeId); return k ? k.firma : (fallback||""); }
 
+// Noch nicht gelieferte Materialien mit Liefertermin (überfällige rot), sortiert nach Termin
+function fehlendesMaterialHtml(o){
+  var l = Array.isArray(o.materialLieferungen) ? o.materialLieferungen : [];
+  if(l.length===0) return '<span style="color:var(--text-muted);">–</span>';
+  var offen = l.filter(x=>!x.geliefert).sort((a,b)=> (a.date||"9999").localeCompare(b.date||"9999"));
+  if(offen.length===0) return '<span style="color:var(--text-muted);">✓ komplett geliefert</span>';
+  var heute = todayISO();
+  return offen.map(x=>{
+    var ueberfaellig = x.date && x.date < heute;
+    return '<div style="' + (ueberfaellig?'color:#c0392b;font-weight:600;':'') + '">' + escapeHtml(x.text||"Material") + ' · ' + (x.date ? isoToDisplay(x.date) : 'kein Termin') + (ueberfaellig?' ⚠':'') + '</div>';
+  }).join("");
+}
 function renderTable(){
   var rows = filteredOrders().slice();
   var search = state.tableSearch.trim().toLowerCase();
@@ -3242,7 +3254,7 @@ function renderTable(){
     html += '<td data-label="Auftrag" class="ov-orderno">' + escapeHtml(o.orderNumber) + '</td>';
     html += '<td data-label="Objekt / Kunde"><div class="ov-customer">' + (o.intern?'<span class="tag" style="background:#eef;color:#447;margin-right:5px;">Intern</span>':'') + escapeHtml(o.description || kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>':'') + '</td>';
     html += '<td data-label="Werkstatt"><span class="tag ' + (o.workshop==="aluminium"?"tag-aluminium":(o.workshop==="reparaturen"?"tag-reparaturen":"")) + '">' + workshopLabel(o.workshop) + '</span></td>';
-    html += '<td data-label="Auftragswert">' + fmtChf(o.auftragswert) + '</td>';
+    html += '<td data-label="Fehlendes Material">' + fehlendesMaterialHtml(o) + '</td>';
     html += '<td data-label="Status"><span class="tag ' + (o.completed?"status-abgeschlossen":"status-fabrikation") + '">' + statusLabel(o.completed) + '</span></td>';
     html += '</tr>';
   });
