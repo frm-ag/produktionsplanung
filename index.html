@@ -5158,7 +5158,7 @@ function renderStaffGrid(){
       var isMinePunchable = STEMPEL_AKTIV && meEmp && emp.id===meEmp.id;
       var isActivePunch = isMinePunchable && myStatus!=="off" && myLastKommen && myLastKommen.orderId===a.orderId;
       var chipClass = "assign-chip type-" + typ + (isMinePunchable?" assign-chip-punchable":"") + (isActivePunch?" assign-chip-active":"");
-      out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?o.customer:"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.' + (a.lieferadresse?' <a class="a-map" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" title="' + escapeHtml(a.lieferadresse) + ' – in Google Maps öffnen">📍</a>':'') + (a.notiz?' <span title="' + escapeHtml(a.notiz) + '">📝</span>':'') + '</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
+      out += '<div class="' + chipClass + '"' + (canEdit?' draggable="true"':'') + (isMinePunchable?' data-punchable="1"':'') + ' data-assign-id="' + a.id + '" title="' + (isMinePunchable?(isActivePunch?"Klicken zum Ausstempeln":"Klicken zum Einstempeln auf diesen Auftrag"):'') + '">' + (canEdit && isMinePunchable?'<button type="button" class="a-edit-btn" data-assign-id="' + a.id + '" title="Einsatz bearbeiten">✎</button>':'') + '<span class="a-order">' + escapeHtml(o?o.orderNumber:"?") + '</span> ' + escapeHtml(o?(o.description||o.customer):"") + '<div class="a-type">' + typLabel + (a.kostenartBezeichnung?' · '+escapeHtml(a.kostenartBezeichnung):'') + '</div><div class="a-hours">' + (a.hours||0) + ' Std.' + (a.lieferadresse?' <a class="a-map" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a.lieferadresse) + '" title="' + escapeHtml(a.lieferadresse) + ' – in Google Maps öffnen">📍</a>':'') + (a.notiz?' <span title="' + escapeHtml(a.notiz) + '">📝</span>':'') + '</div>' + (isActivePunch?'<div class="a-punch-live">● eingestempelt</div>':'') + '</div>';
     });
     if(canEdit) out += '<button type="button" class="staff-cell-add" title="Auftrag per Nummer hinzufügen">+</button>';
     out += '</div>';
@@ -6621,7 +6621,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     var emp = state.staff.find(x=>x.id===a.employeeId);
     $("#assign-order-field").style.display = "none";
     $("#assign-modal-title").textContent = "Einsatz bearbeiten";
-    $("#assign-info").textContent = (o?o.orderNumber + " · " + o.customer:"?") + " — " + (emp?emp.name:"?") + " · " + fmtShort(a.date);
+    $("#assign-info").textContent = (o?o.orderNumber + " · " + (o.description||o.customer):"?") + " — " + (emp?emp.name:"?") + " · " + fmtShort(a.date);
     $("#assign-type").value = a.type || "werkstatt";
     populateAssignKostenartSelect(o, a.kostenartIdx!=null?a.kostenartIdx:"");
     $("#assign-hours").value = a.hours || 8;
@@ -6636,7 +6636,7 @@ function openAssignModal(orderId, cellInfo, assignId){
     var emp2 = state.staff.find(x=>x.id===cellInfo.employeeId);
     $("#assign-order-field").style.display = "none";
     $("#assign-modal-title").textContent = "Einsatz eintragen";
-    $("#assign-info").textContent = (o2?o2.orderNumber + " · " + o2.customer:"?") + " — " + (emp2?emp2.name:"?") + " · " + fmtShort(cellInfo.date);
+    $("#assign-info").textContent = (o2?o2.orderNumber + " · " + (o2.description||o2.customer):"?") + " — " + (emp2?emp2.name:"?") + " · " + fmtShort(cellInfo.date);
     var defaultType = (o2 && o2.workshop === "reparaturen") ? "reparatur" : "werkstatt";
     $("#assign-type").value = defaultType;
     populateAssignKostenartSelect(o2, "");
@@ -6677,7 +6677,7 @@ $("#assign-lieferadresse").addEventListener("input", updateAssignMapsLink);
 function closeAssignModal(){ assignBackdrop.classList.remove("open"); state.editingAssignId=null; state.pendingOrderId=null; }
 function populateAssignOrderList(){
   var open = state.orders.filter(o=>!o.completed).slice().sort((a,b)=> (a.orderNumber||"").localeCompare(b.orderNumber||"", undefined, {numeric:true}));
-  $("#assign-order-list").innerHTML = open.map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(o.customer) + '">').join("");
+  $("#assign-order-list").innerHTML = open.map(o=>'<option value="' + escapeHtml(o.orderNumber) + ' – ' + escapeHtml(o.description||o.customer) + '">').join("");
 }
 $("#assign-order-search").addEventListener("input", e=>{
   var typed = e.target.value.trim();
@@ -6686,7 +6686,7 @@ $("#assign-order-search").addEventListener("input", e=>{
   var emp = state.staff.find(x=>x.id===state.assignEmployeeId);
   if(match){
     state.pendingOrderId = match.id;
-    $("#assign-info").textContent = match.orderNumber + " · " + match.customer + " — " + (emp?emp.name:"?") + " · " + fmtShort(state.assignDate);
+    $("#assign-info").textContent = match.orderNumber + " · " + (match.description||match.customer) + " — " + (emp?emp.name:"?") + " · " + fmtShort(state.assignDate);
     $("#assign-type").value = match.workshop === "reparaturen" ? "reparatur" : "werkstatt";
     populateAssignKostenartSelect(match, "");
     $("#assign-artikel-field").style.display = "block";
