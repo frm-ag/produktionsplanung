@@ -6619,7 +6619,7 @@ $("#staff-grid").addEventListener("click", async e=>{
 $("#staff-grid").addEventListener("dragstart", e=>{
   if(!state.isAdmin) return;
   var chip = e.target.closest(".assign-chip");
-  if(chip){ e.dataTransfer.setData("text/plain", "assign:" + chip.dataset.assignId); e.dataTransfer.effectAllowed = "move"; return; }
+  if(chip){ e.dataTransfer.setData("text/plain", "assign:" + chip.dataset.assignId); e.dataTransfer.effectAllowed = "copyMove"; return; }
   var rowName = e.target.closest(".staff-row-name");
   if(rowName){ e.dataTransfer.setData("text/plain", "staffmove:" + rowName.dataset.staffId); e.dataTransfer.effectAllowed = "move"; return; }
 });
@@ -6628,7 +6628,7 @@ $("#staff-grid").addEventListener("dragover", e=>{
   var rowName = e.target.closest(".staff-row-name");
   if(rowName){ e.preventDefault(); e.dataTransfer.dropEffect = "move"; rowName.classList.add("drag-over-row"); return; }
   var cell = e.target.closest(".staff-cell"); if(!cell) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = "move";
+  e.preventDefault(); e.dataTransfer.dropEffect = (e.ctrlKey || e.metaKey) ? "copy" : "move"; // Strg/Cmd gedrückt = kopieren
   cell.classList.add("drag-over");
 });
 $("#staff-grid").addEventListener("dragleave", e=>{
@@ -6662,8 +6662,20 @@ $("#staff-grid").addEventListener("drop", async e=>{
     openAssignModal(id, { employeeId: cell.dataset.employeeId, date: cell.dataset.date }, null);
   }else if(kind === "assign"){
     try{
-      await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, id), { employeeId: cell.dataset.employeeId, date: cell.dataset.date });
-    }catch(err){ console.error(err); toast("Verschieben fehlgeschlagen."); }
+      if(e.ctrlKey || e.metaKey){
+        // Strg/Cmd gedrückt: Einsatz kopieren (z. B. gleichen Auftrag einem weiteren Mitarbeiter zuweisen)
+        var src = state.assignments.find(x=>x.id===id);
+        if(!src) return;
+        await addDoc(collection(db, ASSIGNMENTS_COLLECTION), {
+          orderId: src.orderId, employeeId: cell.dataset.employeeId, date: cell.dataset.date,
+          hours: src.hours || 8, type: src.type || "werkstatt",
+          lieferadresse: src.lieferadresse || "", notiz: src.notiz || "", createdAt: Date.now()
+        });
+        toast("Einsatz kopiert.");
+      }else{
+        await updateDoc(doc(db, ASSIGNMENTS_COLLECTION, id), { employeeId: cell.dataset.employeeId, date: cell.dataset.date });
+      }
+    }catch(err){ console.error(err); toast("Verschieben/Kopieren fehlgeschlagen."); }
   }
 });
 async function reorderStaff(draggedId, targetId){
