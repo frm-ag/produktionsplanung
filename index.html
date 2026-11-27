@@ -569,7 +569,17 @@
   .staff-row-name .staff-remove{border:none;background:transparent;color:#c3ccd1;cursor:pointer;font-size:13px;flex:none;}
   .staff-row-name .staff-remove:hover{color:var(--danger);}
   .staff-avatar{border-radius:50%;object-fit:cover;flex:none;background:var(--panel-alt);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer;}
-  .staff-avatar.has-photo{cursor:pointer;}
+  .staff-avatar{cursor:default;}
+  .staff-avatar.can-edit{cursor:pointer;}
+  #photo-crop-backdrop{z-index:130;}
+  .pc-stage{position:relative;width:280px;height:280px;max-width:72vw;max-height:72vw;margin:4px auto 12px;border-radius:10px;overflow:hidden;background:#1d2327;touch-action:none;cursor:grab;user-select:none;}
+  .pc-stage.dragging{cursor:grabbing;}
+  .pc-stage canvas{display:block;width:100%;height:100%;}
+  .pc-mask{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(15,20,23,.55);border:2px solid rgba(255,255,255,.85);pointer-events:none;}
+  .pc-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cfd8de;font-size:13px;text-align:center;padding:20px;pointer-events:none;}
+  .pc-tools{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .pc-tools input[type=range]{flex:1;}
+  .pc-hint{font-size:11.5px;color:var(--text-muted);margin-bottom:6px;}
   .staff-avatar-sm{width:22px;height:22px;font-size:9.5px;}
   .staff-avatar-lg{width:70px;height:70px;font-size:22px;border:3px solid var(--accent);}
   .staff-cell{border-left:1px solid var(--border);padding:6px;min-height:64px;display:flex;flex-direction:column;gap:5px;}
@@ -3184,12 +3194,13 @@ function staffColor(name){
   return palette[Math.abs(hash) % palette.length];
 }
 function staffAvatarHtml(emp, sizeClass){
-  var cls = "staff-avatar " + (sizeClass||"staff-avatar-sm");
+  var canEdit = !!state.isAdmin;
+  var cls = "staff-avatar " + (sizeClass||"staff-avatar-sm") + (canEdit ? " can-edit" : "");
   if(emp && emp.photoUrl){
-    return '<img class="' + cls + ' has-photo" data-staff-id="' + emp.id + '" src="' + emp.photoUrl + '" alt="' + escapeHtml(emp.name) + '" title="Klicken, um das Foto zu ändern">';
+    return '<img class="' + cls + ' has-photo" data-staff-id="' + emp.id + '" src="' + emp.photoUrl + '" alt="' + escapeHtml(emp.name) + '"' + (canEdit ? ' title="Klicken, um das Foto anzupassen"' : '') + '>';
   }
   var initials = staffInitials(emp?emp.name:"");
-  return '<span class="' + cls + '" data-staff-id="' + (emp?emp.id:"") + '" style="background:' + staffColor(emp?emp.name:"") + ';" title="Klicken, um ein Foto hinzuzufügen">' + initials + '</span>';
+  return '<span class="' + cls + '" data-staff-id="' + (emp?emp.id:"") + '" style="background:' + staffColor(emp?emp.name:"") + ';"' + (canEdit ? ' title="Klicken, um ein Foto hinzuzufügen"' : '') + '>' + initials + '</span>';
 }
 // Liest eine ausgewählte Bilddatei, verkleinert sie clientseitig auf ein quadratisches
 // Vorschaubild und liefert sie als komprimiertes JPEG-Data-URL zurück (klein genug, um direkt
@@ -3216,30 +3227,172 @@ function compressImageFile(file, maxSize){
     reader.readAsDataURL(file);
   });
 }
-var pendingPhotoStaffId = null;
-var staffPhotoInput = null;
-function triggerStaffPhotoUpload(staffId){
-  pendingPhotoStaffId = staffId;
-  if(!staffPhotoInput){
-    staffPhotoInput = document.createElement("input");
-    staffPhotoInput.type = "file"; staffPhotoInput.accept = "image/*"; staffPhotoInput.style.display = "none";
-    document.body.appendChild(staffPhotoInput);
-    staffPhotoInput.addEventListener("change", async ()=>{
-      var file = staffPhotoInput.files && staffPhotoInput.files[0];
-      staffPhotoInput.value = "";
-      if(!file || !pendingPhotoStaffId) return;
-      try{
-        var dataUrl = await compressImageFile(file, 200);
-        await updateDoc(doc(db, STAFF_COLLECTION, pendingPhotoStaffId), { photoUrl: dataUrl });
-        toast("Foto gespeichert.");
-      }catch(err){ console.error(err); toast("Foto konnte nicht gespeichert werden: " + (err.code || err.message)); }
-    });
-  }
-  staffPhotoInput.click();
+/* ---------- Profilfoto zuschneiden (nur Admins): verschieben, zoomen, drehen ---------- */
+var PHOTO_OUT_SIZE = 400;
+var pc = { staffId: null, src: null, rot: 0, zoom: 1, ox: 0, oy: 0, hadPhoto: false, pointers: {}, pinch: null, drag: null };
+function pcEnsureModal(){
+  if($("#photo-crop-backdrop")) return;
+  var bd = document.createElement("div");
+  bd.className = "modal-backdrop"; bd.id = "photo-crop-backdrop";
+  bd.innerHTML = '<div class="modal" style="max-width:380px;">' +
+    '<h3 id="pc-title">Profilfoto</h3>' +
+    '<div class="pc-hint">Bild mit Maus oder Finger verschieben, mit Regler, Mausrad oder zwei Fingern zoomen.</div>' +
+    '<div class="pc-stage" id="pc-stage"><canvas id="pc-canvas"></canvas><div class="pc-mask"></div><div class="pc-empty" id="pc-empty">Noch kein Foto — bitte «Neues Foto wählen».</div></div>' +
+    '<div class="pc-tools"><span style="font-size:13px;">−</span><input type="range" id="pc-zoom" min="1" max="4" step="0.01" value="1"><span style="font-size:13px;">+</span>' +
+    '<button type="button" class="btn" id="pc-rotate" title="90° drehen">↻</button></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn" id="pc-pick">🖼 Neues Foto wählen</button>' +
+    '<button type="button" class="btn danger" id="pc-remove">Foto entfernen</button></div>' +
+    '<input type="file" id="pc-file" accept="image/*" style="display:none;">' +
+    '<div class="modal-actions"><span></span><div style="display:flex;gap:8px;"><button type="button" class="btn" id="pc-cancel">Abbrechen</button><button type="button" class="btn primary" id="pc-save">Speichern</button></div></div>' +
+    '</div>';
+  document.body.appendChild(bd);
+  bd.addEventListener("click", e=>{ if(e.target === bd) pcClose(); });
+  $("#pc-cancel").addEventListener("click", pcClose);
+  $("#pc-pick").addEventListener("click", ()=> $("#pc-file").click());
+  $("#pc-file").addEventListener("change", e=>{
+    var f = e.target.files && e.target.files[0]; e.target.value = "";
+    if(!f) return;
+    pcLoadSource(URL.createObjectURL(f), true);
+  });
+  $("#pc-rotate").addEventListener("click", ()=>{ if(!pc.src) return; pc.rot = (pc.rot + 90) % 360; pc.ox = 0; pc.oy = 0; pcClamp(); pcDraw(); });
+  $("#pc-zoom").addEventListener("input", e=>{ pcSetZoom(parseFloat(e.target.value), 0, 0); });
+  $("#pc-remove").addEventListener("click", async ()=>{
+    if(!pc.staffId) return;
+    if(!(await showConfirm("Profilfoto dieses Mitarbeiters entfernen?"))) return;
+    try{ await updateDoc(doc(db, STAFF_COLLECTION, pc.staffId), { photoUrl: "" }); toast("Foto entfernt."); pcClose(); }
+    catch(err){ console.error(err); toast("Entfernen fehlgeschlagen: " + (err.code || err.message)); }
+  });
+  $("#pc-save").addEventListener("click", pcSave);
+  var stage = $("#pc-stage");
+  stage.addEventListener("pointerdown", e=>{
+    if(!pc.src) return;
+    stage.setPointerCapture(e.pointerId);
+    pc.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    pcResetGesture();
+  });
+  stage.addEventListener("pointermove", e=>{
+    if(!pc.pointers[e.pointerId]) return;
+    pc.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var ids = Object.keys(pc.pointers), k = pcViewScale();
+    if(ids.length >= 2 && pc.pinch){
+      var a = pc.pointers[ids[0]], b = pc.pointers[ids[1]];
+      var dist = Math.hypot(a.x-b.x, a.y-b.y);
+      var r = stage.getBoundingClientRect();
+      var cx = ((a.x+b.x)/2 - r.left)*k - pcV()/2, cy = ((a.y+b.y)/2 - r.top)*k - pcV()/2;
+      pcSetZoom(pc.pinch.zoom * dist / pc.pinch.dist, cx, cy);
+    }else if(ids.length === 1 && pc.drag){
+      pc.ox = pc.drag.ox + (e.clientX - pc.drag.x)*k;
+      pc.oy = pc.drag.oy + (e.clientY - pc.drag.y)*k;
+      pcClamp(); pcDraw();
+    }
+  });
+  function endPointer(e){ delete pc.pointers[e.pointerId]; pcResetGesture(); }
+  stage.addEventListener("pointerup", endPointer);
+  stage.addEventListener("pointercancel", endPointer);
+  stage.addEventListener("wheel", e=>{
+    if(!pc.src) return;
+    e.preventDefault();
+    var r = stage.getBoundingClientRect(), k = pcViewScale();
+    pcSetZoom(pc.zoom * (e.deltaY < 0 ? 1.08 : 1/1.08), (e.clientX - r.left)*k - pcV()/2, (e.clientY - r.top)*k - pcV()/2);
+  }, { passive: false });
+}
+function pcResetGesture(){
+  var ids = Object.keys(pc.pointers), stage = $("#pc-stage");
+  pc.drag = null; pc.pinch = null;
+  if(ids.length === 1){ var p = pc.pointers[ids[0]]; pc.drag = { x: p.x, y: p.y, ox: pc.ox, oy: pc.oy }; }
+  else if(ids.length >= 2){ var a = pc.pointers[ids[0]], b = pc.pointers[ids[1]]; pc.pinch = { dist: Math.max(10, Math.hypot(a.x-b.x, a.y-b.y)), zoom: pc.zoom }; }
+  stage.classList.toggle("dragging", ids.length > 0);
+}
+// interne Zeichenfläche (Canvas-Pixel) und Umrechnung Bildschirm → Canvas
+function pcV(){ return $("#pc-canvas").width || 560; }
+function pcViewScale(){ var r = $("#pc-stage").getBoundingClientRect(); return r.width ? pcV()/r.width : 1; }
+function pcDims(){ var w = pc.src.width, h = pc.src.height; return (pc.rot % 180) ? { w: h, h: w } : { w: w, h: h }; }
+function pcBaseScale(V){ var d = pcDims(); return Math.max(V/d.w, V/d.h); }
+function pcClamp(){
+  if(!pc.src) return;
+  var V = pcV(), d = pcDims(), s = pcBaseScale(V)*pc.zoom;
+  var mx = Math.max(0, (d.w*s - V)/2), my = Math.max(0, (d.h*s - V)/2);
+  pc.ox = Math.max(-mx, Math.min(mx, pc.ox));
+  pc.oy = Math.max(-my, Math.min(my, pc.oy));
+}
+function pcSetZoom(z, cx, cy){
+  if(!pc.src) return;
+  z = Math.max(1, Math.min(4, z));
+  var f = z / pc.zoom;
+  // Punkt unter Finger/Maus bleibt beim Zoomen an derselben Stelle
+  pc.ox = cx - (cx - pc.ox)*f; pc.oy = cy - (cy - pc.oy)*f;
+  pc.zoom = z; $("#pc-zoom").value = z;
+  pcClamp(); pcDraw();
+}
+function pcRender(ctx, V){
+  ctx.fillStyle = "#1d2327"; ctx.fillRect(0, 0, V, V);
+  if(!pc.src) return;
+  var Vp = pcV(), k = V / Vp, s = pcBaseScale(Vp)*pc.zoom*k;
+  ctx.save();
+  ctx.translate(V/2 + pc.ox*k, V/2 + pc.oy*k);
+  ctx.rotate(pc.rot * Math.PI/180);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(pc.src, -pc.src.width*s/2, -pc.src.height*s/2, pc.src.width*s, pc.src.height*s);
+  ctx.restore();
+}
+function pcDraw(){
+  var c = $("#pc-canvas");
+  pcRender(c.getContext("2d"), c.width);
+  $("#pc-empty").style.display = pc.src ? "none" : "flex";
+  $("#pc-save").disabled = !pc.src;
+}
+// Bild laden; grosse Handyfotos vorab auf max. 1600 px verkleinern (flüssiges Verschieben)
+function pcLoadSource(url, isObjectUrl){
+  var img = new Image();
+  img.onload = function(){
+    var max = 1600, sc = Math.min(1, max / Math.max(img.width, img.height));
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.width*sc)); c.height = Math.max(1, Math.round(img.height*sc));
+    var cx = c.getContext("2d"); cx.imageSmoothingQuality = "high";
+    cx.drawImage(img, 0, 0, c.width, c.height);
+    if(isObjectUrl) URL.revokeObjectURL(url);
+    pc.src = c; pc.rot = 0; pc.zoom = 1; pc.ox = 0; pc.oy = 0;
+    $("#pc-zoom").value = 1;
+    pcDraw();
+  };
+  img.onerror = function(){ if(isObjectUrl) URL.revokeObjectURL(url); toast("Bild konnte nicht geladen werden."); };
+  img.src = url;
+}
+function openPhotoCropper(staffId){
+  if(!state.isAdmin) return;
+  pcEnsureModal();
+  var emp = state.staff.find(x=>x.id===staffId);
+  pc.staffId = staffId; pc.src = null; pc.pointers = {}; pc.drag = null; pc.pinch = null;
+  pc.hadPhoto = !!(emp && emp.photoUrl);
+  $("#pc-title").textContent = "Profilfoto" + (emp ? " – " + emp.name : "");
+  $("#pc-remove").style.display = pc.hadPhoto ? "" : "none";
+  var c = $("#pc-canvas"), dpr = Math.min(2, window.devicePixelRatio || 1);
+  $("#photo-crop-backdrop").classList.add("open");
+  var cssW = $("#pc-stage").getBoundingClientRect().width || 280;
+  c.width = Math.round(cssW*dpr); c.height = c.width;
+  pcDraw();
+  if(pc.hadPhoto) pcLoadSource(emp.photoUrl, false);
+}
+function pcClose(){
+  var bd = $("#photo-crop-backdrop"); if(bd) bd.classList.remove("open");
+  pc.staffId = null; pc.src = null; pc.pointers = {};
+}
+async function pcSave(){
+  if(!pc.src || !pc.staffId) return;
+  var out = document.createElement("canvas");
+  out.width = PHOTO_OUT_SIZE; out.height = PHOTO_OUT_SIZE;
+  pcRender(out.getContext("2d"), PHOTO_OUT_SIZE);
+  var dataUrl = out.toDataURL("image/jpeg", 0.85);
+  var btn = $("#pc-save"); btn.disabled = true;
+  try{
+    await updateDoc(doc(db, STAFF_COLLECTION, pc.staffId), { photoUrl: dataUrl });
+    toast("Foto gespeichert."); pcClose();
+  }catch(err){ console.error(err); toast("Foto konnte nicht gespeichert werden: " + (err.code || err.message)); }
+  finally{ btn.disabled = false; }
 }
 document.addEventListener("click", e=>{
   var avatar = e.target.closest(".staff-avatar[data-staff-id]");
-  if(avatar && avatar.dataset.staffId) triggerStaffPhotoUpload(avatar.dataset.staffId);
+  if(avatar && avatar.dataset.staffId && state.isAdmin) openPhotoCropper(avatar.dataset.staffId);
 });
 
 function getWeekDays(refISO){
