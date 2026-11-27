@@ -319,6 +319,7 @@
   .tag.tag-reparaturen{background:#f4e9d3;color:#8e6b1f;}
   .tag.status-fabrikation{background:var(--accent-dim);color:#1c3b52;}
   .tag.status-abgeschlossen{background:#e3f2e9;color:#1e7d4a;}
+  .tag.status-montage{background:#fdebd0;color:#8a5200;}
   .tag.status-fakturiert{background:#eee4f7;color:#6a3fa0;}
   .tag.tag-montage{background:#efe6f5;color:#7b4fa0;font-weight:700;}
   .tag.tag-werkstatt{background:#e3ebf3;color:var(--accent);font-weight:700;}
@@ -1675,8 +1676,10 @@
       <select id="table-filter-abt" title="Abteilung"></select>
       <select id="table-filter-status" title="Status">
         <option value="alle">Status: alle</option>
-        <option value="offen">In Fabrikation</option>
-        <option value="abgeschlossen">Abgeschlossen</option>
+        <option value="offen">Offen (Werkstatt + Montage)</option>
+        <option value="werkstatt">Werkstatt</option>
+        <option value="montage">Montage</option>
+        <option value="abgeschlossen">Fertig</option>
       </select>
       <select id="table-filter-material" title="Material">
         <option value="alle">Material: alle</option>
@@ -2435,7 +2438,8 @@
           <select id="f-workshop"><option value="stahl">Stahl</option><option value="aluminium">Aluminium</option><option value="reparaturen">Reparaturen</option></select>
         </div>
         <div class="field" style="justify-content:flex-end;">
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:0;"><input type="checkbox" id="f-abgeschlossen" style="width:auto;"> Abgeschlossen</label>
+          <label for="f-status">Status</label>
+          <select id="f-status"><option value="werkstatt">Werkstatt</option><option value="montage">Montage</option><option value="fertig">Fertig</option></select>
         </div>
       </div>
       <div class="field-row legacy-hidden">
@@ -3334,7 +3338,8 @@ function renderHeader(){
   if(subEl) subEl.textContent = info[1];
 }
 function workshopLabel(w){ return abtLabel(w); }
-function statusLabel(completed){ return completed ? "Abgeschlossen" : "In Fabrikation"; }
+function orderStatus(o){ return (o && o.status) ? o.status : ((o && o.completed) ? "fertig" : "werkstatt"); }
+function statusLabel(st){ return st==="fertig" ? "Fertig" : (st==="montage" ? "Montage" : "Werkstatt"); }
 function fmtChf(n){ var v = typeof n==="number" ? n : parseFloat(n)||0; return v.toLocaleString("de-CH",{minimumFractionDigits:2,maximumFractionDigits:2}) + " Fr."; }
 function kundeName(kundeId, fallback){ var k = state.kunden.find(x=>x.id===kundeId); return k ? k.firma : (fallback||""); }
 
@@ -3363,8 +3368,10 @@ function renderTable(){
   abtSel.value = state.filter;
   $("#table-filter-status").value = state.tableStatus || "alle";
   $("#table-filter-material").value = state.tableMaterial || "alle";
-  if(state.tableStatus === "offen") rows = rows.filter(o=>!o.completed);
-  if(state.tableStatus === "abgeschlossen") rows = rows.filter(o=>!!o.completed);
+  if(state.tableStatus === "offen") rows = rows.filter(o=>orderStatus(o)!=="fertig");
+  if(state.tableStatus === "werkstatt") rows = rows.filter(o=>orderStatus(o)==="werkstatt");
+  if(state.tableStatus === "montage") rows = rows.filter(o=>orderStatus(o)==="montage");
+  if(state.tableStatus === "abgeschlossen") rows = rows.filter(o=>orderStatus(o)==="fertig");
   if(state.tableMaterial === "fehlt" || state.tableMaterial === "ueberfaellig"){
     var heuteIso = todayISO();
     rows = rows.filter(o=>{
@@ -3396,7 +3403,7 @@ function renderTable(){
     html += '<td data-label="Objekt / Kunde"><div class="ov-customer">' + (o.intern?'<span class="tag" style="background:#eef;color:#447;margin-right:5px;">Intern</span>':'') + escapeHtml(o.description || kundeName(o.kundeId, o.customer)) + '</div>' + (o.description?'<div class="ov-desc">' + escapeHtml(kundeName(o.kundeId, o.customer)) + '</div>':'') + '</td>';
     html += '<td data-label="Abteilung"><span class="tag"' + abtTagStyle(o.workshop) + '>' + escapeHtml(abtLabel(o.workshop)) + '</span></td>';
     html += '<td data-label="Fehlendes Material">' + fehlendesMaterialHtml(o) + '</td>';
-    html += '<td data-label="Status"><span class="tag ' + (o.completed?"status-abgeschlossen":"status-fabrikation") + '">' + statusLabel(o.completed) + '</span></td>';
+    html += '<td data-label="Status"><span class="tag ' + (orderStatus(o)==="fertig"?"status-abgeschlossen":(orderStatus(o)==="montage"?"status-montage":"status-fabrikation")) + '">' + statusLabel(orderStatus(o)) + '</span></td>';
     html += '</tr>';
   });
   tbody.innerHTML = html;
@@ -7666,7 +7673,7 @@ function openModal(order, prefillDate){
   $("#f-workshop").innerHTML = wsKeys.map(a=>'<option value="' + escapeHtml(a.key) + '">' + escapeHtml(a.name) + '</option>').join("");
   $("#f-workshop").value = order && order.workshop ? order.workshop : wsKeys[0].key;
   if(!$("#f-workshop").value) $("#f-workshop").selectedIndex = 0;
-  $("#f-abgeschlossen").checked = order ? !!order.completed : false;
+  $("#f-status").value = order ? orderStatus(order) : "werkstatt";
   $("#f-auftragswert").value = (order && order.auftragswert) ? order.auftragswert : "";
   $("#f-materialplan").value = (order && order.materialPlan) ? order.materialPlan : "";
   $("#voka-import-status").textContent = "";
@@ -7791,13 +7798,15 @@ form.addEventListener("submit", async e=>{
     }
     // Interne Aufträge bleiben dauerhaft offen, damit sie in der Stempeluhr/Personalplanung
     // immer als wählbarer Auftrag verfügbar bleiben.
-    var completed = intern ? false : $("#f-abgeschlossen").checked;
+    var statusVal = intern ? "werkstatt" : $("#f-status").value;
+    var completed = statusVal === "fertig";
     var payload = {
       orderNumber: orderNumber, kundeId: kundeId, customer: customer, intern: intern,
       description: $("#f-description").value.trim(),
       bkp: $("#f-bkp").value.trim(),
       workshop: $("#f-workshop").value,
       completed: completed,
+      status: statusVal,
       auftragswert: parseFloat($("#f-auftragswert").value) || 0,
       materialPlan: parseFloat($("#f-materialplan").value) || 0,
       kostenarten: kostenarten,
