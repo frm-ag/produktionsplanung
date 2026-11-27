@@ -3238,7 +3238,7 @@ function pcEnsureModal(){
     '<h3 id="pc-title">Profilfoto</h3>' +
     '<div class="pc-hint">Bild mit Maus oder Finger verschieben, mit Regler, Mausrad oder zwei Fingern zoomen.</div>' +
     '<div class="pc-stage" id="pc-stage"><canvas id="pc-canvas"></canvas><div class="pc-mask"></div><div class="pc-empty" id="pc-empty">Noch kein Foto — bitte «Neues Foto wählen».</div></div>' +
-    '<div class="pc-tools"><span style="font-size:13px;">−</span><input type="range" id="pc-zoom" min="1" max="4" step="0.01" value="1"><span style="font-size:13px;">+</span>' +
+    '<div class="pc-tools"><span style="font-size:13px;">−</span><input type="range" id="pc-zoom" min="0.3" max="4" step="0.01" value="1"><span style="font-size:13px;">+</span>' +
     '<button type="button" class="btn" id="pc-rotate" title="90° drehen">↻</button></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn" id="pc-pick">🖼 Neues Foto wählen</button>' +
     '<button type="button" class="btn danger" id="pc-remove">Foto entfernen</button></div>' +
@@ -3254,7 +3254,7 @@ function pcEnsureModal(){
     if(!f) return;
     pcLoadSource(URL.createObjectURL(f), true);
   });
-  $("#pc-rotate").addEventListener("click", ()=>{ if(!pc.src) return; pc.rot = (pc.rot + 90) % 360; pc.ox = 0; pc.oy = 0; pcClamp(); pcDraw(); });
+  $("#pc-rotate").addEventListener("click", ()=>{ if(!pc.src) return; pc.rot = (pc.rot + 90) % 360; pc.ox = 0; pc.oy = 0; pcUpdateZoomRange(); pc.zoom = Math.max(pc.zoom, pcMinZoom()); $("#pc-zoom").value = pc.zoom; pcClamp(); pcDraw(); });
   $("#pc-zoom").addEventListener("input", e=>{ pcSetZoom(parseFloat(e.target.value), 0, 0); });
   $("#pc-remove").addEventListener("click", async ()=>{
     if(!pc.staffId) return;
@@ -3315,13 +3315,20 @@ function pcBaseScale(){ var d = pcDims(), f = pcFrame(); return Math.max(f.w/d.w
 function pcClamp(){
   if(!pc.src) return;
   var f = pcFrame(), d = pcDims(), s = pcBaseScale()*pc.zoom;
-  var mx = Math.max(0, (d.w*s - f.w)/2), my = Math.max(0, (d.h*s - f.h)/2);
+  var mx = Math.abs(d.w*s - f.w)/2, my = Math.abs(d.h*s - f.h)/2;
   pc.ox = Math.max(-mx, Math.min(mx, pc.ox));
   pc.oy = Math.max(-my, Math.min(my, pc.oy));
 }
+// Zoom 1 = Rahmen ganz gefüllt; kleiner = Bild verkleinert (weisser Rand), bis ganzes Bild mit Luft sichtbar
+function pcMinZoom(){
+  if(!pc.src) return 1;
+  var d = pcDims(), f = pcFrame(), contain = Math.min(f.w/d.w, f.h/d.h);
+  return Math.min(1, 0.6 * contain / pcBaseScale());
+}
+function pcUpdateZoomRange(){ $("#pc-zoom").min = pcMinZoom().toFixed(3); }
 function pcSetZoom(z, cx, cy){
   if(!pc.src) return;
-  z = Math.max(1, Math.min(4, z));
+  z = Math.max(pcMinZoom(), Math.min(4, z));
   var f = z / pc.zoom;
   // Punkt unter Finger/Maus bleibt beim Zoomen an derselben Stelle
   pc.ox = cx - (cx - pc.ox)*f; pc.oy = cy - (cy - pc.oy)*f;
@@ -3330,7 +3337,7 @@ function pcSetZoom(z, cx, cy){
 }
 // W×H = Zielfläche; frameOnly: nur der Rahmen-Ausschnitt (Export), sonst ganze Bühne (Vorschau)
 function pcRender(ctx, W, H, frameOnly){
-  ctx.fillStyle = "#1d2327"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
   if(!pc.src) return;
   var k = W / (frameOnly ? pcFrame().w : pcW()), s = pcBaseScale()*pc.zoom*k;
   ctx.save();
@@ -3357,6 +3364,7 @@ function pcLoadSource(url, isObjectUrl){
     cx.drawImage(img, 0, 0, c.width, c.height);
     if(isObjectUrl) URL.revokeObjectURL(url);
     pc.src = c; pc.rot = 0; pc.zoom = 1; pc.ox = 0; pc.oy = 0;
+    pcUpdateZoomRange();
     $("#pc-zoom").value = 1;
     pcDraw();
   };
