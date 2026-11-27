@@ -568,20 +568,20 @@
   .staff-row-name .staff-drag-handle{color:#c3ccd1;font-size:12px;flex:none;}
   .staff-row-name .staff-remove{border:none;background:transparent;color:#c3ccd1;cursor:pointer;font-size:13px;flex:none;}
   .staff-row-name .staff-remove:hover{color:var(--danger);}
-  .staff-avatar{border-radius:50%;object-fit:cover;flex:none;background:var(--panel-alt);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer;}
+  .staff-avatar{border-radius:4px;object-fit:cover;flex:none;background:var(--panel-alt);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer;}
   .staff-avatar{cursor:default;}
   .staff-avatar.can-edit{cursor:pointer;}
   #photo-crop-backdrop{z-index:130;}
-  .pc-stage{position:relative;width:280px;height:280px;max-width:72vw;max-height:72vw;margin:4px auto 12px;border-radius:10px;overflow:hidden;background:#1d2327;touch-action:none;cursor:grab;user-select:none;}
+  .pc-stage{position:relative;width:240px;aspect-ratio:3/4;max-width:62vw;margin:4px auto 12px;border-radius:10px;overflow:hidden;background:#1d2327;touch-action:none;cursor:grab;user-select:none;}
   .pc-stage.dragging{cursor:grabbing;}
   .pc-stage canvas{display:block;width:100%;height:100%;}
-  .pc-mask{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(15,20,23,.55);border:2px solid rgba(255,255,255,.85);pointer-events:none;}
+  .pc-mask{position:absolute;left:14px;right:14px;top:50%;transform:translateY(-50%);aspect-ratio:3/4;border-radius:6px;box-shadow:0 0 0 999px rgba(15,20,23,.55);border:2px solid rgba(255,255,255,.85);pointer-events:none;}
   .pc-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cfd8de;font-size:13px;text-align:center;padding:20px;pointer-events:none;}
   .pc-tools{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
   .pc-tools input[type=range]{flex:1;}
   .pc-hint{font-size:11.5px;color:var(--text-muted);margin-bottom:6px;}
-  .staff-avatar-sm{width:22px;height:22px;font-size:9.5px;}
-  .staff-avatar-lg{width:70px;height:70px;font-size:22px;border:3px solid var(--accent);}
+  .staff-avatar-sm{width:18px;height:24px;font-size:8.5px;border-radius:3px;}
+  .staff-avatar-lg{width:60px;height:80px;font-size:20px;border:3px solid var(--accent);border-radius:8px;}
   .staff-cell{border-left:1px solid var(--border);padding:6px;min-height:64px;display:flex;flex-direction:column;gap:5px;}
   .staff-cell-add{border:1px dashed var(--border);background:transparent;color:#c3ccd1;border-radius:5px;font-size:13px;padding:3px;cursor:pointer;line-height:1;}
   .staff-cell-add:hover{color:var(--accent);border-color:var(--accent);}
@@ -3228,7 +3228,7 @@ function compressImageFile(file, maxSize){
   });
 }
 /* ---------- Profilfoto zuschneiden (nur Admins): verschieben, zoomen, drehen ---------- */
-var PHOTO_OUT_SIZE = 400;
+var PHOTO_OUT_W = 450, PHOTO_OUT_H = 600; // Hochformat 3:4
 var pc = { staffId: null, src: null, rot: 0, zoom: 1, ox: 0, oy: 0, hadPhoto: false, pointers: {}, pinch: null, drag: null };
 function pcEnsureModal(){
   if($("#photo-crop-backdrop")) return;
@@ -3278,7 +3278,7 @@ function pcEnsureModal(){
       var a = pc.pointers[ids[0]], b = pc.pointers[ids[1]];
       var dist = Math.hypot(a.x-b.x, a.y-b.y);
       var r = stage.getBoundingClientRect();
-      var cx = ((a.x+b.x)/2 - r.left)*k - pcV()/2, cy = ((a.y+b.y)/2 - r.top)*k - pcV()/2;
+      var cx = ((a.x+b.x)/2 - r.left)*k - pcW()/2, cy = ((a.y+b.y)/2 - r.top)*k - pcH()/2;
       pcSetZoom(pc.pinch.zoom * dist / pc.pinch.dist, cx, cy);
     }else if(ids.length === 1 && pc.drag){
       pc.ox = pc.drag.ox + (e.clientX - pc.drag.x)*k;
@@ -3293,7 +3293,7 @@ function pcEnsureModal(){
     if(!pc.src) return;
     e.preventDefault();
     var r = stage.getBoundingClientRect(), k = pcViewScale();
-    pcSetZoom(pc.zoom * (e.deltaY < 0 ? 1.08 : 1/1.08), (e.clientX - r.left)*k - pcV()/2, (e.clientY - r.top)*k - pcV()/2);
+    pcSetZoom(pc.zoom * (e.deltaY < 0 ? 1.08 : 1/1.08), (e.clientX - r.left)*k - pcW()/2, (e.clientY - r.top)*k - pcH()/2);
   }, { passive: false });
 }
 function pcResetGesture(){
@@ -3304,14 +3304,18 @@ function pcResetGesture(){
   stage.classList.toggle("dragging", ids.length > 0);
 }
 // interne Zeichenfläche (Canvas-Pixel) und Umrechnung Bildschirm → Canvas
-function pcV(){ return $("#pc-canvas").width || 560; }
-function pcViewScale(){ var r = $("#pc-stage").getBoundingClientRect(); return r.width ? pcV()/r.width : 1; }
+function pcW(){ return $("#pc-canvas").width || 480; }
+function pcH(){ return $("#pc-canvas").height || 640; }
+// Rand zwischen Bühne und sichtbarem Rahmen (.pc-mask inset 14px) in Canvas-Pixeln
+function pcInset(){ return 14 * pcViewScale(); }
+function pcViewScale(){ var r = $("#pc-stage").getBoundingClientRect(); return r.width ? pcW()/r.width : 1; }
 function pcDims(){ var w = pc.src.width, h = pc.src.height; return (pc.rot % 180) ? { w: h, h: w } : { w: w, h: h }; }
-function pcBaseScale(V){ var d = pcDims(); return Math.max(V/d.w, V/d.h); }
+function pcFrame(){ var w = pcW() - 2*pcInset(); return { w: w, h: w*4/3 }; } // Rahmen exakt 3:4
+function pcBaseScale(){ var d = pcDims(), f = pcFrame(); return Math.max(f.w/d.w, f.h/d.h); }
 function pcClamp(){
   if(!pc.src) return;
-  var V = pcV(), d = pcDims(), s = pcBaseScale(V)*pc.zoom;
-  var mx = Math.max(0, (d.w*s - V)/2), my = Math.max(0, (d.h*s - V)/2);
+  var f = pcFrame(), d = pcDims(), s = pcBaseScale()*pc.zoom;
+  var mx = Math.max(0, (d.w*s - f.w)/2), my = Math.max(0, (d.h*s - f.h)/2);
   pc.ox = Math.max(-mx, Math.min(mx, pc.ox));
   pc.oy = Math.max(-my, Math.min(my, pc.oy));
 }
@@ -3324,12 +3328,13 @@ function pcSetZoom(z, cx, cy){
   pc.zoom = z; $("#pc-zoom").value = z;
   pcClamp(); pcDraw();
 }
-function pcRender(ctx, V){
-  ctx.fillStyle = "#1d2327"; ctx.fillRect(0, 0, V, V);
+// W×H = Zielfläche; frameOnly: nur der Rahmen-Ausschnitt (Export), sonst ganze Bühne (Vorschau)
+function pcRender(ctx, W, H, frameOnly){
+  ctx.fillStyle = "#1d2327"; ctx.fillRect(0, 0, W, H);
   if(!pc.src) return;
-  var Vp = pcV(), k = V / Vp, s = pcBaseScale(Vp)*pc.zoom*k;
+  var k = W / (frameOnly ? pcFrame().w : pcW()), s = pcBaseScale()*pc.zoom*k;
   ctx.save();
-  ctx.translate(V/2 + pc.ox*k, V/2 + pc.oy*k);
+  ctx.translate(W/2 + pc.ox*k, H/2 + pc.oy*k);
   ctx.rotate(pc.rot * Math.PI/180);
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(pc.src, -pc.src.width*s/2, -pc.src.height*s/2, pc.src.width*s, pc.src.height*s);
@@ -3337,7 +3342,7 @@ function pcRender(ctx, V){
 }
 function pcDraw(){
   var c = $("#pc-canvas");
-  pcRender(c.getContext("2d"), c.width);
+  pcRender(c.getContext("2d"), c.width, c.height, false);
   $("#pc-empty").style.display = pc.src ? "none" : "flex";
   $("#pc-save").disabled = !pc.src;
 }
@@ -3368,8 +3373,8 @@ function openPhotoCropper(staffId){
   $("#pc-remove").style.display = pc.hadPhoto ? "" : "none";
   var c = $("#pc-canvas"), dpr = Math.min(2, window.devicePixelRatio || 1);
   $("#photo-crop-backdrop").classList.add("open");
-  var cssW = $("#pc-stage").getBoundingClientRect().width || 280;
-  c.width = Math.round(cssW*dpr); c.height = c.width;
+  var cssW = $("#pc-stage").getBoundingClientRect().width || 240;
+  c.width = Math.round(cssW*dpr); c.height = Math.round(c.width*4/3);
   pcDraw();
   if(pc.hadPhoto) pcLoadSource(emp.photoUrl, false);
 }
@@ -3380,8 +3385,8 @@ function pcClose(){
 async function pcSave(){
   if(!pc.src || !pc.staffId) return;
   var out = document.createElement("canvas");
-  out.width = PHOTO_OUT_SIZE; out.height = PHOTO_OUT_SIZE;
-  pcRender(out.getContext("2d"), PHOTO_OUT_SIZE);
+  out.width = PHOTO_OUT_W; out.height = PHOTO_OUT_H;
+  pcRender(out.getContext("2d"), PHOTO_OUT_W, PHOTO_OUT_H, true);
   var dataUrl = out.toDataURL("image/jpeg", 0.85);
   var btn = $("#pc-save"); btn.disabled = true;
   try{
